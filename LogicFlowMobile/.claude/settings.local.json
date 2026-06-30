@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node -v)",
+      "PowerShell(npm -v)",
+      "Bash(npx expo *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/react-native-reanimated/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./node_modules/react-native-reanimated/package.json'\\).peerDependencies||{}, null, 2\\)\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/babel-plugin-module-resolver/package.json'\\).version\\)\")",
+      "Bash(npm install *)",
+      "Bash(npx expo-doctor *)",
+      "Bash(timeout 60 npx expo start --no-dev --port 8099)",
+      "Bash(node -e ' *)",
+      "Bash(mkdir -p \"/c/Users/mateo/AppData/Local/Temp/claude/D--Documentos-UCE-Sexto-semestre-Desarollo-de-software-educativo-LogicFlow-LogicFlowMobile/69194689-34f9-41e5-8b51-e02e187b3fd7/scratchpad/imgwork\")",
+      "Read(//c/Users/mateo/AppData/Local/Temp/claude/D--Documentos-UCE-Sexto-semestre-Desarollo-de-software-educativo-LogicFlow-LogicFlowMobile/69194689-34f9-41e5-8b51-e02e187b3fd7/scratchpad/**)",
+      "Bash(npm init *)",
+      "Read(//c/Users/mateo/AppData/Local/Temp/claude/D--Documentos-UCE-Sexto-semestre-Desarollo-de-software-educativo-LogicFlow-LogicFlowMobile/69194689-34f9-41e5-8b51-e02e187b3fd7/scratchpad/imgwork/**)",
+      "Bash(node detect.js \"D:/Documentos/UCE/Sexto semestre/Desarollo de software educativo/LogicFlow/LogicFlowMobile/assets/icon.png\")",
+      "Bash(node process.js)"
+    ]
+  }
+}

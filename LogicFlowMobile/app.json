@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "LogicFlow",
+    "slug": "logicflow-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.logicflow.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "LogicFlow necesita la cámara para el modo AR de detección de componentes.",
+        "NSPhotoLibraryUsageDescription": "LogicFlow necesita acceso a la galería para guardar capturas del ensamblaje."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#fbf9f4"
+      },
+      "package": "com.logicflow.mobile",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LogicFlow necesita la cámara para el escáner AR de componentes."
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": []
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#fbf9f4"
+        }
+      ]
+    ],
+    "scheme": "logicflow",
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

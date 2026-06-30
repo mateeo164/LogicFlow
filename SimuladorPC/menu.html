@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Tu panel de aprendizaje en LogicFlow: progreso, nivel, insignias y herramientas.">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>Mi Panel — LogicFlow</title>
+    <link rel="stylesheet" href="css/estilos.css">
+    <link rel="stylesheet" href="css/logicflow-premium.css">
+    <link rel="stylesheet" href="css/dashboard-v2.css">
+    <script>
+        (function() {
+            var token = localStorage.getItem('logicflow_access_token');
+            var refresh = localStorage.getItem('logicflow_refresh_token');
+            if (!token && !refresh) { window.location.replace('login.html'); }
+        })();
+</script>
+</head>
+<body class="dashboard-body">
+
+    <header class="lf-header dashboard-header">
+        <a href="index.html" class="logo-area" style="text-decoration:none;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f76d8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            <span class="logo-text">LogicFlow</span>
+        </a>
+        <div class="dashboard-header-actions">
+            <div class="header-user-pill">
+                <div class="avatar avatar--sm" id="header-avatar">??</div>
+                <span id="header-nombre" class="header-user-name">Cargando…</span>
+            </div>
+            <button type="button" class="lf-theme-toggle" id="theme-toggle" aria-label="Cambiar tema" title="Cambiar tema">
+                <svg class="lf-theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <svg class="lf-theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            </button>
+            <button type="button" id="btn-cerrar-sesion" class="btn btn-secondary btn-sm">Cerrar sesión</button>
+        </div>
+    </header>
+
+    <main class="panel-main">
+
+        <section class="perfil-card">
+            <div class="perfil-card__left">
+                <div class="avatar avatar--xl" id="perfil-avatar">??</div>
+                <div class="perfil-info">
+                    <h1 class="perfil-nombre" id="perfil-nombre">Cargando…</h1>
+                    <div class="perfil-meta">
+                        <span class="role-tag" id="perfil-rol">Estudiante</span>
+                        <span class="perfil-email" id="perfil-email"></span>
+                    </div>
+                    <span class="perfil-institucion" id="perfil-institucion"></span>
+                </div>
+            </div>
+            <div class="perfil-card__actions">
+                <button type="button" id="btn-editar-perfil" class="btn btn-secondary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Editar perfil
+                </button>
+                <a href="juego.html" class="btn btn-primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Ir al laboratorio 3D
+                </a>
+            </div>
+        </section>
+
+        <div class="stats-strip">
+            <div class="stats-strip__item">
+                <strong id="stat-componentes">—</strong>
+                <span>Componentes instalados</span>
+            </div>
+            <div class="stats-strip__item">
+                <strong id="stat-simulaciones">—</strong>
+                <span>Simulaciones completadas</span>
+            </div>
+            <div class="stats-strip__item">
+                <strong id="stat-tiempo">—</strong>
+                <span>Tiempo en laboratorio</span>
+            </div>
+            <div class="stats-strip__item">
+                <strong id="stat-porcentaje">—</strong>
+                <span>Progreso general</span>
+            </div>
+        </div>
+
+        <div class="panel-column" style="grid-column: 1;">
+
+            <section class="progreso-card">
+                <div class="progreso-card__header">
+                    <div>
+                        <h2>Avance en el laboratorio 3D</h2>
+                        <p id="progreso-subtitulo">Cargando progreso…</p>
+                    </div>
+                    <span class="pct-badge" id="pct-badge">0%</span>
+                </div>
+
+                <div class="progreso-barra-bg">
+                    <div class="progreso-barra-fill" id="progreso-fill" style="width:0%"></div>
+                </div>
+
+                <ul class="comp-check-list" id="comp-check-list">
+
+                </ul>
+
+                <div class="progreso-footer">
+                    <span>Última actividad: <strong id="ultima-actividad">—</strong></span>
+                </div>
+            </section>
+
+            <section class="progreso-card">
+                <div class="progreso-card__header">
+                    <div>
+                        <h2>Estadísticas de desempeño</h2>
+                        <p id="desempeno-subtitulo">Registro continuo de tus aciertos, errores y demoras durante el ensamblaje.</p>
+                    </div>
+                </div>
+
+                <div class="stats-strip" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+                    <div class="stats-strip__item">
+                        <strong id="stat-aciertos">—</strong>
+                        <span>Ensamblajes correctos</span>
+                    </div>
+                    <div class="stats-strip__item">
+                        <strong id="stat-errores">—</strong>
+                        <span>Errores de pieza</span>
+                    </div>
+                    <div class="stats-strip__item">
+                        <strong id="stat-demoras">—</strong>
+                        <span>Demoras (&gt; 45 s)</span>
+                    </div>
+                    <div class="stats-strip__item">
+                        <strong id="stat-precision">—</strong>
+                        <span>Precisión</span>
+                    </div>
+                </div>
+
+                <div class="progreso-footer">
+                    <span>Tiempo promedio por componente: <strong id="stat-tiempo-prom">—</strong></span>
+                </div>
+
+                <ul class="comp-check-list" id="eventos-recientes" style="margin-top: 20px;">
+
+                </ul>
+            </section>
+        </div>
+
+        <div class="panel-column" style="grid-column: 2;">
+
+            <section class="level-widget">
+                <div class="level-widget__header">
+                    <h2 class="level-widget__title">Tu nivel</h2>
+                    <span class="level-badge" id="level-badge">Novato</span>
+                </div>
+                <div class="level-progress">
+                    <div class="level-progress__bar">
+                        <div class="level-progress__fill" id="level-progress-fill" style="width:0%"></div>
+                    </div>
+                    <div class="level-progress__meta">
+                        <span id="level-current-xp">0 XP</span>
+                        <span id="level-next-xp">100 XP para Aprendiz</span>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--lf-text-muted); line-height: 1.5; margin-top: 8px;">
+                    Gana XP instalando componentes y completando simulaciones. Desbloquea insignias y sube de nivel.
+                </p>
+                <div class="recent-badges" id="recent-badges"></div>
+            </section>
+
+            <section class="progreso-card">
+                <div class="progreso-card__header" style="margin-bottom: 18px;">
+                    <div>
+                        <h2>Insignias</h2>
+                        <p id="badges-subtitulo">Logros desbloqueados en tu camino.</p>
+                    </div>
+                </div>
+                <div class="badges-grid" id="badges-grid">
+
+                </div>
+            </section>
+
+            <section class="progreso-card">
+                <div class="progreso-card__header" style="margin-bottom: 18px;">
+                    <div>
+                        <h2>Herramientas educativas</h2>
+                        <p>Recursos para potenciar tu aprendizaje.</p>
+                    </div>
+                </div>
+                <div class="tools-grid">
+                    <a href="calculadora.html" class="tool-card">
+                        <div class="tool-card__icon">⚡</div>
+                        <span class="tool-card__title">Calculadora PSU</span>
+                        <span class="tool-card__desc">Estima el consumo de tu build.</span>
+                    </a>
+                    <a href="glosario.html" class="tool-card">
+                        <div class="tool-card__icon">📚</div>
+                        <span class="tool-card__title">Glosario</span>
+                        <span class="tool-card__desc">Términos clave de hardware.</span>
+                    </a>
+                </div>
+            </section>
+
+            <section class="tutor-panel" id="tutor-panel" hidden>
+                <h3>👨‍🏫 Panel de tutor</h3>
+                <p>Bienvenido, docente. Desde aquí puedes orientar a tus estudiantes y revisar los recursos didácticos disponibles.</p>
+                <a href="glosario.html" class="btn btn-secondary" style="width:100%;">Ver recursos didácticos</a>
+            </section>
+        </div>
+
+    </main>
+
+    <footer class="footer-dashboard">
+        <p>Universidad Central del Ecuador · Pedagogía de las Ciencias Experimentales — Informática &copy; 2026</p>
+    </footer>
+
+    <div class="modal-overlay" id="modal-editar" aria-modal="true" role="dialog" aria-labelledby="modal-title" hidden>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-title">Editar perfil</h3>
+                <button class="modal-close" id="modal-close" aria-label="Cerrar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="modal-avatar-row">
+                <div class="avatar avatar--lg" id="modal-avatar">??</div>
+                <div>
+                    <p class="modal-avatar-hint">El avatar se genera automáticamente a partir de tu nombre.</p>
+                </div>
+            </div>
+
+            <form id="form-editar-perfil" class="auth-form" novalidate>
+                <div class="input-group">
+                    <input type="text" id="edit-nombre" name="nombre" required placeholder=" " autocomplete="name">
+                    <label for="edit-nombre">Nombre completo</label>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="edit-institucion" name="institucion" placeholder=" " autocomplete="organization">
+                    <label for="edit-institucion">Institución educativa (opcional)</label>
+                </div>
+                <div id="modal-mensaje" class="auth-message" hidden></div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary" id="btn-guardar-perfil">Guardar cambios</button>
+                    <button type="button" class="btn btn-secondary" id="modal-cancel">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/theme.js"></script>
+    <script src="js/ui-effects.js"></script>
+    <script type="module" src="js/menu.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+        }
+</script>
+</body>
+</html>

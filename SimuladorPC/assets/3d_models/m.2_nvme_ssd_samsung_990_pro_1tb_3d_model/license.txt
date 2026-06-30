@@ -1,0 +1,11 @@
+Model Information:
+* title:	M.2 NVME SSD Samsung 990 Pro 1TB 3D model
+* source:	https://sketchfab.com/3d-models/m2-nvme-ssd-samsung-990-pro-1tb-3d-model-41b7bfda7eab40f8b13330913fd66fc2
+* author:	lime.ball.animations (https://sketchfab.com/lime.ball.animations.official)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "M.2 NVME SSD Samsung 990 Pro 1TB 3D model" (https://sketchfab.com/3d-models/m2-nvme-ssd-samsung-990-pro-1tb-3d-model-41b7bfda7eab40f8b13330913fd66fc2) by lime.ball.animations (https://sketchfab.com/lime.ball.animations.official) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Laboratorio 3D de LogicFlow. Ensambla componentes de PC paso a paso.">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>LogicFlow · Laboratorio Virtual de Ensamblaje</title>
+    <link rel="stylesheet" href="css/estilos.css">
+    <link rel="stylesheet" href="css/logicflow-premium.css">
+    <link rel="stylesheet" href="css/sim-v2.css">
+    <script>
+        (function() {
+            var token = localStorage.getItem('logicflow_access_token');
+            var refresh = localStorage.getItem('logicflow_refresh_token');
+            if (!token && !refresh) { window.location.replace('login.html'); }
+        })();
+</script>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+      }
+    }
+</script>
+</head>
+<body class="sim-dashboard-layout">
+
+<template id="tpl-drone">
+    <svg class="drone-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+        <line x1="22" y1="22" x2="38" y2="38" stroke="#1e3a8a" stroke-width="7" stroke-linecap="round"/>
+        <line x1="78" y1="22" x2="62" y2="38" stroke="#1e3a8a" stroke-width="7" stroke-linecap="round"/>
+        <line x1="22" y1="78" x2="38" y2="62" stroke="#1e3a8a" stroke-width="7" stroke-linecap="round"/>
+        <line x1="78" y1="78" x2="62" y2="62" stroke="#1e3a8a" stroke-width="7" stroke-linecap="round"/>
+
+        <circle cx="18" cy="18" r="12" fill="#091833" stroke="#3b82f6" stroke-width="2"/>
+        <circle cx="82" cy="18" r="12" fill="#091833" stroke="#3b82f6" stroke-width="2"/>
+        <circle cx="18" cy="82" r="12" fill="#091833" stroke="#3b82f6" stroke-width="2"/>
+        <circle cx="82" cy="82" r="12" fill="#091833" stroke="#3b82f6" stroke-width="2"/>
+
+        <g><rect x="11" y="16" width="14" height="4" rx="2" fill="rgba(0,229,255,0.9)"/>
+           <rect x="16" y="11" width="4" height="14" rx="2" fill="rgba(0,229,255,0.9)"/>
+           <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="0.22s" repeatCount="indefinite"/></g>
+        <g><rect x="75" y="16" width="14" height="4" rx="2" fill="rgba(0,229,255,0.9)"/>
+           <rect x="80" y="11" width="4" height="14" rx="2" fill="rgba(0,229,255,0.9)"/>
+           <animateTransform attributeName="transform" type="rotate" from="360 82 18" to="0 82 18" dur="0.22s" repeatCount="indefinite"/></g>
+        <g><rect x="11" y="80" width="14" height="4" rx="2" fill="rgba(0,229,255,0.9)"/>
+           <rect x="16" y="75" width="4" height="14" rx="2" fill="rgba(0,229,255,0.9)"/>
+           <animateTransform attributeName="transform" type="rotate" from="0 18 82" to="360 18 82" dur="0.20s" repeatCount="indefinite"/></g>
+        <g><rect x="75" y="80" width="14" height="4" rx="2" fill="rgba(0,229,255,0.9)"/>
+           <rect x="80" y="75" width="4" height="14" rx="2" fill="rgba(0,229,255,0.9)"/>
+           <animateTransform attributeName="transform" type="rotate" from="360 82 82" to="0 82 82" dur="0.20s" repeatCount="indefinite"/></g>
+
+        <circle cx="50" cy="50" r="20" fill="#0d2060" stroke="#3b82f6" stroke-width="2.5"/>
+        <circle cx="50" cy="50" r="10" fill="#001025"/>
+        <circle cx="50" cy="50" r="7"  fill="#0ea5e9" opacity="0.9"/>
+        <circle cx="53" cy="47" r="2.5" fill="white" opacity="0.45"/>
+        <circle cx="50" cy="50" r="3.5" fill="#0c4a8f"/>
+
+        <circle cx="50" cy="33" r="2.5" fill="#22c55e">
+            <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
+
+        <rect x="34" y="64" width="32" height="3" rx="1.5" fill="#00e5ff" opacity="0.55">
+            <animate attributeName="opacity" values="0.55;0.15;0.55" dur="2s" repeatCount="indefinite"/>
+        </rect>
+    </svg>
+</template>
+
+<div id="loading-overlay" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:linear-gradient(160deg,#0c1626,#0a1018);color:#eaf2ff;font-family:'Inter','Segoe UI',sans-serif;">
+    <div class="logo-spin" style="width:62px;height:62px;border-radius:50%;border:4px solid rgba(120,180,255,0.18);border-top-color:#3a8bff;animation:lf-spin 0.9s linear infinite;"></div>
+    <div style="text-align:center;">
+        <div style="font-size:1.35rem;font-weight:700;letter-spacing:.5px;"><span style="color:#3a8bff;">Logic</span>Flow</div>
+        <div id="loading-text" style="margin-top:6px;font-size:.95rem;color:#9fb3c8;">Preparando el laboratorio 3D…</div>
+    </div>
+    <div style="width:260px;max-width:70vw;height:8px;border-radius:99px;background:rgba(255,255,255,0.10);overflow:hidden;">
+        <div id="loading-bar-fill" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#3a8bff,#22c55e);transition:width .25s ease;"></div>
+    </div>
+    <div id="loading-count" style="font-size:.8rem;color:#6b7d92;">0 / 0 modelos</div>
+</div>
+<style>
+@keyframes lf-spin { to { transform: rotate(360deg); } }
+#loading-overlay.is-hidden { opacity:0; pointer-events:none; transition:opacity .45s ease; }
+</style>
+
+<div id="overlay-bienvenida" class="lab-overlay lab-overlay--active">
+    <div class="bienvenida-layout">
+
+        <div class="bienvenida-drone-col">
+            <div class="drone-wrapper drone-wrapper--xl" id="drone-bienvenida"></div>
+            <div class="drone-bubble drone-bubble--left" id="bubble-bienvenida">
+                ¡Hola! Soy <strong>TechBot</strong>, tu asistente de ensamblaje.<br>
+                Juntos construiremos una PC de alto rendimiento paso a paso.
+            </div>
+        </div>
+
+        <div class="bienvenida-info-col">
+            <span class="lab-eyebrow">Laboratorio Virtual · UCE 2026</span>
+            <h1 class="bienvenida-title">Ensambla tu<br>primer PC</h1>
+            <p class="bienvenida-desc">
+                Antes de cada pieza verás un video explicativo. Luego la instalarás tú mismo en el entorno 3D.
+                Al terminar, tu progreso se guarda automáticamente.
+            </p>
+
+            <div class="bienvenida-steps" id="bienvenida-steps">
+
+            </div>
+
+            <button id="btn-empezar" class="btn btn-primary bienvenida-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Comenzar ensamblaje
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<div id="overlay-video" class="lab-overlay" hidden>
+    <div class="video-layout">
+
+        <div class="video-sidebar">
+            <div class="video-step-pill" id="vf-step-pill">Componente 1 / 6</div>
+            <h2 id="vf-titulo" class="video-comp-title">Placa Base</h2>
+            <p  id="vf-subtitulo" class="video-comp-sub">El núcleo del sistema</p>
+
+            <ul id="vf-facts" class="vf-facts-list"></ul>
+
+            <div class="vf-drone-row">
+                <div class="drone-wrapper drone-wrapper--sm" id="drone-video"></div>
+                <div class="drone-bubble drone-bubble--right" id="bubble-video">
+                    Observa bien el video antes de instalar el componente.
+                </div>
+            </div>
+
+            <button id="btn-skip-video" class="btn btn-secondary btn-sm" style="margin-top:auto;">
+                Saltar video — ir al ensamble →
+            </button>
+        </div>
+
+        <div class="video-main">
+            <div id="vf-player-area" class="vf-player-area">
+
+            </div>
+            <div class="vf-footer">
+                <button id="btn-ir-3d" class="btn btn-primary btn-lg">
+                    He revisado el material — Ir al ensamble 3D →
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="overlay-final" class="lab-overlay" hidden>
+    <div class="final-layout">
+        <div class="drone-wrapper drone-wrapper--xl drone-wrapper--celebrate" id="drone-final"></div>
+        <div class="final-content">
+            <h1 class="final-title" id="final-title">¡PC ensamblada<br>con éxito!</h1>
+            <p class="final-desc" id="final-desc">Instalaste todos los componentes correctamente. ¡Excelente trabajo!</p>
+            <div id="final-stats" class="final-stats"></div>
+            <div class="final-actions" id="final-actions"></div>
+            <p id="final-aviso" class="final-desc" style="display:none;margin-top:14px;"></p>
+            <div class="final-actions" style="margin-top:6px;">
+                <a href="menu.html" class="btn btn-secondary">Ver mi progreso →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<header class="sim-header" id="sim-header">
+    <a href="index.html" class="sim-header__logo" style="text-decoration:none;color:inherit;">
+        <span class="logo-accent">Logic</span>Flow
+        <span class="badge-beta">LAB 3D</span>
+    </a>
+    <div class="sim-header__center">
+        <h1 id="mission-title" class="current-task-text">Cargando entorno virtual…</h1>
+    </div>
+    <div class="sim-header__actions">
+        <a href="menu.html" class="btn-exit-sim btn-panel-sim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Mi panel
+        </a>
+        <a href="index.html" class="btn-exit-sim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Inicio
+        </a>
+        <button type="button" class="lf-theme-toggle" id="theme-toggle" aria-label="Cambiar tema" title="Cambiar tema">
+            <svg class="lf-theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <svg class="lf-theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+    </div>
+</header>
+
+<div id="drone-float" class="drone-float" hidden>
+    <div class="drone-wrapper drone-wrapper--md" id="drone-float-svg"></div>
+    <div class="drone-float-bubble" id="drone-float-msg">
+        Selecciona un componente del cajón.
+    </div>
+</div>
+
+<div class="sim-main-container" id="sim-main" hidden>
+
+    <aside class="sim-sidebar-left">
+        <div class="panel-header">Protocolo de Ensamble</div>
+
+        <div class="progress-container">
+            <div class="progress-text">
+                <span>Progreso del sistema</span>
+                <span id="progress-label">0 / 8</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div id="progress-fill" class="progress-bar-fill" style="width:0%;"></div>
+            </div>
+            <div class="progress-text" style="margin-top:8px;">
+                <span>Tiempo de sesión</span>
+                <span id="lab-timer" style="font-variant-numeric:tabular-nums;">0s</span>
+            </div>
+        </div>
+
+        <div class="instruction-card">
+            <h3>Instrucción actual</h3>
+            <p id="instruction-p">Selecciona un componente del cajón inferior para comenzar.</p>
+        </div>
+
+        <div class="checklist-box">
+            <h4>Orden de instalación</h4>
+            <ul id="checklist-ul" class="hardware-checklist"></ul>
+        </div>
+    </aside>
+
+    <main class="sim-stage-viewport">
+        <div id="canvas-container" class="canvas-holder">
+            <canvas id="game-canvas"></canvas>
+        </div>
+
+        <div id="crosshair" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:22px;line-height:1;color:rgba(255,255,255,0.75);pointer-events:none;display:none;z-index:30;text-shadow:0 1px 4px rgba(0,0,0,0.9);font-weight:300;user-select:none;letter-spacing:0;">+</div>
+
+        <div id="walk-start" style="position:absolute;inset:0;z-index:24;display:none;align-items:center;justify-content:center;pointer-events:none;">
+            <button id="walk-start-btn" type="button" style="pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center;padding:18px 28px;border:0;border-radius:14px;background:rgba(15,23,42,0.85);color:#eaf2ff;backdrop-filter:blur(6px);box-shadow:0 10px 30px rgba(0,0,0,0.35);">
+                <span style="font-size:1.05rem;font-weight:700;">▶ Explorar el taller</span>
+                <span style="font-size:0.8rem;opacity:0.85;">Clic para caminar · <b>WASD</b> moverse · <b>Esc</b> para los menús</span>
+            </button>
+        </div>
+
+        <div id="hint-box" class="floating-hint-banner">
+            Sistema inicializado. Esperando acción.
+        </div>
+
+    </main>
+
+    <aside class="sim-sidebar-right">
+        <div class="panel-header">Telemetría de Hardware</div>
+
+        <div class="specs-card">
+            <h3>Especificaciones</h3>
+            <div id="specs-content" class="specs-content-list">
+                <p class="empty-spec-text">Selecciona una pieza para ver su hoja técnica.</p>
+            </div>
+        </div>
+
+        <div class="terminal-card">
+            <h3>Consola del sistema</h3>
+            <div id="terminal-log" class="terminal-log-flow"></div>
+        </div>
+
+        <div class="specs-card" id="walk-controls">
+            <h3>Controles de exploración</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:0.82rem;color:var(--text-700,#3a4a5e);">
+                <div style="display:flex;justify-content:space-between;align-items:center;"><span>Moverse</span><kbd style="background:#1f2b3e;color:#eaf2ff;padding:2px 8px;border-radius:5px;font-weight:600;">W A S D</kbd></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;"><span>Mirar</span><kbd style="background:#1f2b3e;color:#eaf2ff;padding:2px 8px;border-radius:5px;font-weight:600;">Mouse</kbd></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;"><span>Correr</span><kbd style="background:#1f2b3e;color:#eaf2ff;padding:2px 8px;border-radius:5px;font-weight:600;">Shift</kbd></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px;border-top:1px solid var(--border-light,#dde5f0);"><span>Agarrar / Instalar</span><kbd style="background:#0f4d2a;color:#4ade80;padding:2px 10px;border-radius:5px;font-weight:700;">E</kbd></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;"><span>Soltar componente</span><kbd style="background:#2a1f0f;color:#fbbf24;padding:2px 10px;border-radius:5px;font-weight:700;">Q</kbd></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;"><span>Liberar mouse / menús</span><kbd style="background:#1f2b3e;color:#eaf2ff;padding:2px 8px;border-radius:5px;font-weight:600;">Esc</kbd></div>
+            </div>
+        </div>
+    </aside>
+
+</div>
+
+    <script src="js/theme.js"></script>
+    <script src="js/ui-effects.js"></script>
+    <script type="module" src="js/juego.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+        }
+</script>
+</body>
+</html>

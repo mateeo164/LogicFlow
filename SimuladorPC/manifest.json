@@ -1,0 +1,26 @@
+{
+  "name": "LogicFlow — Simulador de Ensamblaje de PCs",
+  "short_name": "LogicFlow",
+  "description": "Simulador educativo interactivo para aprender a ensamblar computadoras en un laboratorio 3D.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
