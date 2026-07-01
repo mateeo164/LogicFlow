@@ -15,6 +15,7 @@ import {
 } from './supabase-config.js'
 
 const RUTA_USUARIO = 'menu.html'
+const RUTA_DOCENTE = 'docente.html'
 const RUTA_LOGIN = 'login.html'
 const RUTA_ACTUALIZAR_PASSWORD = 'actualizar-password.html'
 
@@ -218,11 +219,32 @@ export async function protegerRuta() {
     return session
 }
 
+export function rutaSegunRol(usuario) {
+    return usuario?.user_metadata?.rol === 'Tutor' ? RUTA_DOCENTE : RUTA_USUARIO
+}
+
 export function redirigirSiAutenticado() {
     const session = obtenerSesionGuardada()
     if (session?.access_token && !tokenExpirado()) {
-        window.location.href = RUTA_USUARIO
+        window.location.href = rutaSegunRol(session.user)
     }
 }
 
-export { RUTA_USUARIO, RUTA_LOGIN }
+/**
+ * Como protegerRuta(), pero además exige que el usuario tenga el rol
+ * esperado ('Estudiante' o 'Tutor'); si no coincide, lo redirige a SU
+ * propia sección en vez de dejarlo pasar.
+ */
+export async function exigirRol(rolEsperado) {
+    const session = await protegerRuta()
+    if (!session) return null
+
+    const rolActual = session.user?.user_metadata?.rol || 'Estudiante'
+    if (rolActual !== rolEsperado) {
+        window.location.href = rutaSegunRol(session.user)
+        return null
+    }
+    return session
+}
+
+export { RUTA_USUARIO, RUTA_DOCENTE, RUTA_LOGIN }

@@ -200,10 +200,21 @@
                 </div>
             </section>
 
-            <section class="tutor-panel" id="tutor-panel" hidden>
-                <h3>👨‍🏫 Panel de tutor</h3>
-                <p>Bienvenido, docente. Desde aquí puedes orientar a tus estudiantes y revisar los recursos didácticos disponibles.</p>
-                <a href="glosario.html" class="btn btn-secondary" style="width:100%;">Ver recursos didácticos</a>
+            <section class="progreso-card">
+                <div class="progreso-card__header" style="margin-bottom: 14px;">
+                    <div>
+                        <h2>Unirme a una clase</h2>
+                        <p>Ingresa el código que te compartió tu docente.</p>
+                    </div>
+                </div>
+                <form class="auth-form" id="form-unirse-clase" novalidate>
+                    <div id="unirse-clase-mensaje" class="auth-message" hidden></div>
+                    <div class="input-group">
+                        <input type="text" id="input-codigo-clase" name="codigo" required placeholder=" " autocomplete="off" maxlength="6" style="text-transform: uppercase;">
+                        <label for="input-codigo-clase">Código de clase</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">Unirme</button>
+                </form>
             </section>
         </div>
 

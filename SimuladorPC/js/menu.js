@@ -1,6 +1,7 @@
-import { protegerRuta, cerrarSesion } from './auth.js'
+import { exigirRol, cerrarSesion } from './auth.js'
 import { obtenerProgreso, actualizarPerfil, obtenerEstadisticas } from './progreso.js'
 import { getProgressSummary, formatXp } from './achievements.js'
+import { unirseAClase } from './clases.js'
 
 const COMPONENTS = [
     { id: 'case',    label: 'Gabinete (Case)',              icon: '🗄' },
@@ -75,11 +76,6 @@ function renderPerfil(user) {
     if (rolTag) {
         const rolLower = rol.toLowerCase()
         rolTag.className = `role-tag ${rolLower}`
-    }
-
-    const tutorPanel = document.getElementById('tutor-panel')
-    if (tutorPanel) {
-        tutorPanel.hidden = rol.toLowerCase() !== 'tutor'
     }
 
     document.getElementById('edit-nombre').value = nombre
@@ -288,7 +284,7 @@ function limpiarMensajeModal() {
 
 
 async function init() {
-    const session = await protegerRuta()
+    const session = await exigirRol('Estudiante')
     if (!session) return
 
     const rawUser = localStorage.getItem('logicflow_user')
@@ -308,6 +304,35 @@ async function init() {
     renderAchievements(progreso, estadisticas)
 
     document.getElementById('btn-cerrar-sesion')?.addEventListener('click', () => cerrarSesion())
+
+    document.getElementById('form-unirse-clase')?.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const input = document.getElementById('input-codigo-clase')
+        const msg = document.getElementById('unirse-clase-mensaje')
+        const btn = e.currentTarget.querySelector('button[type="submit"]')
+        const codigo = input?.value?.trim()
+        if (!codigo) return
+
+        if (msg) { msg.hidden = true }
+        if (btn) { btn.disabled = true; btn.textContent = 'Uniendo...' }
+
+        const resultado = await unirseAClase(codigo)
+
+        if (btn) { btn.disabled = false; btn.textContent = 'Unirme' }
+        if (!msg) return
+
+        msg.hidden = false
+        if (resultado.exito) {
+            msg.className = 'auth-message auth-message--success'
+            msg.textContent = resultado.yaMatriculado
+                ? `Ya estabas matriculado en "${resultado.clase.nombre}".`
+                : `✓ Te uniste a "${resultado.clase.nombre}".`
+            input.value = ''
+        } else {
+            msg.className = 'auth-message auth-message--error'
+            msg.textContent = resultado.mensaje || 'No se pudo unir a la clase.'
+        }
+    })
 
     document.getElementById('btn-editar-perfil')?.addEventListener('click', abrirModal)
     document.getElementById('modal-close')?.addEventListener('click', cerrarModal)

@@ -1,4 +1,4 @@
-import { iniciarSesion, redirigirSiAutenticado } from './auth.js'
+import { iniciarSesion, redirigirSiAutenticado, rutaSegunRol } from './auth.js'
 import {
     mostrarMensajeGlobal,
     ocultarMensajeGlobal,
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
             mostrarMensajeGlobal(mensajeGlobal, resultado.mensaje || '✓ Sesión iniciada correctamente.', 'success')
             form.reset()
             window.setTimeout(() => {
-                window.location.href = 'menu.html'
+                window.location.href = rutaSegunRol(resultado.usuario)
             }, 600)
         } finally {
             setBotonCargando(btnSubmit, false, 'Continuar', 'Iniciando sesión...')
