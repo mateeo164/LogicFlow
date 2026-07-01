@@ -22,7 +22,7 @@ import { Colors } from '../src/constants/theme'
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
 export default function RootLayout() {
-  const { session, loading } = useAuth()
+  const { session, loading, userRol } = useAuth()
   const [fontsLoaded, fontError] = useFonts({
     PlayfairDisplay_600SemiBold,
     PlayfairDisplay_700Bold,
@@ -39,8 +39,9 @@ export default function RootLayout() {
     if (!ready) return
     SplashScreen.hideAsync().catch(() => {})
     if (!session) router.replace('/auth/login')
+    else if (userRol === 'Tutor') router.replace('/(tutor)')
     else router.replace('/(tabs)')
-  }, [ready, session])
+  }, [ready, session, userRol])
 
   if (!ready) {
     return <View style={styles.boot} />
@@ -52,6 +53,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
         <Stack.Screen name="auth" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(tutor)" />
       </Stack>
     </GestureHandlerRootView>
   )
