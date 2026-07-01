@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView,
   Animated, Alert, ActivityIndicator, Pressable,
@@ -6,9 +6,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { PC_COMPONENTS, PCComponent } from '../../constants/components'
-import { guardarProgreso, registrarEvento } from '../../services/progress'
+import {
+  guardarProgresoReal, registrarEvento, obtenerProgreso,
+  ensambleWebAprobado, NOTA_MINIMA, ProgresoUsuario,
+} from '../../services/progress'
 import { Colors, Spacing, Typography, Radius, Fonts, Shadow } from '../../constants/theme'
 import { PrimaryButton } from '../../components/PrimaryButton'
 import { GradientCard } from '../../components/GradientCard'
@@ -31,7 +34,29 @@ export function ScannerScreen() {
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null)
   const [quizFeedback, setQuizFeedback] = useState<'correct' | 'wrong' | null>(null)
   const [saving, setSaving] = useState(false)
+  const [progreso, setProgreso] = useState<ProgresoUsuario | null>(null)
+  const [loadingGate, setLoadingGate] = useState(true)
   const scanAnim = useRef(new Animated.Value(0)).current
+
+  const cargarGate = useCallback(async (silent = false) => {
+    if (!silent) setLoadingGate(true)
+    const p = await obtenerProgreso()
+    setProgreso(p)
+    setInstalados(prev => p?.ensamble_real_instalados ?? prev)
+    setLoadingGate(false)
+  }, [])
+
+  const aprobado = ensambleWebAprobado(progreso)
+
+  // Revalida el gate cada vez que se entra a la pantalla → desbloqueo automático.
+  useFocusEffect(useCallback(() => { cargarGate() }, [cargarGate]))
+
+  // Mientras siga bloqueado, revisa en segundo plano por si aprueban el web con la app abierta.
+  useEffect(() => {
+    if (loadingGate || aprobado) return
+    const id = setInterval(() => cargarGate(true), 5000)
+    return () => clearInterval(id)
+  }, [loadingGate, aprobado, cargarGate])
 
   const startScanAnimation = useCallback(() => {
     scanAnim.setValue(0)
@@ -59,10 +84,9 @@ export function ScannerScreen() {
   async function handleInstall() {
     if (!detected) return
     setSaving(true)
-    const start = Date.now()
-    await guardarProgreso({ componenteId: detected.id, segundos: 0 })
-    await registrarEvento({ tipo: 'acierto', componenteId: detected.id, segundos: Math.round((Date.now() - start) / 1000) })
-    setInstalados(prev => [...prev, detected.id])
+    const res = await guardarProgresoReal({ componenteId: detected.id })
+    await registrarEvento({ tipo: 'acierto', componenteId: detected.id, segundos: 0 })
+    setInstalados(res?.instalados ?? [...instalados, detected.id])
     setSaving(false)
     setScanState('quiz')
     setQuizAnswer(null)
@@ -84,8 +108,46 @@ export function ScannerScreen() {
     setQuizFeedback(null)
   }
 
-  if (!permission) {
+  if (loadingGate || !permission) {
     return <View style={styles.center}><ActivityIndicator color={Colors.primary} /></View>
+  }
+
+  // GATE: el ensamble real con AR se desbloquea sólo tras aprobar el ensamble web (nota >= 7)
+  if (!aprobado) {
+    const nota = progreso?.ensamble_web_nota
+    const tieneNota = typeof nota === 'number'
+    return (
+      <SafeAreaView style={styles.permSafe} edges={['top', 'bottom']}>
+        <View style={styles.permissionBox}>
+          <View style={styles.lockIcon}>
+            <Ionicons name="lock-closed" size={44} color={Colors.accentDeep} />
+          </View>
+          <Text style={styles.permTitle}>Ensamble real bloqueado</Text>
+          <Text style={styles.permText}>
+            Se desbloquea automáticamente cuando apruebas el{' '}
+            <Text style={{ fontFamily: Fonts.sansBold, color: Colors.text }}>ensamble web</Text> con una
+            nota de al menos {NOTA_MINIMA}/10.
+          </Text>
+
+          {tieneNota && (
+            <View style={styles.notaChip}>
+              <Text style={styles.notaChipLabel}>Tu nota del ensamble web</Text>
+              <Text style={[styles.notaChipValue, { color: (nota as number) >= NOTA_MINIMA ? Colors.success : Colors.error }]}>
+                {(nota as number).toFixed(1)}/10
+              </Text>
+              <Text style={styles.notaChipHint}>
+                {(nota as number) >= NOTA_MINIMA ? '¡Aprobado!' : `Necesitas ${NOTA_MINIMA}. Repite el ensamble web para mejorar.`}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.autoRow}>
+            <ActivityIndicator color={Colors.textMuted} size="small" />
+            <Text style={styles.autoText}>Esperando tu nota del ensamble web…</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
   }
 
   if (!permission.granted) {
@@ -333,6 +395,13 @@ const styles = StyleSheet.create({
   permSafe: { flex: 1, backgroundColor: Colors.background },
   permissionBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, gap: Spacing.md },
   permIcon: { width: 88, height: 88, borderRadius: 28, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xs },
+  lockIcon: { width: 88, height: 88, borderRadius: 28, backgroundColor: Colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xs },
+  notaChip: { alignSelf: 'stretch', alignItems: 'center', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, padding: Spacing.md, gap: 4 },
+  notaChipLabel: { ...Typography.caption },
+  notaChipValue: { fontFamily: Fonts.serif, fontSize: 32, letterSpacing: -0.5 },
+  notaChipHint: { fontFamily: Fonts.sansSemi, fontSize: 13, color: Colors.textSecondary, textAlign: 'center' },
+  autoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: Spacing.xs },
+  autoText: { fontFamily: Fonts.sansMedium, fontSize: 13, color: Colors.textMuted },
   permTitle: { ...Typography.h1, textAlign: 'center' },
   permText: { ...Typography.body, color: Colors.textSecondary, textAlign: 'center', lineHeight: 23 },
   permCancel: { fontFamily: Fonts.sansSemi, fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingTop: Spacing.xs },

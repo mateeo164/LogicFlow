@@ -108,6 +108,51 @@ export async function guardarProgreso({ componenteId, segundos = 0, total = 6 })
     }
 }
 
+/**
+ * Persiste la NOTA del ensamble web en Supabase. Es lo que la app móvil lee
+ * para desbloquear el ensamble real con AR (requiere nota >= 7). Conserva la
+ * mejor nota y nunca degrada un "aprobado" ya obtenido.
+ */
+export async function guardarNotaWeb({ nota, aprobado }) {
+    const userId = getUserId()
+    if (!userId) return false
+
+    try {
+        const actual = await obtenerProgreso()
+        const ahora = new Date().toISOString()
+
+        const prevNota = typeof actual?.ensamble_web_nota === 'number' ? actual.ensamble_web_nota : null
+        const mejorNota = prevNota !== null ? Math.max(prevNota, nota) : nota
+        const yaAprobado = actual?.ensamble_web_aprobado === true
+        const aprobadoFinal = yaAprobado || !!aprobado
+
+        const campos = {
+            ensamble_web_nota: Math.round(mejorNota * 100) / 100,
+            ensamble_web_aprobado: aprobadoFinal,
+            updated_at: ahora,
+            ...(aprobadoFinal && !actual?.ensamble_web_completado_at ? { ensamble_web_completado_at: ahora } : {})
+        }
+
+        if (actual) {
+            await dataRequest(`/progreso_usuario?user_id=eq.${userId}`, {
+                method: 'PATCH',
+                headers: { Prefer: 'return=minimal' },
+                body: campos
+            })
+        } else {
+            await dataRequest('/progreso_usuario', {
+                method: 'POST',
+                headers: { Prefer: 'return=minimal' },
+                body: { user_id: userId, ...campos }
+            })
+        }
+        return true
+    } catch (err) {
+        console.warn('[LogicFlow] No se pudo guardar la nota web:', err.message)
+        return false
+    }
+}
+
 export async function reiniciarProgreso() {
     const userId = getUserId()
     if (!userId) return false

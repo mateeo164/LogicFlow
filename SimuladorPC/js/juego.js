@@ -1,5 +1,5 @@
-import { protegerRuta } from './auth.js'
-import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento } from './progreso.js'
+import { exigirRol } from './auth.js'
+import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, guardarNotaWeb } from './progreso.js'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -415,6 +415,9 @@ function mostrarFinal() {
     const t = Math.round((Date.now() - labStartTime) / 1000)
     const nota = calcularNota()
     const aprobado = nota >= NOTA_MINIMA
+
+    // Persistir la nota en Supabase: es el gate que desbloquea el ensamble real (AR) en la app móvil.
+    guardarNotaWeb({ nota, aprobado }).catch(() => {})
 
     const titEl = document.getElementById('final-title')
     const descEl = document.getElementById('final-desc')
@@ -3696,7 +3699,7 @@ window.addEventListener('keyup', (e) => {
 })
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const session = await protegerRuta()
+    const session = await exigirRol('Estudiante')
     if (!session) return
     initGame()
 })

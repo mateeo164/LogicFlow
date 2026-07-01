@@ -1,125 +1,130 @@
-import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Pressable } from 'react-native'
+import React, { useState, useCallback } from 'react'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { PC_COMPONENTS, PCComponent } from '../../constants/components'
-import { guardarProgreso, reiniciarProgreso, obtenerProgreso, registrarEvento } from '../../services/progress'
+import { router, useFocusEffect } from 'expo-router'
+import { PC_COMPONENTS } from '../../constants/components'
+import { obtenerProgreso, reiniciarProgresoReal, ensambleWebAprobado, NOTA_MINIMA } from '../../services/progress'
 import { Colors, Spacing, Typography, Radius, Fonts, Shadow } from '../../constants/theme'
 import { GradientCard } from '../../components/GradientCard'
 import { PrimaryButton } from '../../components/PrimaryButton'
 
+/**
+ * Guía del ENSAMBLE REAL: manual paso a paso que se sigue mientras armas la PC
+ * física con la cámara AR. Refleja automáticamente el progreso del scanner
+ * (ensamble_real_instalados). No marca pasos por toque: eso lo hace el AR.
+ */
 export function AssemblyScreen() {
   const [instalados, setInstalados] = useState<string[]>([])
-  const [currentStep, setCurrentStep] = useState(0)
-  const [saving, setSaving] = useState(false)
-  const [sessionStart] = useState(Date.now())
-  const [completed, setCompleted] = useState(false)
+  const [aprobado, setAprobado] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    obtenerProgreso().then(p => {
-      const installed = p?.componentes_instalados || []
-      setInstalados(installed)
-      setCurrentStep(installed.length)
-      if (installed.length >= PC_COMPONENTS.length) setCompleted(true)
-      setLoading(false)
-    })
+  const cargar = useCallback(async () => {
+    const p = await obtenerProgreso()
+    setInstalados(p?.ensamble_real_instalados || [])
+    setAprobado(ensambleWebAprobado(p))
+    setLoading(false)
   }, [])
 
-  async function handleInstall(component: PCComponent) {
-    setSaving(true)
-    const segundos = Math.round((Date.now() - sessionStart) / 1000)
-    const ok = await guardarProgreso({ componenteId: component.id, segundos })
-    if (ok) {
-      await registrarEvento({ tipo: 'acierto', componenteId: component.id, segundos })
-      const newInstalados = [...instalados, component.id]
-      setInstalados(newInstalados)
-      setCurrentStep(newInstalados.length)
-      if (newInstalados.length >= PC_COMPONENTS.length) setCompleted(true)
-    } else {
-      Alert.alert('Error', 'No se pudo guardar el progreso. Verifica tu conexión.')
-    }
-    setSaving(false)
-  }
+  // Recarga al enfocar → el progreso se actualiza al volver del scanner AR.
+  useFocusEffect(useCallback(() => { cargar() }, [cargar]))
 
   async function handleReset() {
     Alert.alert(
-      'Reiniciar ensamblaje',
-      '¿Seguro que quieres empezar desde cero? Tus estadísticas acumuladas se conservan.',
+      'Reiniciar ensamble real',
+      '¿Empezar el ensamble real desde cero? Esto no afecta tu nota del ensamble web.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Reiniciar',
           style: 'destructive',
-          onPress: async () => {
-            await reiniciarProgreso()
-            setInstalados([])
-            setCurrentStep(0)
-            setCompleted(false)
-          },
+          onPress: async () => { await reiniciarProgresoReal(); setInstalados([]) },
         },
       ]
     )
   }
 
-  const progressPercent = Math.round((instalados.length / PC_COMPONENTS.length) * 100)
+  const total = PC_COMPONENTS.length
+  const currentStep = instalados.length
+  const progressPercent = Math.round((instalados.length / total) * 100)
+  const completado = instalados.length >= total
 
   if (loading) return <View style={styles.safe} />
 
-  if (completed) {
+  if (completado) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView contentContainerStyle={styles.completedContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.celebrateBadge}>
-            <Text style={{ fontSize: 64 }}>🎉</Text>
+            <Text style={{ fontSize: 64 }}>🛠️</Text>
           </View>
-          <Text style={styles.completedTitle}>¡PC ensamblada!</Text>
+          <Text style={styles.completedTitle}>¡PC real ensamblada!</Text>
           <Text style={styles.completedSub}>
-            Completaste el ensamblaje de los 8 componentes. Tu PC virtual está lista.
+            Instalaste los {total} componentes en tu PC física con la cámara AR. ¡Gran trabajo!
           </Text>
           <GradientCard style={{ width: '100%' }}>
             <Text style={styles.cardSection}>Componentes instalados</Text>
             {PC_COMPONENTS.map((c, i) => (
-              <View key={c.id} style={[styles.completedRow, i === PC_COMPONENTS.length - 1 && { borderBottomWidth: 0 }]}>
+              <View key={c.id} style={[styles.completedRow, i === total - 1 && { borderBottomWidth: 0 }]}>
                 <Text style={{ fontSize: 20 }}>{c.icon}</Text>
                 <Text style={styles.completedName}>{c.label}</Text>
                 <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
               </View>
             ))}
           </GradientCard>
-          <PrimaryButton label="Nueva simulación" icon="↻" onPress={handleReset} variant="secondary" style={{ width: '100%' }} />
+          <PrimaryButton label="Reiniciar ensamble real" icon="↻" onPress={handleReset} variant="secondary" style={{ width: '100%' }} />
         </ScrollView>
       </SafeAreaView>
     )
   }
 
-  const currentComponent = currentStep < PC_COMPONENTS.length ? PC_COMPONENTS[currentStep] : null
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={Typography.overline}>SIMULADOR</Text>
-          <Text style={Typography.h1}>Guía de ensamble</Text>
+          <Text style={Typography.overline}>MANUAL</Text>
+          <Text style={Typography.h1}>Guía del ensamble real</Text>
+          <Text style={styles.subtitle}>
+            Sigue estos pasos mientras armas tu PC física con la cámara AR.
+          </Text>
         </View>
+
+        {!aprobado && (
+          <GradientCard tone="accent" style={styles.lockBanner}>
+            <View style={styles.lockBannerRow}>
+              <Ionicons name="lock-closed" size={20} color={Colors.accentDeep} />
+              <Text style={styles.lockBannerText}>
+                El ensamble real se desbloquea al aprobar el ensamble web (nota ≥ {NOTA_MINIMA}). Abajo tienes el manual como referencia.
+              </Text>
+            </View>
+          </GradientCard>
+        )}
+
+        {/* CTA principal: abrir la cámara AR */}
+        <PrimaryButton
+          label={aprobado ? 'Abrir cámara AR' : 'Ver ensamble real'}
+          icon="📷"
+          onPress={() => router.push('/(tabs)/scanner')}
+          style={{ marginBottom: Spacing.lg }}
+        />
 
         {/* Progress card */}
         <GradientCard style={styles.progressCard}>
           <View style={styles.progressTop}>
-            <Text style={styles.progressLabel}>Progreso del build</Text>
+            <Text style={styles.progressLabel}>Progreso del ensamble real</Text>
             <Text style={styles.progressPct}>{progressPercent}%</Text>
           </View>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
           </View>
-          <Text style={styles.progressStep}>Paso {Math.min(currentStep + 1, PC_COMPONENTS.length)} de {PC_COMPONENTS.length}</Text>
+          <Text style={styles.progressStep}>{instalados.length} de {total} componentes instalados</Text>
         </GradientCard>
 
-        {/* Timeline */}
+        {/* Timeline (solo referencia — se completa desde el scanner AR) */}
         <View style={styles.timeline}>
           {PC_COMPONENTS.map((comp, idx) => {
             const isDone = instalados.includes(comp.id)
-            const isCurrent = idx === currentStep
+            const isCurrent = !isDone && idx === currentStep
             const isPending = !isDone && !isCurrent
             return (
               <View key={comp.id} style={styles.timelineRow}>
@@ -132,44 +137,34 @@ export function AssemblyScreen() {
                       ? <Ionicons name="checkmark" size={15} color={Colors.textInverse} />
                       : <Text style={[styles.dotText, isCurrent && { color: Colors.textInverse }]}>{idx + 1}</Text>}
                   </View>
-                  {idx < PC_COMPONENTS.length - 1 && (
-                    <View style={[styles.line, isDone && styles.lineDone]} />
-                  )}
+                  {idx < total - 1 && <View style={[styles.line, isDone && styles.lineDone]} />}
                 </View>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.stepCard,
-                    isCurrent && styles.stepCardCurrent,
-                    isCurrent && Shadow.md,
-                    isDone && styles.stepCardDone,
-                    pressed && isCurrent && { transform: [{ scale: 0.99 }] },
-                  ]}
-                  disabled={!isCurrent || saving}
-                  onPress={() => isCurrent && currentComponent && handleInstall(currentComponent)}
-                >
+                <View style={[
+                  styles.stepCard,
+                  isCurrent && styles.stepCardCurrent,
+                  isCurrent && Shadow.md,
+                  isDone && styles.stepCardDone,
+                ]}>
                   <View style={styles.stepCardRow}>
                     <Text style={{ fontSize: 26, opacity: isPending ? 0.4 : 1 }}>{comp.icon}</Text>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.compName, isPending && { color: Colors.textMuted }]}>{comp.label}</Text>
                       <Text style={styles.compShort} numberOfLines={1}>{comp.shortDesc}</Text>
                     </View>
-                    {isCurrent && !isDone && (
-                      <View style={styles.installBadge}>
-                        <Text style={styles.installText}>{saving ? '…' : 'Instalar'}</Text>
-                      </View>
-                    )}
-                    {isDone && <Ionicons name="checkmark-circle" size={22} color={Colors.success} />}
+                    {isDone
+                      ? <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
+                      : isCurrent && <View style={styles.nextBadge}><Text style={styles.nextText}>Siguiente</Text></View>}
                   </View>
-                  {isCurrent && !isDone && (
+                  {!isDone && (
                     <View style={styles.hint}>
                       <View style={styles.hintHead}>
                         <Ionicons name="bulb-outline" size={14} color={Colors.accentDeep} />
-                        <Text style={styles.hintTitle}>Consejo</Text>
+                        <Text style={styles.hintTitle}>Cómo instalarlo</Text>
                       </View>
                       <Text style={styles.hintText}>{comp.assemblyHint}</Text>
                     </View>
                   )}
-                </Pressable>
+                </View>
               </View>
             )
           })}
@@ -178,7 +173,7 @@ export function AssemblyScreen() {
         {instalados.length > 0 && (
           <TouchableOpacity onPress={handleReset} style={styles.resetBtn} activeOpacity={0.7}>
             <Ionicons name="refresh-outline" size={16} color={Colors.error} />
-            <Text style={styles.resetText}>Reiniciar ensamblaje</Text>
+            <Text style={styles.resetText}>Reiniciar ensamble real</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -190,6 +185,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: Spacing.md, paddingBottom: 120 },
   header: { marginBottom: Spacing.md, gap: 2 },
+  subtitle: { ...Typography.body, color: Colors.textSecondary, marginTop: 4, lineHeight: 22 },
+
+  lockBanner: { marginBottom: Spacing.md },
+  lockBannerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  lockBannerText: { flex: 1, fontFamily: Fonts.sansSemi, fontSize: 13, color: Colors.accentDeep, lineHeight: 19 },
 
   progressCard: { marginBottom: Spacing.lg, gap: 10 },
   progressTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
@@ -218,8 +218,8 @@ const styles = StyleSheet.create({
   stepCardRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   compName: { fontFamily: Fonts.sansBold, fontSize: 15, color: Colors.text },
   compShort: { ...Typography.caption, marginTop: 1 },
-  installBadge: { backgroundColor: Colors.primaryDeep, borderRadius: Radius.sm, paddingHorizontal: 14, paddingVertical: 7 },
-  installText: { fontFamily: Fonts.sansBold, fontSize: 12, color: Colors.textInverse },
+  nextBadge: { backgroundColor: Colors.primaryTint, borderRadius: Radius.sm, paddingHorizontal: 12, paddingVertical: 6 },
+  nextText: { fontFamily: Fonts.sansBold, fontSize: 12, color: Colors.primaryDeep },
   hint: { marginTop: Spacing.sm, padding: Spacing.sm, backgroundColor: Colors.accentSoft, borderRadius: Radius.sm },
   hintHead: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
   hintTitle: { fontFamily: Fonts.sansBold, fontSize: 12, color: Colors.accentDeep },

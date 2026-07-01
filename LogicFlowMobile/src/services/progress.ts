@@ -11,6 +11,27 @@ export interface ProgresoUsuario {
   tiempo_total_segundos: number
   completed_at: string | null
   updated_at?: string
+  // Ensamble WEB (SimuladorPC): la nota es el gate del ensamble real AR
+  ensamble_web_nota?: number | null
+  ensamble_web_aprobado?: boolean | null
+  ensamble_web_completado_at?: string | null
+  // Ensamble REAL con AR (esta app): progreso propio, separado del web
+  ensamble_real_instalados?: string[] | null
+  ensamble_real_completado_at?: string | null
+}
+
+/** Nota mínima del ensamble web para desbloquear el ensamble real con AR. */
+export const NOTA_MINIMA = 7
+
+/**
+ * ¿El usuario aprobó el ensamble web (nota >= NOTA_MINIMA)? Es la condición
+ * que desbloquea el modo AR. Tolera columnas ausentes: si el web aún no guardó
+ * su nota, se considera bloqueado.
+ */
+export function ensambleWebAprobado(p: ProgresoUsuario | null | undefined): boolean {
+  if (!p) return false
+  if (typeof p.ensamble_web_nota === 'number') return p.ensamble_web_nota >= NOTA_MINIMA
+  return p.ensamble_web_aprobado === true
 }
 
 export interface Estadisticas {
@@ -45,37 +66,36 @@ export async function obtenerProgreso(): Promise<ProgresoUsuario | null> {
   return data
 }
 
-export async function guardarProgreso(params: {
+/**
+ * Guarda el progreso del ENSAMBLE REAL con AR, en su propia columna
+ * (`ensamble_real_instalados`), separada del ensamble web/virtual.
+ * Devuelve el estado actualizado o null si falla.
+ */
+export async function guardarProgresoReal(params: {
   componenteId: string
-  segundos?: number
   total?: number
-}): Promise<boolean> {
-  const { componenteId, segundos = 0, total = 8 } = params
+}): Promise<{ instalados: string[]; completado: boolean } | null> {
+  const { componenteId, total = 8 } = params
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
+  if (!user) return null
 
   try {
     const actual = await obtenerProgreso()
-    const instalados = actual?.componentes_instalados || []
+    const instalados = actual?.ensamble_real_instalados || []
 
-    if (instalados.includes(componenteId)) return true
+    if (instalados.includes(componenteId)) {
+      return { instalados, completado: instalados.length >= total }
+    }
 
-    const nuevosInstalados = [...instalados, componenteId]
-    const completado = nuevosInstalados.length >= total
+    const nuevos = [...instalados, componenteId]
+    const completado = nuevos.length >= total
     const ahora = new Date().toISOString()
 
     const campos: Partial<ProgresoUsuario> = {
-      componentes_instalados: nuevosInstalados,
-      paso_actual: Math.min(nuevosInstalados.length + 1, total + 1),
-      total_componentes: total,
-      simulaciones_completadas: completado
-        ? (actual?.simulaciones_completadas || 0) + 1
-        : (actual?.simulaciones_completadas || 0),
-      ultimo_componente: componenteId,
-      tiempo_total_segundos: (actual?.tiempo_total_segundos || 0) + Math.max(0, Math.round(segundos)),
+      ensamble_real_instalados: nuevos,
       updated_at: ahora,
-      ...(completado && !actual?.completed_at ? { completed_at: ahora } : {}),
+      ...(completado && !actual?.ensamble_real_completado_at ? { ensamble_real_completado_at: ahora } : {}),
     }
 
     if (actual?.id) {
@@ -91,9 +111,26 @@ export async function guardarProgreso(params: {
       if (error) throw error
     }
 
+    return { instalados: nuevos, completado }
+  } catch (err: any) {
+    console.warn('[LogicFlow] Error guardando progreso AR:', err.message)
+    return null
+  }
+}
+
+/** Reinicia únicamente el progreso del ensamble real (AR), sin tocar el web. */
+export async function reiniciarProgresoReal(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
+  try {
+    const { error } = await supabase
+      .from('progreso_usuario')
+      .update({ ensamble_real_instalados: [], ensamble_real_completado_at: null, updated_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+    if (error) throw error
     return true
   } catch (err: any) {
-    console.warn('[LogicFlow] Error guardando progreso:', err.message)
+    console.warn('[LogicFlow] Error reiniciando progreso AR:', err.message)
     return false
   }
 }

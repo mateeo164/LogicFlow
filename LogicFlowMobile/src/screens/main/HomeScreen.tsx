@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useAuth } from '../../hooks/useAuth'
-import { obtenerProgreso, obtenerEstadisticas, ProgresoUsuario, Estadisticas } from '../../services/progress'
+import { obtenerProgreso, obtenerEstadisticas, ensambleWebAprobado, ProgresoUsuario, Estadisticas } from '../../services/progress'
 import { calculateXp, getLevelProgress, PC_COMPONENTS, COMPONENT_MAP } from '../../constants/components'
 import { XPBar } from '../../components/XPBar'
 import { StatCard } from '../../components/StatCard'
@@ -54,6 +54,7 @@ export function HomeScreen() {
   useEffect(() => { load() }, [load])
 
   const instalados = progreso?.componentes_instalados || []
+  const arWeb = ensambleWebAprobado(progreso)
   const xp = calculateXp(progreso?.simulaciones_completadas || 0, instalados)
   const { current: level, progress: levelProgress } = getLevelProgress(xp)
   const precision = stats?.precision ?? null
@@ -153,19 +154,22 @@ export function HomeScreen() {
         {/* Quick actions */}
         <SectionTitle>Explorar</SectionTitle>
         <View style={styles.actionsGrid}>
-          {ACTIONS.map(a => (
-            <Pressable
-              key={a.id}
-              onPress={() => router.push(a.route as any)}
-              style={({ pressed }) => [styles.actionCard, Shadow.sm, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: a.tone + '14' }]}>
-                <Ionicons name={a.icon} size={22} color={a.tone} />
-              </View>
-              <Text style={styles.actionLabel}>{a.label}</Text>
-              <Text style={styles.actionSub}>{a.sub}</Text>
-            </Pressable>
-          ))}
+          {ACTIONS.map(a => {
+            const locked = a.id === 'scanner' && !arWeb
+            return (
+              <Pressable
+                key={a.id}
+                onPress={() => router.push(a.route as any)}
+                style={({ pressed }) => [styles.actionCard, Shadow.sm, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: a.tone + '14' }]}>
+                  <Ionicons name={locked ? 'lock-closed' : a.icon} size={22} color={locked ? Colors.accentDeep : a.tone} />
+                </View>
+                <Text style={styles.actionLabel}>{a.label}</Text>
+                <Text style={styles.actionSub}>{locked ? `Requiere nota ≥ 7 en web` : a.sub}</Text>
+              </Pressable>
+            )
+          })}
         </View>
 
         {/* Next component */}
