@@ -1,0 +1,74 @@
+# Vercel Web Analytics Installation Report
+
+## Summary
+Successfully installed and configured Vercel Web Analytics for the LogicFlow project following the latest official documentation from Vercel.
+
+## Changes Made
+
+### 1. Package Installation
+- **Package**: `@vercel/analytics@^2.0.1`
+- **Method**: Installed via npm
+- **Location**: Added to dependencies in `package.json`
+
+### 2. Analytics Initialization File
+- **Created**: `js/analytics.js`
+- **Purpose**: Initializes Vercel Web Analytics using the `inject()` method
+- **Implementation**: ES module that imports and calls the inject function from @vercel/analytics
+
+### 3. HTML Files Updated
+Added analytics script tag to all 10 HTML pages:
+- `index.html` - Landing page
+- `menu.html` - Main menu/dashboard
+- `login.html` - Login page
+- `registro.html` - Registration page
+- `juego.html` - 3D simulator game
+- `calculadora.html` - PSU calculator tool
+- `glosario.html` - Technical glossary
+- `retos.html` - Challenges page
+- `actualizar-password.html` - Update password page
+- `recuperar-password.html` - Password recovery page
+
+Each page now includes:
+```html
+<script type="module" src="js/analytics.js"></script>
+```
+
+### 4. Build Verification
+- ✅ Vite build completed successfully
+- ✅ Analytics package properly bundled in output
+- ✅ No build errors introduced
+- ✅ All module imports resolved correctly
+
+## Implementation Details
+
+### Framework Detection
+This is a vanilla JavaScript/HTML project using:
+- **Package Manager**: npm
+- **Build Tool**: Vite 8.0.16
+- **Module System**: ES Modules (type="module")
+
+### Analytics Setup Method
+Based on the official Vercel documentation (https://vercel.com/docs/analytics/quickstart and https://vercel.com/docs/analytics/package), I used:
+- The `inject()` function from `@vercel/analytics`
+- ES module imports (compatible with Vite bundler)
+- Script tag with `type="module"` attribute for proper module loading
+
+### Deployment Requirements
+To activate analytics after deployment to Vercel:
+1. Navigate to your Vercel project dashboard
+2. Go to the Analytics tab
+3. Click "Enable" to activate Web Analytics
+4. Vercel will automatically add routes at `/_vercel/insights/*`
+5. Analytics data will begin collecting on the next deployment
+
+## Files Modified
+- `package.json` - Added @vercel/analytics dependency
+- `package-lock.json` - Updated with analytics package tree
+- `js/analytics.js` - Created analytics initialization file
+- All 10 HTML files - Added analytics script tag
+
+## Notes
+- Analytics will only be active when deployed to Vercel (not in local development)
+- No configuration options were added - using default analytics behavior
+- The implementation is non-invasive and preserves all existing functionality
+- Script is loaded as a module before other page scripts to ensure early initialization
