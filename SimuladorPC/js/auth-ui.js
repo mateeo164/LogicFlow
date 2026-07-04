@@ -19,7 +19,6 @@ export function mostrarErrorCampo(idCampo, mensaje) {
     const grupo = input.closest('.input-group')
     if (!grupo) return
 
-    
     const errorAnterior = grupo.querySelector(`.field-error[data-error-for="${idCampo}"]`)
     if (errorAnterior) errorAnterior.remove()
 
@@ -71,7 +70,6 @@ export function establecerValidacionTiempoReal(idCampo, funcionValidacion) {
     const input = document.getElementById(idCampo)
     if (!input) return
 
-    
     input.addEventListener('blur', () => {
         const resultado = funcionValidacion(input.value)
         if (!resultado.valido && input.value.trim()) {
@@ -81,7 +79,6 @@ export function establecerValidacionTiempoReal(idCampo, funcionValidacion) {
         }
     })
 
-    
     input.addEventListener('input', () => {
         const grupo = input.closest('.input-group')
         if (grupo?.classList.contains('input-group--error')) {

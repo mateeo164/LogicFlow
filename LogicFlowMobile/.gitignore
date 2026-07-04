@@ -4,3 +4,9 @@
 
 expo-env.d.ts
 # @end expo-cli
+
+# Supabase CLI local state and secrets — nunca deben subirse al repo
+supabase/.temp
+supabase/.env.local
+.env
+.env.local

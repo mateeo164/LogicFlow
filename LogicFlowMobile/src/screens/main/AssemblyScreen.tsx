@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { PC_COMPONENTS, PCComponent } from '../../constants/components'
 import { guardarProgreso, reiniciarProgreso, obtenerProgreso, registrarEvento } from '../../services/progress'
+import { otorgarLogros } from '../../services/logros'
+import { sfx } from '../../services/sound'
 import { Colors, Spacing, Typography, Radius, Fonts, Shadow } from '../../constants/theme'
 import { GradientCard } from '../../components/GradientCard'
 import { PrimaryButton } from '../../components/PrimaryButton'
@@ -35,8 +37,15 @@ export function AssemblyScreen() {
       const newInstalados = [...instalados, component.id]
       setInstalados(newInstalados)
       setCurrentStep(newInstalados.length)
-      if (newInstalados.length >= PC_COMPONENTS.length) setCompleted(true)
+      if (newInstalados.length >= PC_COMPONENTS.length) {
+        setCompleted(true)
+        sfx.complete()
+        otorgarLogros(['instalacion_real'], 'assembly')
+      } else {
+        sfx.success()
+      }
     } else {
+      sfx.error()
       Alert.alert('Error', 'No se pudo guardar el progreso. Verifica tu conexión.')
     }
     setSaving(false)

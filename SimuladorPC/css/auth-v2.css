@@ -1,5 +1,3 @@
-
-
 .auth-body {
   height: 100vh;
   display: grid;
@@ -212,7 +210,7 @@
   align-items: center;
   padding: 64px;
   background: var(--lf-primary-900);
-  color: var(--lf-paper);
+  color: #fff;
   position: relative;
   overflow-x: hidden;
   overflow-y: auto;

@@ -1,5 +1,3 @@
-
-
 export const CPU_WATTAGE = {
   'cpu-intel-i3': { name: 'Intel Core i3-12100F', tdp: 89, socket: 'LGA1700' },
   'cpu-intel-i5': { name: 'Intel Core i5-12600K', tdp: 125, socket: 'LGA1700' },

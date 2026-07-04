@@ -214,3 +214,45 @@ export function getLevelProgress(xp: number) {
 export function calculateXp(simulacionesCompletadas: number, componentesInstalados: string[]) {
   return componentesInstalados.length * 100 + simulacionesCompletadas * 200
 }
+
+// ---------- Logros persistidos (tabla logros_usuario, compartida con la web) ----------
+export interface LogroDef {
+  id: string
+  title: string
+  description: string
+  icon: string
+}
+
+// Logros granulares que se otorgan por acciones concretas del ecosistema móvil
+// (quizzes perfectos, instalación real, etc.). Se guardan en BD y suben la nota.
+export const GRANULAR_LOGROS: LogroDef[] = [
+  { id: 'escaner_novato',   title: 'Ojo biónico',       description: 'Detectaste tu primer componente con el escáner AR.', icon: '📸' },
+  { id: 'quiz_perfecto',    title: 'Mente afilada',     description: 'Respondiste un quiz de conocimiento sin fallar.',     icon: '🧠' },
+  { id: 'quiz_maestro',     title: 'Sin una sola falla', description: 'Acertaste el quiz de los 8 componentes.',            icon: '🎓' },
+  { id: 'instalacion_real', title: 'Manos a la obra',   description: 'Completaste la instalación real guiada en el móvil.', icon: '🛠️' },
+  { id: 'ecosistema',       title: 'Ciclo completo',    description: 'Aprobaste la web y completaste la app: certificado listo.', icon: '🏆' },
+]
+
+// Logros calculados (los mismos que muestra BadgesScreen). Se persisten cuando
+// se desbloquean para que cuenten en el bono de nota y el mapa de logros.
+export const COMPUTED_LOGRO_IDS = [
+  'primera_pc', 'sin_errores', 'rapido', 'tecnico', 'experto',
+  'master_builder', 'curioso', 'perseverante',
+]
+
+// Bono de nota por logros: muy mínimo, para la sensación de colección.
+export const LOGRO_BONO_UNIT = 0.05
+export const LOGRO_BONO_MAX = 0.5
+
+export function bonoPorLogros(cantidad: number): number {
+  return Math.min(LOGRO_BONO_MAX, Math.max(0, cantidad) * LOGRO_BONO_UNIT)
+}
+
+export function notaConBono(notaBase: number, cantidadLogros: number): number {
+  return Math.min(10, Math.max(0, notaBase) + bonoPorLogros(cantidadLogros))
+}
+
+// Nota del ensamble móvil: parte de 10 y descuenta por errores (quizzes / piezas).
+export function calcularNotaMovil(errores: number): number {
+  return Math.max(0, Math.min(10, 10 - errores * 1.0))
+}

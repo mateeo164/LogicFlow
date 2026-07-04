@@ -1,5 +1,3 @@
-
-
 import { GLOSARIO, filterGlosario } from './learning-tools.js'
 
 function renderTerminos(terminos) {

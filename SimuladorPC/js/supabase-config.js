@@ -1,5 +1,3 @@
-
-
 const SUPABASE_URL = 'https://kgyhbimpwwtnkiozymyr.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtneWhiaW1wd3d0bmtpb3p5bXlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMjUxMDEsImV4cCI6MjA5NjcwMTEwMX0.Ob03jI480Wc6dAxOgyXP3HgPd9sKrFtApFdhvsXaIj8'
 

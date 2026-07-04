@@ -1,5 +1,3 @@
-
-
 (function () {
   const STORAGE_KEY = 'logicflow-theme';
   const THEME_ATTR = 'data-theme';

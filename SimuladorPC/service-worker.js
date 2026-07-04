@@ -1,6 +1,6 @@
 
 
-const CACHE_NAME = 'logicflow-v1';
+const CACHE_NAME = 'logicflow-v12';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -10,6 +10,7 @@ const STATIC_ASSETS = [
   '/actualizar-password.html',
   '/menu.html',
   '/juego.html',
+  '/retos.html',
   '/calculadora.html',
   '/glosario.html',
   '/css/estilos.css',
@@ -20,6 +21,7 @@ const STATIC_ASSETS = [
   '/css/dashboard-v2.css',
   '/css/sim-v2.css',
   '/css/tools-v2.css',
+  '/css/retos.css',
   '/js/theme.js',
   '/js/ui-effects.js',
   '/js/menu.js',

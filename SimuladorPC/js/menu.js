@@ -1,6 +1,9 @@
 import { protegerRuta, cerrarSesion } from './auth.js'
 import { obtenerProgreso, actualizarPerfil, obtenerEstadisticas } from './progreso.js'
-import { getProgressSummary, formatXp } from './achievements.js'
+import { getProgressSummary, formatXp, bonoPorLogros } from './achievements.js'
+import { obtenerLogrosUsuario, obtenerResultadosRetos, resumirResultados } from './retos-api.js'
+import { RETOS } from './retos-data.js'
+import { initTutorPanel, initClasesEstudiante, initNotificaciones } from './tutor.js'
 
 const COMPONENTS = [
     { id: 'case',    label: 'Gabinete (Case)',              icon: '🗄' },
@@ -77,9 +80,13 @@ function renderPerfil(user) {
         rolTag.className = `role-tag ${rolLower}`
     }
 
+    const esTutor = rol.toLowerCase() === 'tutor'
+
+    document.body.classList.toggle('is-tutor', esTutor)
+
     const tutorPanel = document.getElementById('tutor-panel')
     if (tutorPanel) {
-        tutorPanel.hidden = rol.toLowerCase() !== 'tutor'
+        tutorPanel.hidden = !esTutor
     }
 
     document.getElementById('edit-nombre').value = nombre
@@ -143,7 +150,6 @@ function renderProgresoVacio() {
     renderProgreso(null)
 }
 
-
 function formatHora(iso) {
     if (!iso) return ''
     const d = new Date(iso)
@@ -151,9 +157,11 @@ function formatHora(iso) {
 }
 
 const EVENTO_META = {
-    acierto:     { label: 'Ensamblaje correcto', cls: 'done',    icon: '✓' },
-    error_pieza: { label: 'Pieza equivocada',    cls: 'pending', icon: '✕' },
-    demora:      { label: 'Demora',              cls: 'current', icon: '⏱' }
+    acierto:         { label: 'Ensamblaje correcto',   cls: 'done',    icon: '✓' },
+    acierto_ensamble:{ label: 'Procedimiento correcto', cls: 'done',    icon: '✓' },
+    error_pieza:     { label: 'Pieza equivocada',      cls: 'pending', icon: '✕' },
+    error_ensamble:  { label: 'Error de ensamble',     cls: 'pending', icon: '✕' },
+    demora:          { label: 'Demora',                cls: 'current', icon: '⏱' }
 }
 
 function renderEstadisticas(stats) {
@@ -186,6 +194,8 @@ function renderEstadisticas(stats) {
         let detalle = comp
         if (ev.tipo === 'error_pieza' && ev.componente_esperado) {
             detalle = `${comp} (se esperaba ${COMP_LABEL[ev.componente_esperado] || ev.componente_esperado})`
+        } else if (ev.tipo === 'error_ensamble' && ev.detalle) {
+            detalle = `${comp} · ${ev.detalle}`
         } else if (ev.tipo === 'demora' && ev.segundos) {
             detalle = `${comp} · ${ev.segundos}s`
         }
@@ -198,9 +208,8 @@ function renderEstadisticas(stats) {
     }).join('')
 }
 
-
-function renderAchievements(progreso, stats) {
-    const summary = getProgressSummary(progreso, stats)
+function renderAchievements(progreso, stats, logros = []) {
+    const summary = getProgressSummary(progreso, stats, logros)
 
     const badgeEl = document.getElementById('level-badge')
     if (badgeEl) {
@@ -256,6 +265,40 @@ function renderAchievements(progreso, stats) {
     }
 }
 
+function renderNotasCertificado(progreso, logros = [], resultados = []) {
+    const setEl = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt }
+
+    const notaWeb = progreso?.nota_web
+    setEl('nota-ensamble', notaWeb != null ? `${Number(notaWeb).toFixed(1)}/10` : '—')
+    setEl('nota-ensamble-detalle', progreso?.web_aprobado_at ? '✓ Aprobado' : 'Sin aprobar aún')
+
+    const resumen = resumirResultados(resultados)
+    const superados = RETOS.filter(r => resumen[r.id]?.exito).length
+    const mejor = resultados.length ? Math.max(...resultados.map(r => Number(r.nota) || 0)) : null
+    setEl('nota-retos-mejor', mejor === null ? '—' : `${mejor.toFixed(1)}/10`)
+    setEl('nota-retos-superados', `${superados} de ${RETOS.length} retos superados`)
+
+    const bono = bonoPorLogros(logros.length)
+    setEl('nota-bono', `+${bono.toFixed(2)}`)
+    setEl('nota-bono-detalle', `${logros.length} logro${logros.length === 1 ? '' : 's'} desbloqueado${logros.length === 1 ? '' : 's'}`)
+
+    const webOk = !!progreso?.web_aprobado_at
+    const appOk = !!progreso?.movil_completado_at
+    const pct = Math.round(((webOk ? 1 : 0) + (appOk ? 1 : 0)) / 2 * 100)
+    setEl('cert-pct', `${pct}%`)
+    const fill = document.getElementById('cert-progress-fill')
+    if (fill) fill.style.width = `${pct}%`
+    document.getElementById('cert-web')?.classList.toggle('cert-step--done', webOk)
+    document.getElementById('cert-app')?.classList.toggle('cert-step--done', appOk)
+
+    const hint = document.getElementById('cert-hint')
+    if (hint) {
+        if (webOk && appOk) hint.innerHTML = '🎉 <strong>¡Listo!</strong> Abre la app móvil para generar y compartir tu certificado con la foto de tu PC.'
+        else if (webOk) hint.textContent = 'Ensamble web aprobado. Ahora completa la instalación real guiada en la app móvil.'
+        else if (appOk) hint.textContent = 'Instalación real completada. Aprueba el ensamble en el laboratorio 3D para desbloquear el certificado.'
+        else hint.textContent = 'Completa el ensamble web y la instalación real en la app móvil para emitir tu certificado.'
+    }
+}
 
 function abrirModal() {
     const m = document.getElementById('modal-editar')
@@ -286,7 +329,6 @@ function limpiarMensajeModal() {
     if (el) el.setAttribute('hidden', '')
 }
 
-
 async function init() {
     const session = await protegerRuta()
     if (!session) return
@@ -295,17 +337,33 @@ async function init() {
     const user = rawUser ? JSON.parse(rawUser) : null
     renderPerfil(user)
 
-    const progreso = await obtenerProgreso()
-    if (progreso) {
-        renderProgreso(progreso)
+    const esTutor = (user?.user_metadata?.rol || 'Estudiante').toLowerCase() === 'tutor'
+
+    if (esTutor) {
+
+        initTutorPanel()
     } else {
-        renderProgresoVacio()
+        const progreso = await obtenerProgreso()
+        if (progreso) {
+            renderProgreso(progreso)
+        } else {
+            renderProgresoVacio()
+        }
+
+        const estadisticas = await obtenerEstadisticas()
+        renderEstadisticas(estadisticas)
+
+        const [logros, resultadosRetos] = await Promise.all([
+            obtenerLogrosUsuario(),
+            obtenerResultadosRetos()
+        ])
+
+        renderAchievements(progreso, estadisticas, logros)
+        renderNotasCertificado(progreso, logros, resultadosRetos)
+
+        initClasesEstudiante()
+        initNotificaciones()
     }
-
-    const estadisticas = await obtenerEstadisticas()
-    renderEstadisticas(estadisticas)
-
-    renderAchievements(progreso, estadisticas)
 
     document.getElementById('btn-cerrar-sesion')?.addEventListener('click', () => cerrarSesion())
 

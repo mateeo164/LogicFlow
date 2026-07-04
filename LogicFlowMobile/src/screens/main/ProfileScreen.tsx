@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, TextInput, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../hooks/useAuth'
 import { signOut } from '../../services/auth'
+import { unirseAClase, misClasesEstudiante, Clase } from '../../services/tutor'
 import { calculateXp, getLevelProgress } from '../../constants/components'
 import { Colors, Spacing, Typography, Radius, Fonts, Shadow } from '../../constants/theme'
 import { GradientCard } from '../../components/GradientCard'
@@ -11,6 +12,7 @@ import { PrimaryButton } from '../../components/PrimaryButton'
 import { InputField } from '../../components/InputField'
 import { router } from 'expo-router'
 import { supabase } from '../../services/supabase'
+import { loadSoundPref, setSoundPref, sfx } from '../../services/sound'
 
 async function actualizarPerfilSupabase(params: { full_name?: string; institucion?: string }) {
   const { error } = await supabase.auth.updateUser({ data: params })
@@ -25,6 +27,38 @@ export function ProfileScreen() {
   const [saving, setSaving] = useState(false)
   const [notifications, setNotifications] = useState(true)
   const [soundEffects, setSoundEffects] = useState(true)
+  const [codigo, setCodigo] = useState('')
+  const [joining, setJoining] = useState(false)
+  const [misClases, setMisClases] = useState<Clase[]>([])
+
+  const esTutor = (userRol || 'Estudiante').toLowerCase() === 'tutor'
+
+  useEffect(() => {
+    loadSoundPref().then(setSoundEffects)
+    if (!esTutor) misClasesEstudiante().then(setMisClases).catch(() => {})
+  }, [])
+
+  async function handleJoin() {
+    const c = codigo.trim()
+    if (!c) return
+    setJoining(true)
+    try {
+      const clase = await unirseAClase(c)
+      setCodigo('')
+      Alert.alert('¡Listo!', `Te uniste a "${clase?.nombre || 'la clase'}".`)
+      setMisClases(await misClasesEstudiante())
+    } catch (err: any) {
+      Alert.alert('No se pudo unir', err.message || 'Código de clase no válido.')
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  function handleSoundToggle(value: boolean) {
+    setSoundEffects(value)
+    setSoundPref(value)
+    if (value) sfx.tap()
+  }
 
   const xp = calculateXp(0, [])
   const { current: level } = getLevelProgress(xp)
@@ -58,11 +92,49 @@ export function ProfileScreen() {
           </View>
           <Text style={styles.name}>{userName}</Text>
           <Text style={styles.email}>{userEmail}</Text>
-          <View style={[styles.levelBadge, { backgroundColor: level.color + '18' }]}>
-            <Text style={styles.levelIcon}>{level.icon}</Text>
-            <Text style={[styles.levelText, { color: level.color }]}>{level.name}</Text>
-          </View>
+          {esTutor ? (
+            <View style={[styles.levelBadge, { backgroundColor: Colors.primaryTint }]}>
+              <Ionicons name="school" size={14} color={Colors.primaryDeep} />
+              <Text style={[styles.levelText, { color: Colors.primaryDeep }]}>Docente</Text>
+            </View>
+          ) : (
+            <View style={[styles.levelBadge, { backgroundColor: level.color + '18' }]}>
+              <Text style={styles.levelIcon}>{level.icon}</Text>
+              <Text style={[styles.levelText, { color: level.color }]}>{level.name}</Text>
+            </View>
+          )}
         </View>
+
+        {/* Unirse a una clase (solo estudiantes) */}
+        {!esTutor && (
+          <GradientCard style={styles.section}>
+            <Text style={[styles.sectionTitle, { marginBottom: Spacing.sm }]}>Mi clase</Text>
+            <Text style={[styles.muted, { marginBottom: Spacing.sm }]}>
+              ¿Tu tutor te compartió un código? Únete a su clase.
+            </Text>
+            <View style={styles.joinRow}>
+              <TextInput
+                value={codigo}
+                onChangeText={t => setCodigo(t.toUpperCase())}
+                placeholder="Código (ej. ABC123)"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="characters"
+                maxLength={8}
+                style={styles.joinInput}
+              />
+              <TouchableOpacity style={[styles.joinBtn, joining && { opacity: 0.6 }]} onPress={handleJoin} disabled={joining}>
+                {joining ? <ActivityIndicator color={Colors.textInverse} size="small" /> : <Text style={styles.joinBtnTxt}>Unirme</Text>}
+              </TouchableOpacity>
+            </View>
+            {misClases.map(c => (
+              <View key={c.id} style={styles.miClaseRow}>
+                <Ionicons name="people-outline" size={16} color={Colors.primary} />
+                <Text style={styles.miClaseName}>{c.nombre}</Text>
+                <Text style={styles.miClaseCode}>{c.codigo}</Text>
+              </View>
+            ))}
+          </GradientCard>
+        )}
 
         {/* Account info */}
         <GradientCard style={styles.section}>
@@ -108,7 +180,7 @@ export function ProfileScreen() {
           <View style={styles.prefDivider} />
           <PrefRow
             title="Efectos de sonido" sub="Feedback auditivo en el ensamblaje"
-            value={soundEffects} onValueChange={setSoundEffects}
+            value={soundEffects} onValueChange={handleSoundToggle}
           />
         </GradientCard>
 
@@ -188,6 +260,18 @@ const styles = StyleSheet.create({
 
   cancelBtn: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surfaceSunken, borderRadius: Radius.md },
   cancelText: { fontFamily: Fonts.sansSemi, fontSize: 14, color: Colors.textSecondary },
+
+  joinRow: { flexDirection: 'row', gap: Spacing.sm },
+  joinInput: {
+    flex: 1, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: 11,
+    fontFamily: Fonts.sansSemi, fontSize: 15, letterSpacing: 2, color: Colors.text,
+  },
+  joinBtn: { paddingHorizontal: Spacing.lg, borderRadius: Radius.md, backgroundColor: Colors.primaryDeep, alignItems: 'center', justifyContent: 'center' },
+  joinBtnTxt: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.textInverse },
+  miClaseRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: Spacing.sm },
+  miClaseName: { flex: 1, fontFamily: Fonts.sansSemi, fontSize: 14, color: Colors.text },
+  miClaseCode: { fontFamily: Fonts.sansBold, fontSize: 12, color: Colors.primary, letterSpacing: 1 },
 
   prefRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   prefDivider: { height: 1, backgroundColor: Colors.border },

@@ -1,10 +1,15 @@
 import { protegerRuta } from './auth.js'
-import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento } from './progreso.js'
+import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, marcarAprobacionWeb, subirFotoSimulador } from './progreso.js'
+import { PROC_LOGRO, notaConBono } from './achievements.js'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { obtenerReto, calcularNotaReto, LOGROS_RETO, NOTA_MINIMA_RETO } from './retos-data.js'
+import { guardarResultadoReto, obtenerResultadosRetos, otorgarLogros, obtenerLogrosUsuario } from './retos-api.js'
+import * as LFSound from './audio.js'
 
 const PASOS = [
     {
@@ -50,7 +55,7 @@ const PASOS = [
         videoId: null,
         drone: {
             video:       'La placa base es el componente central: todo se conecta a ella. Observa el socket del CPU, las ranuras de RAM y los slots PCIe.',
-            instalacion: 'Selecciona la placa base en el cajón y haz clic en el disco luminoso dentro del gabinete para atornillarla a la bandeja.',
+            instalacion: 'Selecciona la placa base en la vitrina y haz clic en el disco luminoso dentro del gabinete para atornillarla a la bandeja.',
             exito:       '¡Excelente! La placa base está fijada. Es la columna vertebral de todo el sistema.'
         }
     },
@@ -215,8 +220,11 @@ let modelos3D = {}
 const animacionesCaida = []
 let motorListo = false
 
+const ES_TACTIL = window.matchMedia('(pointer: coarse)').matches || !window.matchMedia('(pointer: fine)').matches
+
 let walkControls = null
 let walkMode = false
+let distCaminata = 0
 const teclas = { w: false, a: false, s: false, d: false, shift: false }
 const relojWalk = new THREE.Clock()
 const ALTURA_OJOS = 2.3
@@ -226,20 +234,22 @@ let heldComponent = null
 let heldMesh     = null
 const shelfMeshes   = []
 const shelfSlotObjs = {}
+const propsInteractivos = []
+let hoverSlotId = null
+let ultimoHover = 0
 let frameCount = 0
+let crosshairEl = null
 
 let procActivo   = null
 let camTween     = null
 let iniciandoProc = false
 
-// Fuerza un único recálculo de las sombras en el próximo render. Se usa cuando
-// algo de la escena cambia (modelo colocado, animación de caída, etc.) ya que
-// shadowMap.autoUpdate está desactivado por rendimiento.
+let modoReto = null
+
 function pedirActualizarSombras() {
     if (renderer) renderer.shadowMap.needsUpdate = true
 }
 
-// Objetos reutilizables para evitar asignaciones por frame en el bucle de render.
 const _crosshairRay = new THREE.Raycaster()
 const _scrFwd   = new THREE.Vector3()
 const _scrRight = new THREE.Vector3()
@@ -384,7 +394,7 @@ function mostrarFase3D(idx) {
     updateMissionProgress()
     renderDrawer()
     armarCaminar()
-    setHint(`<strong>Instala: ${paso.nombre}</strong> — selecciona la pieza en el cajón y haz clic en el disco luminoso.`)
+    setHint(`<strong>Instala: ${paso.nombre}</strong> — haz clic en la pieza dentro de la vitrina y luego en el disco luminoso.`)
 }
 
 function droneHabla(msg) {
@@ -393,6 +403,7 @@ function droneHabla(msg) {
 }
 
 const NOTA_MINIMA = 7
+let notaFinalSesion = 0
 
 function calcularNota() {
     let nota = 10 - erroresSesion * 1.0 - demorasSesion * 0.5
@@ -411,17 +422,19 @@ function mostrarFinal() {
     guardarStatsLocal()
     mostrarOverlay('overlay-final')
     montarDrone('drone-final')
+    LFSound.complete()
 
     const t = Math.round((Date.now() - labStartTime) / 1000)
-    const nota = calcularNota()
-    const aprobado = nota >= NOTA_MINIMA
+    const notaBase = calcularNota()
+    const aprobado = notaBase >= NOTA_MINIMA
+    notaFinalSesion = notaBase
 
     const titEl = document.getElementById('final-title')
     const descEl = document.getElementById('final-desc')
     if (titEl) titEl.innerHTML = aprobado ? '¡PC ensamblada<br>con éxito!' : 'Ensamble<br>completado'
     if (descEl) {
         descEl.textContent = aprobado
-            ? `¡Aprobado! Tu ensamble cumple el estándar (mínimo ${NOTA_MINIMA}/10). Ya puedes practicar la instalación real guiada en la app móvil.`
+            ? `¡Aprobado! Tu ensamble cumple el estándar (mínimo ${NOTA_MINIMA}/10). Continúa en la app móvil para practicar la instalación real y desbloquear tu certificado.`
             : `Tu nota está por debajo del mínimo aceptable (${NOTA_MINIMA}/10). Repasa el orden y la elección de las piezas, y vuelve a intentarlo.`
     }
 
@@ -430,8 +443,8 @@ function mostrarFinal() {
         el.innerHTML = `
             <div class="final-stat"><strong>${TOTAL}</strong><span>Componentes<br>instalados</span></div>
             <div class="final-stat"><strong>${formatTiempo(t)}</strong><span>Tiempo de<br>ensamblaje</span></div>
-            <div class="final-stat"><strong>${erroresSesion}</strong><span>Errores<br>de pieza</span></div>
-            <div class="final-stat"><strong style="color:${aprobado ? '#22c55e' : '#ef4444'}">${nota.toFixed(1)}/10</strong><span>Nota<br>${aprobado ? 'APROBADO' : 'NO APROBADO'}</span></div>`
+            <div class="final-stat"><strong>${erroresSesion}</strong><span>Errores<br>cometidos</span></div>
+            <div class="final-stat"><strong id="final-nota" style="color:${aprobado ? '#22c55e' : '#ef4444'}">${notaBase.toFixed(1)}/10</strong><span id="final-nota-lbl">Nota<br>${aprobado ? 'APROBADO' : 'NO APROBADO'}</span></div>`
     }
 
     const acc = document.getElementById('final-actions')
@@ -449,13 +462,51 @@ function mostrarFinal() {
         }
         acc.innerHTML = html
         document.getElementById('btn-explorar-taller')?.addEventListener('click', explorarTaller)
-        document.getElementById('btn-descargar-img')?.addEventListener('click', () => descargarImagenEnsamble(nota, aprobado))
+        document.getElementById('btn-descargar-img')?.addEventListener('click', () => descargarImagenEnsamble(notaFinalSesion, aprobado))
         document.getElementById('btn-reintentar')?.addEventListener('click', volverAIntentar)
         document.getElementById('btn-app-movil')?.addEventListener('click', irAppMovil)
     }
 
     const aviso = document.getElementById('final-aviso')
     if (aviso) aviso.style.display = 'none'
+
+    procesarCierreSesion(notaBase, aprobado)
+}
+
+async function procesarCierreSesion(notaBase, aprobado) {
+
+    const ganados = ['primera_pc', 'componente_estrella']
+    if (erroresSesion === 0) ganados.push('sin_errores')
+    try { await otorgarLogros(ganados, 'ensamble:final') } catch (_) {}
+
+    let nLogros = 0
+    try { nLogros = (await obtenerLogrosUsuario()).length } catch (_) {}
+    const notaFinal = notaConBono(notaBase, nLogros)
+    notaFinalSesion = notaFinal
+    const aprobadoFinal = notaFinal >= NOTA_MINIMA
+
+    const notaEl = document.getElementById('final-nota')
+    const lblEl = document.getElementById('final-nota-lbl')
+    if (notaEl) {
+        notaEl.textContent = `${notaFinal.toFixed(1)}/10`
+        notaEl.style.color = aprobadoFinal ? '#22c55e' : '#ef4444'
+    }
+    const bono = notaFinal - notaBase
+    if (lblEl) {
+        lblEl.innerHTML = bono > 0.001
+            ? `Nota (base ${notaBase.toFixed(1)} +${bono.toFixed(2)} logros)<br>${aprobadoFinal ? 'APROBADO' : 'NO APROBADO'}`
+            : `Nota<br>${aprobadoFinal ? 'APROBADO' : 'NO APROBADO'}`
+    }
+
+    if (!aprobadoFinal) return
+
+    try {
+        const fotoPath = await subirImagenEnsamble(notaFinal, true)
+        await marcarAprobacionWeb({ nota: notaFinal, fotoPath })
+        appendLog('Aprobación web registrada para tu certificado.', 'success')
+    } catch (err) {
+        console.warn('[LogicFlow] No se pudo registrar la aprobación web:', err.message)
+    }
 }
 
 async function volverAIntentar() {
@@ -468,7 +519,7 @@ function irAppMovil() {
     const aviso = document.getElementById('final-aviso')
     if (aviso) {
         aviso.style.display = 'block'
-        aviso.innerHTML = '📱 <strong>App móvil en construcción.</strong> Pronto podrás escanear con la cámara para una instalación real guiada paso a paso. ¡Tu aprobación quedará registrada!'
+        aviso.innerHTML = '✓ <strong>Aprobación registrada.</strong> Abre la app móvil de LogicFlow, completa la instalación real guiada y desbloquea tu <strong>certificado</strong> con el tiempo total y la foto de tu PC.'
     }
 }
 
@@ -479,8 +530,8 @@ function explorarTaller() {
     droneHabla('¡Tu PC está lista! Camina por el taller y observa el sistema que construiste. Usa W/A/S/D para moverte.')
 }
 
-function descargarImagenEnsamble(nota, aprobado) {
-    if (!renderer || !scene || !camera) return
+function construirCanvasEnsamble(nota, aprobado) {
+    if (!renderer || !scene || !camera) return null
 
     camera.position.set(1.7, 1.42, 2.65)
     camera.lookAt(0, 0.9, 0)
@@ -539,9 +590,15 @@ function descargarImagenEnsamble(nota, aprobado) {
     ctx.font = `${Math.round(sw * 0.020)}px 'Segoe UI', Arial, sans-serif`
     ctx.fillText(aprobado ? 'APROBADO' : 'NO APROBADO', out.width - 26, fy + padBottom * 0.72)
 
+    return out
+}
+
+function descargarImagenEnsamble(nota, aprobado) {
+    const out = construirCanvasEnsamble(nota, aprobado)
+    if (!out) return
     try {
         const a = document.createElement('a')
-        const slug = nombre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        const slug = obtenerNombreUsuario().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
         a.download = `ensamble-logicflow-${slug || 'estudiante'}.png`
         a.href = out.toDataURL('image/png')
         a.click()
@@ -549,6 +606,17 @@ function descargarImagenEnsamble(nota, aprobado) {
     } catch (err) {
         appendLog('No se pudo generar la imagen: ' + err.message, 'warn')
     }
+}
+
+function subirImagenEnsamble(nota, aprobado) {
+    return new Promise(resolve => {
+        const out = construirCanvasEnsamble(nota, aprobado)
+        if (!out) { resolve(null); return }
+        out.toBlob(async blob => {
+            const path = await subirFotoSimulador(blob)
+            resolve(path)
+        }, 'image/png')
+    })
 }
 
 function formatTiempo(seg) {
@@ -629,16 +697,20 @@ function updateMissionProgress() {
         if (title) title.textContent = '¡POST exitoso! Gabinete listo.'
         if (btnToggle) btnToggle.style.display = 'none'
     }
+    dibujarPantallaTaller()
 }
 
 function appendLog(msg, type = 'system') {
     const log = document.getElementById('terminal-log')
-    if (!log) return
-    const line = document.createElement('div')
-    line.className = `log-line ${type}`
-    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
-    log.appendChild(line)
-    log.scrollTop = log.scrollHeight
+    if (log) {
+        const line = document.createElement('div')
+        line.className = `log-line ${type}`
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
+        log.appendChild(line)
+        log.scrollTop = log.scrollHeight
+    }
+    if (type === 'success') LFSound.success()
+    else if (type === 'warn' || type === 'warning') LFSound.error()
 }
 
 function setHint(msg) {
@@ -673,25 +745,105 @@ function handleSelection(componentId) {
     activarMarcador(idx, true)
 }
 
-function onCanvasClick(e) {
-    if (procActivo) { clicProcedimiento(e); return }
-    if (walkMode) return
-    if (!selectedComponent) {
-        droneHabla('Primero selecciona el componente en el cajón inferior.')
-        return
-    }
+function setMouseDesdeEvento(e) {
     const rect = canvas.getBoundingClientRect()
     mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1
     mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1
+}
+
+function onCanvasClick(e) {
+    if (procActivo) { clicProcedimiento(e); return }
+    if (walkMode) return
+    if (modoReto) { clicReto(e); return }
+    setMouseDesdeEvento(e)
     raycaster.setFromCamera(mouse, camera)
 
-    const hits = raycaster.intersectObjects(slotDiscs)
-    const hit = hits.find(h => h.object.userData.id === selectedComponent.id)
-    if (hit) {
-        if (tieneProcedimiento(selectedComponent.id)) iniciarProcedimiento(selectedComponent)
-        else finalizarPaso(selectedComponent)
-    } else {
+    if (selectedComponent) {
+        const hits = raycaster.intersectObjects(slotDiscs)
+        const hit = hits.find(h => h.object.userData.id === selectedComponent.id)
+        if (hit) {
+            if (tieneProcedimiento(selectedComponent.id)) iniciarProcedimiento(selectedComponent)
+            else finalizarPaso(selectedComponent)
+            return
+        }
+    }
+
+    const sHits = raycaster.intersectObjects(shelfMeshes)
+    if (sHits.length) {
+        const { pasoId, idx } = sHits[0].object.userData
+        const paso = PASOS[idx]
+        if (idx < indiceActual) {
+            droneHabla(`"${paso.nombre}" ya está instalado en el PC.`)
+        } else if (idx > indiceActual) {
+            droneHabla(`Todavía no toca "${paso.nombre}". Ahora corresponde instalar "${PASOS[indiceActual]?.nombre}".`)
+        } else {
+            handleSelection(pasoId)
+        }
+        return
+    }
+
+    if (propsInteractivos.length) {
+        const pHits = raycaster.intersectObjects(propsInteractivos, true)
+        if (pHits.length) {
+            let obj = pHits[0].object
+            while (obj && !obj.userData.fact) obj = obj.parent
+            if (obj?.userData.fact) { droneHabla(obj.userData.fact); return }
+        }
+    }
+
+    if (selectedComponent) {
         droneHabla(`Haz clic sobre el disco luminoso de "${selectedComponent.nombre}".`)
+    } else {
+        droneHabla('Haz clic sobre un componente de la vitrina para seleccionarlo.')
+    }
+}
+
+function onCanvasHover(e) {
+    if (walkMode || procActivo || fase !== '3d' || !camera) return
+    const ahora = performance.now()
+    if (ahora - ultimoHover < 70) return
+    ultimoHover = ahora
+
+    setMouseDesdeEvento(e)
+    raycaster.setFromCamera(mouse, camera)
+
+    if (modoReto) {
+        const dHits = raycaster.intersectObjects(slotDiscs)
+        if (dHits.length) {
+            const p = PASOS.find(x => x.id === dHits[0].object.userData.id)
+            canvas.style.cursor = 'pointer'
+            if (p) setHint(modoReto.fase === 'reparacion'
+                ? `<strong>${p.nombre}</strong> — clic para instalar el repuesto aquí.`
+                : `<strong>🔍 ${p.nombre}</strong> — clic para inspeccionar${modoReto.inspeccionados.has(p.id) ? ' de nuevo' : ''}.`)
+            return
+        }
+        const sHitsReto = raycaster.intersectObjects(shelfMeshes)
+        canvas.style.cursor = sHitsReto.length ? 'pointer' : ''
+        return
+    }
+
+    const hits = raycaster.intersectObjects(shelfMeshes)
+    const nuevo = hits.length ? hits[0].object.userData.pasoId : null
+    if (nuevo === hoverSlotId) return
+
+    if (hoverSlotId) aplicarHoverSlot(hoverSlotId, false)
+    hoverSlotId = nuevo
+    if (hoverSlotId) aplicarHoverSlot(hoverSlotId, true)
+    canvas.style.cursor = hoverSlotId ? 'pointer' : ''
+}
+
+function aplicarHoverSlot(pasoId, activo) {
+    const slot = shelfSlotObjs[pasoId]
+    if (!slot) return
+    slot.scale.setScalar(activo ? 1.05 : 1)
+    const led = slot.userData.ledMat
+    if (led) led.emissiveIntensity = activo ? 3.4 : 1.6
+    if (activo) {
+        const idx = PASOS.findIndex(p => p.id === pasoId)
+        const estado = modoReto
+            ? 'pieza de repuesto'
+            : idx < indiceActual ? 'ya instalado' : idx === indiceActual ? 'clic para seleccionar' : 'bloqueado por ahora'
+        setHint(`<strong>${PASOS[idx].brand} ${PASOS[idx].nombre}</strong> — ${estado}.`)
     }
 }
 
@@ -732,7 +884,7 @@ function armarCaminar() {
 function actualizarOverlayWalk() {
     const card = document.getElementById('walk-start')
     if (!card) return
-    const mostrar = fase === '3d' && !walkMode && !selectedComponent && !heldComponent
+    const mostrar = fase === '3d' && !walkMode && !selectedComponent && !heldComponent && !modoReto
     card.style.display = mostrar ? 'flex' : 'none'
 }
 
@@ -749,6 +901,12 @@ function actualizarCaminar(delta) {
 
     colisionarSala(obj.position, ax, az)
     obj.position.y = SALA.y0 + ALTURA_OJOS
+
+    const recorrido = Math.hypot(obj.position.x - ax, obj.position.z - az)
+    if (recorrido > 0.0001) {
+        distCaminata += recorrido
+        if (distCaminata > 0.85) { distCaminata = 0; LFSound.footstep() }
+    }
 }
 
 function colisionarSala(pos, prevX, prevZ) {
@@ -759,6 +917,10 @@ function colisionarSala(pos, prevX, prevZ) {
     if (Math.hypot(pos.x, pos.z) < RADIO_MESA) {
         pos.x = prevX
         pos.z = prevZ
+    }
+
+    if (Math.abs(pos.x) < VITRINA.w / 2 + 0.30 && pos.z > VITRINA.frontZ - 0.30) {
+        pos.z = VITRINA.frontZ - 0.30
     }
 }
 
@@ -819,10 +981,15 @@ function initMotor3D() {
     renderer.toneMappingExposure = 1.2
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFShadowMap
-    // La escena es prácticamente estática: las sombras se recalculan solo
-    // cuando algo cambia (modelo colocado, animación, modo caminar), no en cada frame.
+
     renderer.shadowMap.autoUpdate = false
     renderer.shadowMap.needsUpdate = true
+
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
+
+    crosshairEl = document.getElementById('crosshair')
 
     controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
@@ -833,6 +1000,7 @@ function initMotor3D() {
     controls.target.set(0, 0.78, 0)
 
     canvas.addEventListener('click', onCanvasClick)
+    canvas.addEventListener('pointermove', onCanvasHover)
 
     walkControls = new PointerLockControls(camera, renderer.domElement)
     walkControls.addEventListener('lock', onWalkLock)
@@ -848,6 +1016,7 @@ function initMotor3D() {
         get scene() { return scene },
         get camera() { return camera },
         get controls() { return controls },
+        get renderer() { return renderer },
         modelos3D, PASOS, THREE,
         medir() {
             const r = n => Math.round(n * 1000) / 1000
@@ -1100,50 +1269,6 @@ function crearTexturaLetreroComponentes() {
     return tex
 }
 
-function crearFondoGradiente() {
-    const c = document.createElement('canvas')
-    c.width = 16; c.height = 256
-    const ctx = c.getContext('2d')
-    const g = ctx.createLinearGradient(0, 0, 0, 256)
-    g.addColorStop(0,   '#cdd6e0')
-    g.addColorStop(0.55,'#aab6c4')
-    g.addColorStop(1,   '#8b97a6')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, 16, 256)
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    return tex
-}
-
-function crearTexturaConcreto(size = 512) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = '#6f6a63'
-    ctx.fillRect(0, 0, size, size)
-
-    for (let i = 0; i < 40; i++) {
-        const x = Math.random() * size, y = Math.random() * size
-        const r = 30 + Math.random() * 90
-        const gr = ctx.createRadialGradient(x, y, 0, x, y, r)
-        const tono = Math.random() > 0.5 ? '255,255,255' : '60,66,72'
-        gr.addColorStop(0, `rgba(${tono},${0.03 + Math.random() * 0.05})`)
-        gr.addColorStop(1, `rgba(${tono},0)`)
-        ctx.fillStyle = gr
-        ctx.fillRect(x - r, y - r, r * 2, r * 2)
-    }
-
-    for (let i = 0; i < 2400; i++) {
-        ctx.fillStyle = `rgba(${Math.random() > 0.5 ? '255,255,255' : '40,44,50'},${Math.random() * 0.08})`
-        ctx.fillRect(Math.random() * size, Math.random() * size, 1, 1)
-    }
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-    tex.repeat.set(5, 5)
-    return tex
-}
-
 function crearTexturaPisoModerno(size = 1024) {
     const c = document.createElement('canvas')
     c.width = c.height = size
@@ -1279,158 +1404,145 @@ function crearTexturaEtiqueta(nombre) {
     return tex
 }
 
-function crearEstanteriaComponentes(grupo) {
+function crearVitrinaComponentes(grupo) {
+    const { cols, slotW, depth, backZ, frontZ, w, baseH, rowH } = VITRINA
+    const ROWS  = Math.ceil(PASOS.length / cols)
+    const CX_Z  = (backZ + frontZ) / 2
+    const H     = baseH + ROWS * rowH + 0.06
+    const yBase = SALA.y0
 
-    const BACK_Z  = SALA.zMax - 0.06
-    const FRONT_Z = SALA.zMax - 0.60
-    const CX_Z    = (BACK_Z + FRONT_Z) / 2
-    const SHELF_D = BACK_Z - FRONT_Z
-    const SHELF_Y = SALA.y0 + 1.62
-    const BBH     = 1.18
-    const W_TOTAL = 7.6
-    const slotW   = W_TOTAL / PASOS.length
-    const xStart  = -(W_TOTAL / 2)
+    const woodTex  = crearTexturaMaderaClara(); woodTex.repeat.set(3, 1)
+    const mWood    = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.58, metalness: 0.02 })
+    const mTrim    = new THREE.MeshStandardMaterial({ map: crearTexturaMadera(), roughness: 0.55, metalness: 0.05 })
+    const mDark    = new THREE.MeshStandardMaterial({ color: 0x2a2f36, metalness: 0.55, roughness: 0.45 })
 
-    const backTex = crearTexturaMaderaClara(); backTex.repeat.set(3, 1)
-    const repTex  = crearTexturaMaderaClara(); repTex.repeat.set(4, 1)
-    const mBack  = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.62, metalness: 0.0 })
-    const mRep   = new THREE.MeshStandardMaterial({ map: repTex, roughness: 0.50, metalness: 0.04 })
-    const mTrim  = new THREE.MeshStandardMaterial({ map: crearTexturaMadera(), roughness: 0.55, metalness: 0.05 })
-    const mPed   = new THREE.MeshStandardMaterial({ map: crearTexturaMadera(), roughness: 0.55, metalness: 0.05 })
-    const mFrame = mTrim
-    const mGlass = new THREE.MeshStandardMaterial({
-        color: 0xeaf6ff, transparent: true, opacity: 0.06,
-        roughness: 0.04, metalness: 0, depthWrite: false, side: THREE.DoubleSide
+    const back = new THREE.Mesh(new THREE.BoxGeometry(w + 0.26, H, 0.05), mWood)
+    back.position.set(0, yBase + H / 2, backZ)
+    back.receiveShadow = true
+    grupo.add(back)
+
+    ;[-1, 1].forEach(s => {
+        const lado = new THREE.Mesh(new THREE.BoxGeometry(0.07, H, depth + 0.04), mTrim)
+        lado.position.set(s * (w / 2 + 0.10), yBase + H / 2, CX_Z)
+        lado.castShadow = true
+        grupo.add(lado)
     })
 
-    const bb = new THREE.Mesh(new THREE.BoxGeometry(W_TOTAL + 0.44, BBH, 0.06), mBack)
-    bb.position.set(0, SHELF_Y + BBH / 2, BACK_Z)
-    bb.receiveShadow = true
-    grupo.add(bb)
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, baseH - 0.04, depth - 0.04), mWood)
+    base.position.set(0, yBase + (baseH - 0.04) / 2, CX_Z)
+    base.castShadow = base.receiveShadow = true
+    grupo.add(base)
 
-    const rep = new THREE.Mesh(new THREE.BoxGeometry(W_TOTAL + 0.44, 0.055, SHELF_D), mRep)
-    rep.position.set(0, SHELF_Y - 0.028, CX_Z)
-    rep.castShadow = rep.receiveShadow = true
-    grupo.add(rep)
+    for (let d = 1; d < cols; d++) {
+        const ranura = new THREE.Mesh(new THREE.BoxGeometry(0.012, baseH - 0.22, 0.012), mDark)
+        ranura.position.set(-w / 2 + d * slotW, yBase + baseH / 2 - 0.04, frontZ - 0.002)
+        grupo.add(ranura)
+    }
+    for (let d = 0; d < cols; d++) {
+        const tirador = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.024, 0.024), mDark)
+        tirador.position.set(-w / 2 + (d + 0.5) * slotW, yBase + baseH - 0.20, frontZ - 0.012)
+        grupo.add(tirador)
+    }
+    const zocalo = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, 0.10, depth - 0.10), mDark)
+    zocalo.position.set(0, yBase + 0.05, CX_Z + 0.03)
+    grupo.add(zocalo)
 
-    const front = new THREE.Mesh(new THREE.BoxGeometry(W_TOTAL + 0.44, 0.090, 0.032), mTrim)
-    front.position.set(0, SHELF_Y + 0.008, FRONT_Z - 0.016)
-    front.castShadow = true
-    grupo.add(front)
+    for (let r = 0; r <= ROWS; r++) {
+        const esTapa = r === ROWS
+        const board = new THREE.Mesh(
+            new THREE.BoxGeometry(w + (esTapa ? 0.30 : 0.14), esTapa ? 0.06 : 0.05, depth + (esTapa ? 0.08 : 0)),
+            esTapa ? mTrim : mWood
+        )
+        board.position.set(0, yBase + baseH + r * rowH - 0.025, CX_Z)
+        board.castShadow = board.receiveShadow = true
+        grupo.add(board)
+    }
 
-    const ledStrip = new THREE.Mesh(
-        new THREE.BoxGeometry(W_TOTAL + 0.20, 0.012, 0.012),
-        new THREE.MeshStandardMaterial({ color: 0xffe8c4, emissive: 0xffd9a0, emissiveIntensity: 1.2, roughness: 1 })
-    )
-    ledStrip.position.set(0, SHELF_Y - 0.046, FRONT_Z - 0.005)
-    grupo.add(ledStrip)
+    const mLed = new THREE.MeshStandardMaterial({ color: 0xffe8c4, emissive: 0xffd9a0, emissiveIntensity: 1.4, roughness: 1 })
+    for (let r = 0; r < ROWS; r++) {
+        const led = new THREE.Mesh(new THREE.BoxGeometry(w - 0.15, 0.014, 0.014), mLed)
+        led.position.set(0, yBase + baseH + (r + 1) * rowH - 0.075, frontZ + 0.06)
+        grupo.add(led)
+    }
 
-    const topBar = new THREE.Mesh(new THREE.BoxGeometry(W_TOTAL + 0.54, 0.05, 0.12), mTrim)
-    topBar.position.set(0, SHELF_Y + BBH + 0.005, BACK_Z + 0.02)
-    topBar.castShadow = true
-    grupo.add(topBar)
-
-    ;[-(W_TOTAL / 2 + 0.21), W_TOTAL / 2 + 0.21].forEach(px => {
-        const pilar = new THREE.Mesh(new THREE.BoxGeometry(0.07, BBH + 0.10, SHELF_D + 0.05), mTrim)
-        pilar.position.set(px, SHELF_Y + (BBH + 0.10) / 2, CX_Z)
-        pilar.castShadow = true
-        grupo.add(pilar)
-    })
-
-    const letreroBoard = new THREE.Mesh(new THREE.BoxGeometry(W_TOTAL + 0.62, 0.30, 0.07), mTrim)
-    letreroBoard.position.set(0, SHELF_Y + BBH + 0.17, BACK_Z - 0.01)
+    const letreroBoard = new THREE.Mesh(new THREE.BoxGeometry(w + 0.30, 0.36, 0.07), mTrim)
+    letreroBoard.position.set(0, yBase + H + 0.22, backZ - 0.02)
     letreroBoard.castShadow = true
     grupo.add(letreroBoard)
     const letrero = new THREE.Mesh(
-        new THREE.PlaneGeometry(W_TOTAL + 0.50, 0.25),
-        new THREE.MeshStandardMaterial({ map: crearTexturaLetreroComponentes(), roughness: 0.5, side: THREE.DoubleSide })
+        new THREE.PlaneGeometry(w + 0.16, 0.30),
+        new THREE.MeshStandardMaterial({ map: crearTexturaLetreroComponentes(), roughness: 0.5 })
     )
-    letrero.position.set(0, SHELF_Y + BBH + 0.17, BACK_Z - 0.055)
+    letrero.position.set(0, yBase + H + 0.22, backZ - 0.062)
     letrero.rotation.y = Math.PI
     grupo.add(letrero)
 
-    const foco = new THREE.PointLight(0xffe6c0, 3.2, 5.5, 2)
-    foco.position.set(0, SHELF_Y + BBH + 0.10, CX_Z)
+    const foco = new THREE.PointLight(0xffe6c0, 3.0, 5.0, 2)
+    foco.position.set(0, yBase + H + 0.05, frontZ - 0.35)
     grupo.add(foco)
 
-    const tubo = new THREE.Mesh(
-        new THREE.BoxGeometry(W_TOTAL - 0.1, 0.03, 0.05),
-        new THREE.MeshStandardMaterial({ color: 0xfff4e2, emissive: 0xffe7c2, emissiveIntensity: 1.8, roughness: 1 })
-    )
-    tubo.position.set(0, SHELF_Y + BBH - 0.05, BACK_Z - 0.14)
-    grupo.add(tubo)
-
-    const glass = new THREE.Mesh(
-        new THREE.BoxGeometry(W_TOTAL + 0.06, BBH - 0.05, 0.012),
-        mGlass
-    )
-    glass.position.set(0, SHELF_Y + BBH / 2, FRONT_Z + 0.02)
-    glass.renderOrder = 3
-    grupo.add(glass)
-
     PASOS.forEach((paso, i) => {
-        const cx = xStart + slotW * (i + 0.5)
-        const slotGrupo = new THREE.Group()
+        const col = i % cols
+        const row = i < cols ? ROWS - 1 : ROWS - 2 - Math.floor((i - cols) / cols)
+        const cx  = -w / 2 + slotW * (col + 0.5)
+        const cy  = yBase + baseH + Math.max(row, 0) * rowH
 
-        slotGrupo.position.set(cx, SHELF_Y, CX_Z)
+        const slotGrupo = new THREE.Group()
+        slotGrupo.position.set(cx, cy, CX_Z)
 
         const hitbox = new THREE.Mesh(
-            new THREE.BoxGeometry(slotW * 0.90, BBH - 0.10, SHELF_D - 0.04),
+            new THREE.BoxGeometry(slotW * 0.92, rowH - 0.10, depth - 0.06),
             new THREE.MeshBasicMaterial({ visible: false })
         )
-        hitbox.position.y = (BBH - 0.10) / 2
+        hitbox.position.y = (rowH - 0.10) / 2
         hitbox.userData = { tipo: 'shelf-item', pasoId: paso.id, idx: i }
         slotGrupo.add(hitbox)
         shelfMeshes.push(hitbox)
 
-        const pedW = slotW * 0.76
-        const ped = new THREE.Mesh(new THREE.BoxGeometry(pedW, 0.022, 0.38), mPed)
+        const pedW = slotW * 0.72
+        const ped = new THREE.Mesh(new THREE.BoxGeometry(pedW, 0.022, 0.40), mTrim)
         ped.position.set(0, 0.011, -0.02)
-        ped.castShadow = true
         slotGrupo.add(ped)
 
-        const lc = paso.color
-        const ledPed = new THREE.Mesh(
-            new THREE.BoxGeometry(pedW * 0.86, 0.008, 0.008),
-            new THREE.MeshStandardMaterial({ color: lc, emissive: lc, emissiveIntensity: 1.8, roughness: 1 })
-        )
-        ledPed.position.set(0, 0.022, FRONT_Z - CX_Z + 0.05)
+        const ledMat = new THREE.MeshStandardMaterial({
+            color: paso.color, emissive: paso.color, emissiveIntensity: 1.6, roughness: 1
+        })
+        const ledPed = new THREE.Mesh(new THREE.BoxGeometry(pedW * 0.88, 0.010, 0.010), ledMat)
+        ledPed.position.set(0, 0.020, -0.225)
         slotGrupo.add(ledPed)
+        slotGrupo.userData.ledMat = ledMat
 
         const ph = new THREE.Mesh(
-            new THREE.BoxGeometry(slotW * 0.44, 0.22, 0.12),
+            new THREE.BoxGeometry(slotW * 0.42, 0.22, 0.12),
             new THREE.MeshStandardMaterial({
                 color: paso.color, emissive: paso.color, emissiveIntensity: 0.30,
                 metalness: 0.15, roughness: 0.55
             })
         )
-        ph.position.set(0, 0.022 + 0.11 + 0.004, -0.02)
+        ph.position.set(0, 0.135, -0.02)
         ph.userData.isPlaceholder = true
-        ph.castShadow = true
         slotGrupo.add(ph)
 
         const npGrp = new THREE.Group()
         const placa = new THREE.Mesh(
-            new THREE.BoxGeometry(slotW * 0.82, 0.062, 0.009),
+            new THREE.BoxGeometry(slotW * 0.80, 0.062, 0.009),
             new THREE.MeshStandardMaterial({ color: 0x5a4632, metalness: 0.2, roughness: 0.6 })
         )
         npGrp.add(placa)
         const labelPlane = new THREE.Mesh(
-            new THREE.PlaneGeometry(slotW * 0.76, 0.048),
+            new THREE.PlaneGeometry(slotW * 0.74, 0.048),
             new THREE.MeshBasicMaterial({ map: crearTexturaEtiqueta(paso.nombre), transparent: true, depthWrite: false, side: THREE.DoubleSide })
         )
-        labelPlane.position.z = 0.006
+        labelPlane.position.z = -0.006
+        labelPlane.rotation.y = Math.PI
         npGrp.add(labelPlane)
-        npGrp.position.set(0, -0.020, FRONT_Z - CX_Z + 0.016)
-        npGrp.rotation.x = -0.22
+        npGrp.position.set(0, -0.004, -depth / 2 + 0.012)
+        npGrp.rotation.x = 0.22
         slotGrupo.add(npGrp)
 
-        if (i > 0) {
-            const div = new THREE.Mesh(
-                new THREE.BoxGeometry(0.013, BBH - 0.12, 0.020),
-                mFrame
-            )
-            div.position.set(-slotW / 2, BBH / 2, BACK_Z - CX_Z + 0.04)
+        if (col > 0) {
+            const div = new THREE.Mesh(new THREE.BoxGeometry(0.014, rowH - 0.10, 0.022), mTrim)
+            div.position.set(-slotW / 2, rowH / 2 - 0.03, depth / 2 - 0.10)
             slotGrupo.add(div)
         }
 
@@ -1476,10 +1588,12 @@ function actualizarSlotEstante(paso, innerObj) {
         paso.shelfRotZ ?? 0
     )
 
-    clone.position.set(0, paso.shelfOffsetY ?? 0, paso.shelfOffsetZ ?? -0.02)
-
+    clone.position.set(0, 0, 0)
     const bbox = new THREE.Box3().setFromObject(clone)
+    const centro = bbox.getCenter(new THREE.Vector3())
     const baseOffset = paso.id === 'mb' ? 0.028 : 0.004
+    clone.position.x = -centro.x
+    clone.position.z = -centro.z + (paso.shelfOffsetZ ?? -0.02)
     clone.position.y = 0.022 - bbox.min.y + baseOffset
 
     let display = null
@@ -1552,8 +1666,11 @@ function agarrarComponente(pasoId) {
         const innerClone = modelGrp.children[0].clone(true)
         const HELD_SIZE = 0.18
         innerClone.scale.multiplyScalar(HELD_SIZE / paso.size)
-        innerClone.position.set(0, 0, 0)
         innerClone.rotation.set(paso.rot?.x || 0, paso.rot?.y || 0, paso.rot?.z || 0)
+
+        innerClone.position.set(0, 0, 0)
+        const bb = new THREE.Box3().setFromObject(innerClone)
+        innerClone.position.copy(bb.getCenter(new THREE.Vector3()).negate())
         heldMesh.add(innerClone)
     } else {
         const box = new THREE.Mesh(
@@ -1644,6 +1761,7 @@ function intentarInstalar() {
 }
 
 function interactuarE() {
+    if (modoReto) return
     if (!walkControls?.isLocked) return
 
     const eRay = new THREE.Raycaster()
@@ -1662,6 +1780,13 @@ function interactuarE() {
             }
             agarrarComponente(pasoId)
         } else {
+
+            const pHits = eRay.intersectObjects(propsInteractivos, true)
+            if (pHits.length) {
+                let obj = pHits[0].object
+                while (obj && !obj.userData.fact) obj = obj.parent
+                if (obj?.userData.fact) { droneHabla(obj.userData.fact); return }
+            }
             droneHabla('Acércate a la estantería (detrás de ti) y apunta a un componente para agarrarlo.')
         }
     } else {
@@ -1741,12 +1866,22 @@ function clicProcedimiento(e) {
     const d = obj.userData.proc
     if (d.accion === 'ok') {
         P.bloqueado = true
+        LFSound.snap()
         const done = () => avanzarPasoProc()
         if (d.alAcertar) d.alAcertar(done); else done()
     } else if (d.accion === 'mal') {
         P.errores++; erroresSesion++
+        const subPaso = P.pasos[P.idx]?.titulo || null
+        const elapsed = Math.round((Date.now() - sessionStartTime) / 1000)
+
+        registrarEvento({
+            tipo: 'error_ensamble',
+            componenteId: P.paso.id,
+            detalle: subPaso,
+            segundos: elapsed
+        })
         droneHabla(d.motivo || 'Eso no es correcto. Observa bien e inténtalo de nuevo.')
-        appendLog(`Paso incorrecto en "${P.paso.nombre}".`, 'warn')
+        appendLog(`Paso incorrecto en "${P.paso.nombre}"${subPaso ? ` (${subPaso})` : ''}.`, 'warn')
     } else if (d.accion === 'espera') {
 
         droneHabla(d.espera || 'Sigue el orden indicado (el resaltado es el siguiente).')
@@ -1770,6 +1905,15 @@ function terminarProcedimiento() {
     scene.remove(P.grupo); disposeGroup(P.grupo)
     procActivo = null
     appendLog(`Procedimiento de "${paso.nombre}" completado con ${errores} error(es).`, 'success')
+
+    const segsProc = Math.round((Date.now() - sessionStartTime) / 1000)
+    registrarEvento({ tipo: 'acierto_ensamble', componenteId: paso.id, detalle: paso.nombre, segundos: segsProc })
+    if (errores === 0) {
+        const ganados = ['ensamble_perfecto']
+        if (PROC_LOGRO[paso.id]) ganados.push(PROC_LOGRO[paso.id])
+        otorgarLogros(ganados, `ensamble:${paso.id}`)
+        notificarLogro(`Procedimiento impecable: "${paso.nombre}" sin errores.`)
+    }
 
     enfocarCamara(new THREE.Vector3(0, SALA.y0 + ALTURA_OJOS, 3.2), new THREE.Vector3(0, 1.05, -0.2), 0.75, () => {
         if (controls) controls.enabled = orbitaPrev
@@ -2663,6 +2807,20 @@ function construirProcedimientoPSU(P) {
 
 const SALA = { xMin: -5, xMax: 5, zMin: -4, zMax: 5, y0: -1.0, h: 3.6 }
 
+const VITRINA = (() => {
+    const cols  = 4
+    const slotW = 1.06
+    const depth = 0.56
+    const backZ = SALA.zMax - 0.05
+    return {
+        cols, slotW, depth, backZ,
+        w: cols * slotW,
+        frontZ: backZ - depth,
+        baseH: 1.12,
+        rowH: 0.78
+    }
+})()
+
 function construirEntorno() {
     const grupo = new THREE.Group()
     crearSalaTaller(grupo)
@@ -2673,10 +2831,20 @@ function construirEntorno() {
     crearEstanteria(grupo, SALA.xMin + 0.32, -1.6, Math.PI / 2)
     crearEstanteria(grupo, SALA.xMax - 0.32, -0.6, -Math.PI / 2)
     crearDecoracionPared(grupo)
+    crearVentana(grupo)
+    crearPantallaTaller(grupo)
+    crearLedPerimetral(grupo)
+    crearPlantas(grupo)
     crearSombraContacto(grupo)
     crearProps(grupo)
-    crearEstanteriaComponentes(grupo)
     scene.add(grupo)
+
+    grupo.updateWorldMatrix(true, true)
+    grupo.traverse(o => { o.matrixAutoUpdate = false })
+
+    const vitrina = new THREE.Group()
+    crearVitrinaComponentes(vitrina)
+    scene.add(vitrina)
 }
 
 function crearSalaTaller(grupo) {
@@ -2769,6 +2937,7 @@ function crearTexturaPared(size = 512) {
 }
 
 function crearLucesTecho(grupo) {
+
     const top = SALA.y0 + SALA.h
     const marcoMat = new THREE.MeshStandardMaterial({ color: 0x2a2f36, metalness: 0.6, roughness: 0.4 })
     const tuboMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2d8, emissiveIntensity: 1.8 })
@@ -2776,11 +2945,11 @@ function crearLucesTecho(grupo) {
         const marco = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 0.5), marcoMat)
         marco.position.set(x, top - 0.04, z); grupo.add(marco)
         const tubo = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.05, 0.4), tuboMat)
-        tubo.position.set(x, top - 0.07, z); grupo.add(tubo)
-        const luz = new THREE.PointLight(0xfff3df, 5, 9, 2)
-        luz.position.set(x, top - 0.25, z)
-        grupo.add(luz)
+        tubo.position.set(x, top - 0.105, z); grupo.add(tubo)
     })
+    const luz = new THREE.PointLight(0xfff3df, 4.5, 12, 1.8)
+    luz.position.set(0, top - 0.4, 0.4)
+    grupo.add(luz)
 }
 
 function crearEstanteria(grupo, x, z, rotY) {
@@ -2833,7 +3002,9 @@ function crearDecoracionPared(grupo) {
     )
     lamina.position.z = 0.028; poster.add(lamina)
     poster.position.set(1.7, 1.15, zBack)
+    poster.userData.fact = 'Un plano de placa base ATX: el estándar de tamaño más usado desde 1995. ¡Casi 30 años y sigue vigente!'
     grupo.add(poster)
+    propsInteractivos.push(poster)
 
     const reloj = new THREE.Group()
     const cuerpo = new THREE.Mesh(
@@ -2852,7 +3023,9 @@ function crearDecoracionPared(grupo) {
     const minuto = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.018, 0.012), hMat)
     minuto.position.set(0.05, 0, 0.04); reloj.add(minuto)
     reloj.position.set(3.4, 1.9, zBack)
+    reloj.userData.fact = 'Tic, tac… Un ensamblador con práctica arma un PC completo en menos de 30 minutos. ¡Tómate tu tiempo para aprender!'
     grupo.add(reloj)
+    propsInteractivos.push(reloj)
 
     const cartel = new THREE.Mesh(
         new THREE.PlaneGeometry(2.6, 0.55),
@@ -2860,6 +3033,190 @@ function crearDecoracionPared(grupo) {
     )
     cartel.position.set(-1.4, 2.25, zBack)
     grupo.add(cartel)
+}
+
+function crearVentana(grupo) {
+    const g = new THREE.Group()
+    const marcoMat = new THREE.MeshStandardMaterial({ color: 0x30363e, metalness: 0.55, roughness: 0.4 })
+
+    const W = 2.0, H = 1.15
+    const cielo = new THREE.Mesh(
+        new THREE.PlaneGeometry(W, H),
+        new THREE.MeshBasicMaterial({ map: crearTexturaCielo() })
+    )
+    g.add(cielo)
+
+    const mT = new THREE.Mesh(new THREE.BoxGeometry(W + 0.12, 0.07, 0.07), marcoMat)
+    mT.position.y = H / 2 + 0.02; g.add(mT)
+    const mB = mT.clone(); mB.position.y = -H / 2 - 0.02; g.add(mB)
+    const mL = new THREE.Mesh(new THREE.BoxGeometry(0.07, H + 0.12, 0.07), marcoMat)
+    mL.position.x = -W / 2 - 0.02; g.add(mL)
+    const mR = mL.clone(); mR.position.x = W / 2 + 0.02; g.add(mR)
+    const cruceta = new THREE.Mesh(new THREE.BoxGeometry(0.05, H, 0.05), marcoMat)
+    g.add(cruceta)
+    const crucetaH = new THREE.Mesh(new THREE.BoxGeometry(W, 0.05, 0.05), marcoMat)
+    g.add(crucetaH)
+
+    const repisa = new THREE.Mesh(new THREE.BoxGeometry(W + 0.2, 0.05, 0.16), marcoMat)
+    repisa.position.set(0, -H / 2 - 0.08, 0.05); g.add(repisa)
+
+    g.position.set(SALA.xMin + 0.045, SALA.y0 + 2.0, 1.6)
+    g.rotation.y = Math.PI / 2
+    g.userData.fact = 'Por la ventana entra luz natural. En un taller real conviene armar el PC lejos de alfombras y con buena iluminación.'
+    grupo.add(g)
+    propsInteractivos.push(g)
+}
+
+function crearTexturaCielo() {
+    const c = document.createElement('canvas')
+    c.width = 512; c.height = 288
+    const ctx = c.getContext('2d')
+    const g = ctx.createLinearGradient(0, 0, 0, c.height)
+    g.addColorStop(0, '#7db8e8'); g.addColorStop(0.62, '#bcd9ef'); g.addColorStop(1, '#e8ecd9')
+    ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, c.height)
+
+    const sol = ctx.createRadialGradient(400, 66, 4, 400, 66, 70)
+    sol.addColorStop(0, 'rgba(255,250,225,0.98)'); sol.addColorStop(0.25, 'rgba(255,244,200,0.75)')
+    sol.addColorStop(1, 'rgba(255,244,200,0)')
+    ctx.fillStyle = sol; ctx.fillRect(300, 0, 212, 170)
+
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'
+    ;[[90, 80, 46], [150, 96, 34], [260, 60, 40], [210, 74, 28]].forEach(([x, y, r]) => {
+        ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.45, 0, 0, Math.PI * 2); ctx.fill()
+    })
+
+    ctx.fillStyle = '#6c8f5f'
+    ctx.beginPath(); ctx.moveTo(0, 288)
+    for (let x = 0; x <= 512; x += 32) ctx.lineTo(x, 246 + Math.sin(x * 0.02) * 12)
+    ctx.lineTo(512, 288); ctx.closePath(); ctx.fill()
+
+    const tex = new THREE.CanvasTexture(c)
+    tex.colorSpace = THREE.SRGBColorSpace
+    return tex
+}
+
+let pantallaTallerCanvas = null
+let pantallaTallerTex = null
+
+function crearPantallaTaller(grupo) {
+    const g = new THREE.Group()
+
+    pantallaTallerCanvas = document.createElement('canvas')
+    pantallaTallerCanvas.width = 512; pantallaTallerCanvas.height = 288
+    pantallaTallerTex = new THREE.CanvasTexture(pantallaTallerCanvas)
+    pantallaTallerTex.colorSpace = THREE.SRGBColorSpace
+    dibujarPantallaTaller()
+
+    const marco = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 1.0, 0.07),
+        new THREE.MeshStandardMaterial({ color: 0x14171c, metalness: 0.5, roughness: 0.4 })
+    )
+    g.add(marco)
+    const screen = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.58, 0.88),
+        new THREE.MeshBasicMaterial({ map: pantallaTallerTex })
+    )
+    screen.position.z = -0.038
+    screen.rotation.y = Math.PI
+    g.add(screen)
+
+    g.position.set(SALA.xMax - 0.07, SALA.y0 + 2.05, 1.5)
+    g.rotation.y = Math.PI / 2
+    g.userData.fact = 'Esta pantalla muestra el estado del ensamblaje. ¡Así los técnicos llevan el control del protocolo!'
+    grupo.add(g)
+    propsInteractivos.push(g)
+}
+
+function dibujarPantallaTaller() {
+    if (!pantallaTallerCanvas) return
+    const c = pantallaTallerCanvas
+    const ctx = c.getContext('2d')
+    const paso = PASOS[indiceActual]
+
+    ctx.fillStyle = '#0b1524'; ctx.fillRect(0, 0, c.width, c.height)
+    ctx.strokeStyle = 'rgba(58,139,255,0.55)'; ctx.lineWidth = 4
+    ctx.strokeRect(6, 6, c.width - 12, c.height - 12)
+
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
+    ctx.font = 'bold 30px "Segoe UI", sans-serif'
+    ctx.fillStyle = '#3a8bff'; ctx.fillText('Logic', 28, 52)
+    ctx.fillStyle = '#eaf2ff'; ctx.fillText('Flow · Taller', 28 + ctx.measureText('Logic').width, 52)
+
+    ctx.font = '17px "Segoe UI", sans-serif'; ctx.fillStyle = '#8fa5bd'
+    ctx.fillText(modoReto ? 'MODO RETO · REPARACIÓN' : 'PROTOCOLO DE ENSAMBLE', 28, 92)
+
+    if (modoReto) {
+        ctx.font = 'bold 30px "Segoe UI", sans-serif'; ctx.fillStyle = '#ff9d4a'
+        ctx.fillText(modoReto.reto.icono + ' ' + modoReto.reto.titulo, 28, 150)
+        ctx.font = '20px "Segoe UI", sans-serif'; ctx.fillStyle = '#eaf2ff'
+        ctx.fillText(modoReto.fase === 'reparacion' ? 'Falla diagnosticada: reemplaza la pieza' : 'Diagnóstico en curso…', 28, 190)
+        pantallaTallerTex && (pantallaTallerTex.needsUpdate = true)
+        return
+    }
+
+    if (paso) {
+        ctx.font = 'bold 34px "Segoe UI", sans-serif'; ctx.fillStyle = '#ffd54a'
+        ctx.fillText(`Paso ${indiceActual + 1}/${TOTAL}`, 28, 148)
+        ctx.font = 'bold 26px "Segoe UI", sans-serif'; ctx.fillStyle = '#eaf2ff'
+        ctx.fillText(paso.nombre, 28, 188)
+    } else {
+        ctx.font = 'bold 34px "Segoe UI", sans-serif'; ctx.fillStyle = '#4ade80'
+        ctx.fillText('✓ Sistema completo', 28, 158)
+    }
+
+    const pct = Math.min(1, indiceActual / TOTAL)
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'
+    ctx.fillRect(28, 224, c.width - 56, 22)
+    ctx.fillStyle = pct >= 1 ? '#4ade80' : '#3a8bff'
+    ctx.fillRect(28, 224, (c.width - 56) * pct, 22)
+
+    pantallaTallerTex && (pantallaTallerTex.needsUpdate = true)
+}
+
+function crearLedPerimetral(grupo) {
+    const { xMin, xMax, zMin, zMax, y0, h } = SALA
+    const y = y0 + h - 0.16
+    const mat = new THREE.MeshStandardMaterial({ color: 0x1cc9ff, emissive: 0x1cc9ff, emissiveIntensity: 1.5, roughness: 1 })
+    const W = xMax - xMin, D = zMax - zMin
+    const t = 0.035
+    const mk = (sx, sz, px, pz) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(sx, t, sz), mat)
+        m.position.set(px, y, pz)
+        grupo.add(m)
+    }
+    mk(W - 0.2, t, 0, zMin + 0.05)
+    mk(W - 0.2, t, 0, zMax - 0.05)
+    mk(t, D - 0.2, xMin + 0.05, 0)
+    mk(t, D - 0.2, xMax - 0.05, 0)
+}
+
+function crearPlantas(grupo) {
+    const hoja = new THREE.MeshStandardMaterial({ color: 0x3f7a44, roughness: 0.85, flatShading: true })
+    const hoja2 = new THREE.MeshStandardMaterial({ color: 0x4f9152, roughness: 0.85, flatShading: true })
+    const potMat = new THREE.MeshStandardMaterial({ color: 0xa8552f, roughness: 0.7 })
+
+    const mkPlanta = (x, z, s = 1) => {
+        const g = new THREE.Group()
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.12 * s, 0.24 * s, 14), potMat)
+        pot.position.y = 0.12 * s; pot.castShadow = true; g.add(pot)
+        const tallo = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.02 * s, 0.028 * s, 0.34 * s, 8),
+            new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9 })
+        )
+        tallo.position.y = 0.38 * s; g.add(tallo)
+        ;[[0, 0.62, 0, 0.22], [0.13, 0.5, 0.06, 0.15], [-0.11, 0.52, -0.08, 0.16], [0.02, 0.5, -0.13, 0.14]].forEach(([px, py, pz, r], i) => {
+            const bola = new THREE.Mesh(new THREE.IcosahedronGeometry(r * s, 1), i % 2 ? hoja : hoja2)
+            bola.position.set(px * s, py * s, pz * s)
+            bola.castShadow = true
+            g.add(bola)
+        })
+        g.position.set(x, SALA.y0, z)
+        g.userData.fact = 'Una planta en el taller: el hardware prefiere ambientes sin polvo… ¡pero un poco de verde anima a cualquier técnico!'
+        grupo.add(g)
+        propsInteractivos.push(g)
+    }
+    mkPlanta(SALA.xMin + 0.7, SALA.zMax - 1.1, 1.5)
+    mkPlanta(SALA.xMax - 0.65, SALA.zMin + 0.7, 1.2)
 }
 
 function crearTexturaCartel(size = 512) {
@@ -2876,75 +3233,6 @@ function crearTexturaCartel(size = 512) {
     const tex = new THREE.CanvasTexture(c)
     tex.colorSpace = THREE.SRGBColorSpace
     return tex
-}
-
-function crearHabitacion(grupo) {
-    const muroMat = new THREE.MeshStandardMaterial({
-        color: 0xb8c3cf, roughness: 0.97, metalness: 0, side: THREE.DoubleSide
-    })
-    const Y0 = -1.15, H = 4.8, cy = Y0 + H / 2
-
-    const trasera = new THREE.Mesh(new THREE.PlaneGeometry(14, H), muroMat)
-    trasera.position.set(0, cy, -2.5); trasera.receiveShadow = true; grupo.add(trasera)
-
-    const izq = new THREE.Mesh(new THREE.PlaneGeometry(12, H), muroMat)
-    izq.rotation.y = Math.PI / 2
-    izq.position.set(-4.3, cy, -0.5); izq.receiveShadow = true; grupo.add(izq)
-
-    const der = new THREE.Mesh(new THREE.PlaneGeometry(12, H), muroMat)
-    der.rotation.y = -Math.PI / 2
-    der.position.set(4.3, cy, -0.5); der.receiveShadow = true; grupo.add(der)
-
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x39322a, roughness: 0.7 })
-    const rbT = new THREE.Mesh(new THREE.BoxGeometry(14, 0.16, 0.04), baseMat)
-    rbT.position.set(0, Y0 + 0.08, -2.46); grupo.add(rbT)
-    const rbI = new THREE.Mesh(new THREE.BoxGeometry(12, 0.16, 0.04), baseMat)
-    rbI.rotation.y = Math.PI / 2; rbI.position.set(-4.26, Y0 + 0.08, -0.5); grupo.add(rbI)
-    const rbD = rbI.clone(); rbD.position.x = 4.26; grupo.add(rbD)
-
-    grupo.add(crearPoster())
-    grupo.add(crearReloj())
-}
-
-function crearPoster() {
-    const g = new THREE.Group()
-    const marco = new THREE.Mesh(
-        new THREE.BoxGeometry(0.05, 1.25, 1.6),
-        new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.6 })
-    )
-    marco.castShadow = true; g.add(marco)
-    const lamina = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.42, 1.06),
-        new THREE.MeshStandardMaterial({ map: crearTexturaBlueprint(), roughness: 0.5 })
-    )
-    lamina.rotation.y = Math.PI / 2
-    lamina.position.x = 0.028
-    g.add(lamina)
-    g.position.set(-4.26, 0.75, -0.8)
-    return g
-}
-
-function crearReloj() {
-    const g = new THREE.Group()
-    const cuerpo = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.3, 0.3, 0.05, 40),
-        new THREE.MeshStandardMaterial({ color: 0x23272e, metalness: 0.5, roughness: 0.4 })
-    )
-    cuerpo.rotation.z = Math.PI / 2; cuerpo.castShadow = true; g.add(cuerpo)
-    const cara = new THREE.Mesh(
-        new THREE.CircleGeometry(0.26, 40),
-        new THREE.MeshStandardMaterial({ color: 0xf4f6f9, roughness: 0.5 })
-    )
-    cara.rotation.y = -Math.PI / 2; cara.position.x = -0.026; g.add(cara)
-    const hMat = new THREE.MeshStandardMaterial({ color: 0x23272e })
-    const hora = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.13, 0.018), hMat)
-    hora.position.set(-0.032, 0.05, 0); g.add(hora)
-    const minuto = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.018, 0.18), hMat)
-    minuto.position.set(-0.032, 0, 0.06); g.add(minuto)
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 16), hMat)
-    hub.rotation.z = Math.PI / 2; hub.position.x = -0.034; g.add(hub)
-    g.position.set(4.27, 0.95, -0.6)
-    return g
 }
 
 function crearTexturaBlueprint(size = 512) {
@@ -2970,26 +3258,6 @@ function crearTexturaBlueprint(size = 512) {
     const tex = new THREE.CanvasTexture(c)
     tex.colorSpace = THREE.SRGBColorSpace
     return tex
-}
-
-function crearPisoConcreto(grupo) {
-
-    const alpha = crearTexturaRadial([
-        [0.0, 'rgba(255,255,255,1)'],
-        [0.62, 'rgba(255,255,255,1)'],
-        [1.0, 'rgba(255,255,255,0)']
-    ])
-    const piso = new THREE.Mesh(
-        new THREE.CircleGeometry(6.5, 96),
-        new THREE.MeshStandardMaterial({
-            map: crearTexturaConcreto(), alphaMap: alpha, transparent: true,
-            roughness: 0.92, metalness: 0.0, color: 0x8c867d
-        })
-    )
-    piso.rotation.x = -Math.PI / 2
-    piso.position.y = -1.0
-    piso.receiveShadow = true
-    grupo.add(piso)
 }
 
 function crearPanelPegboard(grupo) {
@@ -3134,11 +3402,19 @@ function crearSombraContacto(grupo) {
 }
 
 function crearProps(grupo) {
-    grupo.add(crearLampara())
-    grupo.add(crearCajaHerramientas())
-    grupo.add(crearDestornillador())
-    grupo.add(crearTaza())
-    grupo.add(crearBobinaCable())
+
+    const props = [
+        [crearLampara(), 'La lámpara del técnico: una buena luz evita errores al conectar cables pequeños como los del panel frontal.'],
+        [crearCajaHerramientas(), 'Caja de herramientas. Para armar un PC casi solo necesitas un destornillador Phillips #2… ¡y paciencia!'],
+        [crearDestornillador(), 'Destornillador imantado: sujeta los tornillos y evita que caigan dentro del gabinete.'],
+        [crearTaza(), '¡Cuidado con el café! Los líquidos y la electrónica son enemigos mortales. Mantenlo lejos de la mesa de trabajo.'],
+        [crearBobinaCable(), 'Bridas y cables: una buena gestión de cables mejora el flujo de aire dentro del gabinete.']
+    ]
+    for (const [obj, fact] of props) {
+        obj.userData.fact = fact
+        grupo.add(obj)
+        propsInteractivos.push(obj)
+    }
 }
 
 function meshEntre(p1, p2, radio, mat) {
@@ -3271,11 +3547,10 @@ function crearBobinaCable() {
 
 function construirIluminacion() {
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+    scene.add(new THREE.AmbientLight(0xffffff, 0.28))
+    scene.add(new THREE.HemisphereLight(0xfff1d8, 0x55504a, 0.42))
 
-    scene.add(new THREE.HemisphereLight(0xfff1d8, 0x6f6a63, 0.55))
-
-    const key = new THREE.DirectionalLight(0xfff4e2, 1.7)
+    const key = new THREE.DirectionalLight(0xfff4e2, 1.6)
     key.position.set(2.5, 5, 3)
     key.castShadow = true
     key.shadow.mapSize.set(2048, 2048)
@@ -3286,9 +3561,15 @@ function construirIluminacion() {
     key.shadow.bias = -0.0004
     scene.add(key)
 
-    const fill = new THREE.DirectionalLight(0xcfe0f5, 0.5)
+    const fill = new THREE.DirectionalLight(0xcfe0f5, 0.45)
     fill.position.set(-3, 2.5, 2)
     scene.add(fill)
+
+    const spot = new THREE.SpotLight(0xfff0dc, 3.2, 9, 0.62, 0.55, 1.4)
+    spot.position.set(0, SALA.y0 + SALA.h - 0.3, VITRINA.frontZ - 1.7)
+    spot.target.position.set(0, SALA.y0 + 1.4, VITRINA.backZ)
+    scene.add(spot)
+    scene.add(spot.target)
 }
 
 function crearMarcadores() {
@@ -3343,13 +3624,9 @@ function ocultarMarcador(id) {
     if (paso?.marker) paso.marker.visible = false
 }
 
-// Máxima resolución de textura permitida. Los modelos traen PNG de varios MB
-// (hasta 4K+) que son enormes para piezas que se ven pequeñas en pantalla.
-// Reescalarlas reduce drásticamente la memoria de GPU y los tirones al subirlas.
 const MAX_TEX_SIZE = 1024
 let _maxAniso = 4
 
-// Reduce una textura a MAX_TEX_SIZE como máximo y ajusta filtrado/anisotropía.
 function optimizarTextura(tex) {
     if (!tex || !tex.image || tex.userData?.optimizada) return
     const img = tex.image
@@ -3401,8 +3678,6 @@ function precargarModelos() {
         if (cargados >= total) { clearTimeout(safety); ocultarLoading() }
     }
 
-    // Carga secuencial: subir las texturas pesadas de una en una evita el gran
-    // congelamiento que produce decodificar/subir 8 modelos a la vez.
     let idx = 0
     const siguiente = () => {
         if (idx >= PASOS.length) return
@@ -3493,7 +3768,7 @@ function animar() {
             if (camera) p.marker.quaternion.copy(camera.quaternion)
             const intenso = p.marker.userData.intenso
             const pulso = 1 + Math.sin(t * 2) * (intenso ? 0.18 : 0.10)
-            p.marker.scale.setScalar(pulso)
+            p.marker.scale.setScalar(pulso * (p.marker.userData.baseScale || 1))
             const { flecha, anillo, baseFlechaY } = p.marker.userData
             if (flecha) flecha.position.y = baseFlechaY + Math.sin(t * 2.5) * baseFlechaY * 0.18
             if (anillo) anillo.material.opacity = intenso ? 1 : 0.7 + Math.sin(t * 2) * 0.25
@@ -3509,7 +3784,7 @@ function animar() {
                 animacionesCaida.splice(i, 1)
             }
         }
-        // Los modelos en caída proyectan sombra: refrescarla mientras se animan.
+
         pedirActualizarSombras()
     }
 
@@ -3549,8 +3824,7 @@ function animar() {
         _crosshairRay.far = 3.2
         const targets = heldComponent ? slotDiscs : shelfMeshes
         const hit = _crosshairRay.intersectObjects(targets).length > 0
-        const ch = document.getElementById('crosshair')
-        if (ch) ch.style.color = hit ? '#4ade80' : 'rgba(255,255,255,0.75)'
+        if (crosshairEl) crosshairEl.style.color = hit ? '#4ade80' : 'rgba(255,255,255,0.75)'
     }
 
     renderer?.render(scene, camera)
@@ -3564,6 +3838,33 @@ function resizeRenderer() {
     camera.aspect = w / h
     camera.updateProjectionMatrix()
     renderer.setSize(w, h, false)
+}
+
+let _logroToastCSS = false
+function notificarLogro(texto, icono = '🏅') {
+    if (!_logroToastCSS) {
+        const st = document.createElement('style')
+        st.textContent =
+            '@keyframes lfLogroIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}' +
+            '@keyframes lfLogroOut{to{opacity:0;transform:translateY(-10px)}}' +
+            '.lf-logro-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9999;' +
+            'display:flex;align-items:center;gap:12px;max-width:420px;padding:13px 18px;border-radius:14px;' +
+            'background:linear-gradient(135deg,#11213a,#0e1726);border:1px solid #2b6cff55;color:#eaf2ff;' +
+            'box-shadow:0 14px 40px rgba(0,0,0,.45);font-family:"Segoe UI",Arial,sans-serif;animation:lfLogroIn .35s ease}' +
+            '.lf-logro-toast .ic{font-size:26px;filter:drop-shadow(0 2px 6px #2b6cff88)}' +
+            '.lf-logro-toast b{display:block;font-size:12px;letter-spacing:.6px;color:#7fb0ff;text-transform:uppercase}' +
+            '.lf-logro-toast span{font-size:14px;color:#dbe7f5}'
+        document.head.appendChild(st)
+        _logroToastCSS = true
+    }
+    const el = document.createElement('div')
+    el.className = 'lf-logro-toast'
+    el.innerHTML = `<div class="ic">${icono}</div><div><b>¡Logro desbloqueado!</b><span>${texto}</span></div>`
+    document.body.appendChild(el)
+    setTimeout(() => {
+        el.style.animation = 'lfLogroOut .4s ease forwards'
+        setTimeout(() => el.remove(), 400)
+    }, 3200)
 }
 
 const LS_KEY = 'lf_instalados'
@@ -3599,7 +3900,398 @@ function limpiarStatsLocal() {
     localStorage.removeItem(LS_STATS_KEY)
 }
 
+function iniciarModoReto(reto) {
+    modoReto = {
+        reto,
+        fase: 'brief',
+        inspeccionados: new Set(),
+        erroresDiag: 0,
+        pistasUsadas: 0,
+        piezaLista: false,
+        t0: null
+    }
+    indiceActual = TOTAL
+    labStartTime = Date.now()
+    initMotor3D()
+    motorListo = true
+    mostrarBriefReto()
+}
+
+function mostrarBriefReto() {
+    const r = modoReto.reto
+    let ov = document.getElementById('overlay-reto-brief')
+    if (!ov) {
+        ov = document.createElement('div')
+        ov.id = 'overlay-reto-brief'
+        ov.className = 'lab-overlay'
+        document.body.appendChild(ov)
+    }
+    ov.innerHTML = `
+        <div class="bienvenida-layout" style="grid-template-columns:1fr;max-width:660px;">
+            <div class="bienvenida-info-col">
+                <span class="lab-eyebrow">Taller de reparación · Reto ${'★'.repeat(r.dificultad)}${'☆'.repeat(3 - r.dificultad)}</span>
+                <h1 class="bienvenida-title" style="font-size:2.2rem;">${r.icono} ${r.titulo}</h1>
+                <p class="bienvenida-desc" style="font-style:italic;border-left:3px solid #3a8bff;padding-left:14px;">
+                    “${r.cliente}”<br><span style="font-size:.8rem;opacity:.7;">— el cliente</span>
+                </p>
+                <ul class="vf-facts-list" style="margin:14px 0;">
+                    ${r.sintomas.map(s => `<li class="vf-fact-item">${s}</li>`).join('')}
+                </ul>
+                <p class="bienvenida-desc" style="font-size:.88rem;">
+                    <strong>Cómo se califica:</strong> partes con 10/10. Cada diagnóstico equivocado resta 2,
+                    cada pista resta 1 y tardar más de 6 minutos resta 1. Necesitas ${NOTA_MINIMA_RETO}/10 para aprobar.
+                </p>
+                <button id="btn-aceptar-reto" class="btn btn-primary bienvenida-btn">🔧 Aceptar el reto</button>
+            </div>
+        </div>`
+    mostrarOverlay('overlay-reto-brief')
+    document.getElementById('btn-aceptar-reto')?.addEventListener('click', comenzarInspeccionReto)
+}
+
+function comenzarInspeccionReto() {
+    const M = modoReto
+    M.fase = 'inspeccion'
+    M.t0 = Date.now()
+    labStartTime = Date.now()
+    fase = '3d'
+    mostrarOverlay('3d')
+    montarDrone('drone-float-svg')
+
+    if (controls) {
+        controls.enabled = true
+        controls.target.set(0, 0.85, 0)
+    }
+    camera.position.set(1.55, 1.35, 2.7)
+
+    PASOS.forEach(p => {
+        if (!p.marker) return
+        p.marker.visible = true
+        p.marker.userData.intenso = false
+        const radio = Math.max(0.12, p.size * 0.34)
+        p.marker.userData.baseScale = Math.min(1, 0.09 / radio)
+        p.marker.scale.setScalar(p.marker.userData.baseScale)
+    })
+
+    setupSidebarReto()
+    renderPanelReto()
+    dibujarPantallaTaller()
+    actualizarNotaReto()
+    droneHabla(`El cliente dice: “${M.reto.cliente}”. Haz clic en los discos de la PC para inspeccionar cada componente.`)
+    setHint(`<strong>${M.reto.icono} ${M.reto.titulo}</strong> — inspecciona los componentes (clic en los discos) y diagnostica la falla en el panel derecho.`)
+    appendLog(`Reto iniciado: ${M.reto.titulo}`, 'info')
+
+    const title = document.getElementById('mission-title')
+    if (title) title.textContent = `RETO: ${M.reto.titulo}`
+}
+
+function setupSidebarReto() {
+    const instr = document.getElementById('instruction-p')
+    if (instr) instr.textContent = `“${modoReto.reto.cliente}”`
+    const box = document.querySelector('.checklist-box h4')
+    if (box) box.textContent = 'Síntomas reportados'
+    const ul = document.getElementById('checklist-ul')
+    if (ul) {
+        ul.innerHTML = modoReto.reto.sintomas.map(s =>
+            `<li class="hw-item hw-item--current" style="cursor:default;"><span class="hw-dot"></span><span>${s}</span></li>`
+        ).join('')
+    }
+    const instrH = document.querySelector('.instruction-card h3')
+    if (instrH) instrH.textContent = 'Queja del cliente'
+}
+
+function actualizarNotaReto() {
+    const M = modoReto; if (!M) return
+    const nota = calcularNotaReto({
+        erroresDiagnostico: M.erroresDiag,
+        pistasUsadas: M.pistasUsadas,
+        segundos: M.t0 ? (Date.now() - M.t0) / 1000 : 0
+    })
+    const fill = document.getElementById('progress-fill')
+    const lbl  = document.getElementById('progress-label')
+    if (fill) {
+        fill.style.width = `${nota * 10}%`
+        fill.style.background = nota >= NOTA_MINIMA_RETO ? '' : '#ef4444'
+    }
+    if (lbl) lbl.textContent = `Nota: ${nota.toFixed(1)} / 10`
+    const txt = document.querySelector('.progress-text span')
+    if (txt) txt.textContent = 'Puntaje del reto'
+}
+
+function renderPanelReto() {
+    const M = modoReto; if (!M) return
+    let el = document.getElementById('reto-panel')
+    if (!el) {
+        el = document.createElement('div')
+        el.id = 'reto-panel'
+        el.style.cssText = 'position:absolute;top:16px;right:16px;z-index:40;width:300px;max-height:calc(100% - 32px);overflow:auto;background:rgba(10,18,30,0.93);color:#eaf2ff;border:1px solid rgba(120,180,255,0.25);border-radius:12px;padding:14px 16px;font-family:Inter,system-ui,sans-serif;box-shadow:0 10px 34px rgba(0,0,0,.45);backdrop-filter:blur(4px);'
+        ;(document.getElementById('canvas-container') || document.body).appendChild(el)
+    }
+    el.style.display = 'block'
+
+    if (M.fase === 'reparacion') {
+        const paso = PASOS.find(p => p.id === M.reto.componenteFalla)
+        el.innerHTML = `
+            <div style="font-weight:700;font-size:.95rem;">✓ Falla diagnosticada</div>
+            <div style="color:#4ade80;font-size:.85rem;margin:6px 0 12px;">${paso.nombre}: ${M.reto.descripcionFalla}</div>
+            <ol style="padding-left:18px;margin:0;display:flex;flex-direction:column;gap:8px;font-size:.83rem;color:#cdd9e8;">
+                <li style="${M.piezaLista ? 'opacity:.55;text-decoration:line-through;' : 'font-weight:600;color:#eaf2ff;'}">Toma un/a ${paso.nombre} nuevo/a de la vitrina (clic).</li>
+                <li style="${M.piezaLista ? 'font-weight:600;color:#eaf2ff;' : 'opacity:.55;'}">Haz clic en el disco luminoso de la PC para instalarlo.</li>
+            </ol>`
+        return
+    }
+
+    const filas = PASOS.map(p => {
+        const visto = M.inspeccionados.has(p.id)
+        return `
+            <li style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                <span style="flex:0 0 16px;text-align:center;">${visto ? '🔍' : '·'}</span>
+                <span style="flex:1;font-size:.82rem;${visto ? '' : 'opacity:.6;'}">${p.nombre}</span>
+                <button data-diag="${p.id}" title="Diagnosticar como pieza dañada"
+                    style="border:1px solid rgba(255,120,120,.45);background:transparent;color:#ff9d9d;font-size:.68rem;border-radius:6px;padding:3px 7px;cursor:pointer;">
+                    Es la falla
+                </button>
+            </li>`
+    }).join('')
+
+    const quedanPistas = M.reto.pistas.length - M.pistasUsadas
+    el.innerHTML = `
+        <div style="font-weight:700;font-size:.95rem;">Diagnóstico</div>
+        <div style="color:#9fb3c8;font-size:.78rem;margin:4px 0 10px;">
+            Inspecciona con clic en los discos (${M.inspeccionados.size}/${PASOS.length} revisados) y marca la pieza dañada.
+        </div>
+        <ul style="list-style:none;padding:0;margin:0 0 12px;">${filas}</ul>
+        <button id="btn-pista-reto" ${quedanPistas <= 0 ? 'disabled' : ''}
+            style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,213,74,.4);background:rgba(255,213,74,.08);color:#ffd54a;font-size:.8rem;cursor:${quedanPistas > 0 ? 'pointer' : 'default'};opacity:${quedanPistas > 0 ? 1 : 0.45};">
+            💡 Pedir pista a TechBot (−1 punto) · quedan ${quedanPistas}
+        </button>`
+
+    el.querySelectorAll('[data-diag]').forEach(btn =>
+        btn.addEventListener('click', () => diagnosticarReto(btn.getAttribute('data-diag'))))
+    el.querySelector('#btn-pista-reto')?.addEventListener('click', pedirPistaReto)
+}
+
+function inspeccionarReto(id) {
+    const M = modoReto
+    const paso = PASOS.find(p => p.id === id)
+    const info = M.reto.inspecciones[id]
+    if (!paso || !info) return
+
+    M.inspeccionados.add(id)
+    const specs = document.getElementById('specs-content')
+    if (specs) {
+        specs.innerHTML = `
+            <div style="font-weight:700;margin-bottom:6px;">🔍 ${paso.brand} ${paso.nombre}</div>
+            <p style="font-size:.84rem;line-height:1.5;margin:0;${info.anomalo ? 'color:#ffb04a;font-weight:600;' : ''}">${info.texto}</p>`
+    }
+    appendLog(`Inspeccionado: ${paso.nombre}`, info.anomalo ? 'warn' : 'info')
+    droneHabla(info.texto)
+    setHint(`<strong>🔍 ${paso.nombre}:</strong> ${info.texto}`)
+    renderPanelReto()
+}
+
+function pedirPistaReto() {
+    const M = modoReto
+    if (M.pistasUsadas >= M.reto.pistas.length) return
+    const pista = M.reto.pistas[M.pistasUsadas]
+    M.pistasUsadas++
+    droneHabla(`💡 Pista: ${pista}`)
+    setHint(`<strong>💡 Pista de TechBot:</strong> ${pista}`)
+    appendLog(`Pista usada (−1 punto): ${pista}`, 'warn')
+    actualizarNotaReto()
+    renderPanelReto()
+}
+
+function diagnosticarReto(id) {
+    const M = modoReto
+    const paso = PASOS.find(p => p.id === id)
+    if (!paso || M.fase !== 'inspeccion') return
+
+    if (id === M.reto.componenteFalla) {
+        M.fase = 'reparacion'
+        const m = modelos3D[id]
+        if (m) { m.visible = false; pedirActualizarSombras() }
+        PASOS.forEach(p => { if (p.marker) p.marker.visible = false })
+        if (paso.marker) { paso.marker.visible = true; paso.marker.userData.intenso = true }
+
+        appendLog(`✓ Diagnóstico correcto: ${paso.nombre}. Pieza retirada.`, 'success')
+        droneHabla(`¡Diagnóstico correcto! ${M.reto.descripcionFalla} Retiré la pieza dañada: toma un repuesto de la vitrina.`)
+        setHint(`<strong>✓ Falla encontrada: ${paso.nombre}.</strong> Toma el repuesto en la vitrina (clic) y luego haz clic en el disco luminoso.`)
+        dibujarPantallaTaller()
+        renderPanelReto()
+    } else {
+        M.erroresDiag++
+        const info = M.reto.inspecciones[id]
+        appendLog(`✗ Diagnóstico incorrecto: ${paso.nombre} (−2 puntos).`, 'warn')
+        droneHabla(`No es ${paso.nombre}. ${info ? info.texto : 'Ese componente funciona correctamente.'} Sigue investigando.`)
+        setHint(`<strong>✗ Incorrecto (−2 puntos).</strong> ${paso.nombre} no es la causa. Revisa las inspecciones con ⚠.`)
+        actualizarNotaReto()
+    }
+}
+
+function clicReto(e) {
+    const M = modoReto
+    if (!M || M.fase === 'brief' || M.fase === 'final') return
+    setMouseDesdeEvento(e)
+    raycaster.setFromCamera(mouse, camera)
+
+    if (M.fase === 'inspeccion') {
+        const hits = raycaster.intersectObjects(slotDiscs)
+        if (hits.length) { inspeccionarReto(hits[0].object.userData.id); return }
+
+        const sHits = raycaster.intersectObjects(shelfMeshes)
+        if (sHits.length) {
+            droneHabla('La vitrina es para los repuestos. Primero diagnostica cuál pieza está dañada.')
+            return
+        }
+    } else if (M.fase === 'reparacion') {
+        const fallaId = M.reto.componenteFalla
+
+        const sHits = raycaster.intersectObjects(shelfMeshes)
+        if (sHits.length) {
+            const pasoId = sHits[0].object.userData.pasoId
+            const paso = PASOS.find(p => p.id === pasoId)
+            if (pasoId === fallaId) {
+                M.piezaLista = true
+                droneHabla(`Perfecto: ${paso.nombre} nuevo en mano. Ahora haz clic en el disco luminoso de la PC.`)
+                setHint(`<strong>En mano: ${paso.nombre} (repuesto).</strong> Haz clic en el disco luminoso para instalarlo.`)
+                appendLog(`Repuesto tomado: ${paso.nombre}`, 'info')
+                renderPanelReto()
+            } else {
+                droneHabla(`Ese es ${paso.nombre}, pero la pieza dañada es ${PASOS.find(p => p.id === fallaId).nombre}.`)
+            }
+            return
+        }
+
+        const dHits = raycaster.intersectObjects(slotDiscs)
+        if (dHits.find(h => h.object.userData.id === fallaId)) {
+            if (!M.piezaLista) {
+                droneHabla('Primero toma el repuesto de la vitrina (haz clic sobre la pieza).')
+                return
+            }
+            instalarReemplazoReto()
+            return
+        }
+    }
+
+    if (propsInteractivos.length) {
+        const pHits = raycaster.intersectObjects(propsInteractivos, true)
+        if (pHits.length) {
+            let obj = pHits[0].object
+            while (obj && !obj.userData.fact) obj = obj.parent
+            if (obj?.userData.fact) droneHabla(obj.userData.fact)
+        }
+    }
+}
+
+function instalarReemplazoReto() {
+    const M = modoReto
+    const paso = PASOS.find(p => p.id === M.reto.componenteFalla)
+    M.fase = 'final'
+    ocultarMarcador(paso.id)
+    colocarModelo(paso, true)
+    appendLog(`${paso.nombre} reemplazado. Encendiendo la PC…`, 'success')
+    droneHabla('¡Pieza instalada! Encendiendo para verificar… POST correcto. ¡La PC funciona!')
+    setTimeout(finalizarReto, 1800)
+}
+
+async function finalizarReto() {
+    const M = modoReto
+    const r = M.reto
+    const segundos = Math.round((Date.now() - M.t0) / 1000)
+    const nota = calcularNotaReto({ erroresDiagnostico: M.erroresDiag, pistasUsadas: M.pistasUsadas, segundos })
+    const exito = nota >= NOTA_MINIMA_RETO
+
+    const resultado = {
+        retoId: r.id, nota, exito,
+        erroresDiagnostico: M.erroresDiag,
+        pistasUsadas: M.pistasUsadas,
+        inspecciones: M.inspeccionados.size,
+        segundos
+    }
+
+    const guardado = await guardarResultadoReto(resultado)
+    let logrosNuevos = []
+    try {
+        const resultados = guardado ? await obtenerResultadosRetos() : []
+
+        const historial = resultados.length ? resultados : [{
+            reto_id: r.id, nota, exito,
+            errores_diagnostico: M.erroresDiag, pistas_usadas: M.pistasUsadas, segundos
+        }]
+        const candidatos = LOGROS_RETO.filter(l => l.condition(historial)).map(l => l.id)
+        if (candidatos.length) {
+            const previos = await obtenerLogrosUsuario()
+            logrosNuevos = candidatos.filter(id => !previos.includes(id))
+            if (logrosNuevos.length && guardado) await otorgarLogros(logrosNuevos, r.id)
+        }
+    } catch (_) {  }
+
+    mostrarFinalReto(resultado, logrosNuevos, guardado)
+}
+
+function mostrarFinalReto(res, logrosNuevos, guardado) {
+    const r = modoReto.reto
+    const aprobado = res.exito
+    if (aprobado) LFSound.complete(); else LFSound.error()
+    let ov = document.getElementById('overlay-reto-final')
+    if (!ov) {
+        ov = document.createElement('div')
+        ov.id = 'overlay-reto-final'
+        ov.className = 'lab-overlay'
+        document.body.appendChild(ov)
+    }
+
+    const logrosHtml = logrosNuevos.length ? `
+        <div style="margin:16px 0 4px;">
+            <div style="font-size:.8rem;letter-spacing:1px;color:#9fb3c8;margin-bottom:8px;">🏅 LOGROS DESBLOQUEADOS</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+                ${logrosNuevos.map(id => {
+                    const l = LOGROS_RETO.find(x => x.id === id)
+                    return l ? `<span style="background:rgba(255,213,74,.12);border:1px solid rgba(255,213,74,.4);color:#ffd54a;border-radius:99px;padding:6px 14px;font-size:.82rem;">${l.icono} ${l.titulo}</span>` : ''
+                }).join('')}
+            </div>
+        </div>` : ''
+
+    ov.innerHTML = `
+        <div class="final-layout" style="max-width:720px;">
+            <div class="final-content">
+                <h1 class="final-title">${aprobado ? '¡PC reparada!' : 'Reparación completada'}</h1>
+                <p class="final-desc">
+                    ${aprobado
+                        ? `Diagnóstico y reemplazo correctos. ${guardado ? 'Tu calificación quedó registrada.' : '(Sin conexión: la nota no se pudo guardar en la base de datos.)'}`
+                        : `La PC quedó funcionando, pero la nota está bajo el mínimo (${NOTA_MINIMA_RETO}/10). Puedes reintentarlo: en el taller se aprende reparando.`}
+                </p>
+                <div class="final-stats">
+                    <div class="final-stat"><strong style="color:${aprobado ? '#22c55e' : '#ef4444'}">${res.nota.toFixed(1)}/10</strong><span>Nota<br>${aprobado ? 'APROBADO' : 'NO APROBADO'}</span></div>
+                    <div class="final-stat"><strong>${formatTiempo(res.segundos)}</strong><span>Tiempo de<br>reparación</span></div>
+                    <div class="final-stat"><strong>${res.erroresDiagnostico}</strong><span>Diagnósticos<br>errados</span></div>
+                    <div class="final-stat"><strong>${res.pistasUsadas}</strong><span>Pistas<br>usadas</span></div>
+                </div>
+                <p class="final-desc" style="font-size:.86rem;background:rgba(58,139,255,.08);border:1px solid rgba(58,139,255,.25);border-radius:10px;padding:12px 16px;">
+                    🎓 <strong>¿Por qué era ${PASOS.find(p => p.id === r.componenteFalla).nombre}?</strong><br>${r.explicacion}
+                </p>
+                ${logrosHtml}
+                <div class="final-actions">
+                    <button type="button" class="btn btn-primary" id="btn-reto-reintentar">↻ Reintentar este reto</button>
+                    <a href="retos.html" class="btn btn-secondary">Ver más retos →</a>
+                    <a href="menu.html" class="btn btn-secondary">Mi panel</a>
+                </div>
+            </div>
+        </div>`
+    mostrarOverlay('overlay-reto-final')
+    document.getElementById('btn-reto-reintentar')?.addEventListener('click', () => location.reload())
+    const panel = document.getElementById('reto-panel')
+    if (panel) panel.style.display = 'none'
+}
+
 async function initGame() {
+
+    const retoParam = new URLSearchParams(location.search).get('reto')
+    if (retoParam) {
+        const reto = obtenerReto(retoParam)
+        if (reto) { iniciarModoReto(reto); return }
+        appendLog(`Reto "${retoParam}" no encontrado; se abre el modo ensamblaje.`, 'warn')
+    }
 
     let instalados = leerProgresoLocal()
 
@@ -3641,9 +4333,31 @@ async function initGame() {
     }
 }
 
-document.getElementById('btn-empezar')?.addEventListener('click', () => mostrarVideo(indiceActual))
-document.getElementById('btn-ir-3d')?.addEventListener('click', () => mostrarFase3D(indiceActual))
+document.getElementById('btn-empezar')?.addEventListener('click', () => { LFSound.unlock(); mostrarVideo(indiceActual) })
+document.getElementById('btn-ir-3d')?.addEventListener('click', () => { LFSound.unlock(); mostrarFase3D(indiceActual) })
 document.getElementById('btn-skip-video')?.addEventListener('click', () => mostrarFase3D(indiceActual))
+
+function actualizarIconoSonido(btn, muted) {
+    if (!btn) return
+    const on = btn.querySelector('.lf-sound-icon--on')
+    const off = btn.querySelector('.lf-sound-icon--off')
+    if (on) on.style.display = muted ? 'none' : 'block'
+    if (off) off.style.display = muted ? 'block' : 'none'
+    btn.setAttribute('aria-label', muted ? 'Activar sonido' : 'Silenciar sonido')
+    btn.setAttribute('title', muted ? 'Activar sonido' : 'Silenciar sonido')
+}
+
+const soundToggleBtn = document.getElementById('sound-toggle')
+actualizarIconoSonido(soundToggleBtn, LFSound.isMuted())
+soundToggleBtn?.addEventListener('click', (e) => {
+    LFSound.unlock()
+    const muted = LFSound.toggleMute()
+    actualizarIconoSonido(e.currentTarget, muted)
+})
+
+document.addEventListener('click', (e) => {
+    if (e.target.closest('.btn, button')) LFSound.click()
+})
 
 document.getElementById('component-list')?.addEventListener('click', e => {
     const btn = e.target.closest('button')
@@ -3666,7 +4380,20 @@ setInterval(() => {
     if (el) el.textContent = formatTiempo(Math.round((Date.now() - labStartTime) / 1000))
 }, 1000)
 
+if (ES_TACTIL) {
+    const titulo = document.getElementById('walk-start-title')
+    const sub = document.getElementById('walk-start-sub')
+    if (titulo) titulo.textContent = 'Requiere computadora'
+    if (sub) sub.innerHTML = 'El modo de exploración 3D necesita <b>mouse y teclado</b>. Abre este laboratorio desde una PC para caminar e instalar los componentes.'
+    document.getElementById('walk-controls')?.setAttribute('hidden', '')
+}
+
 document.getElementById('walk-start-btn')?.addEventListener('click', () => {
+    if (ES_TACTIL) {
+        droneHabla('El modo de exploración 3D solo funciona en una computadora con mouse y teclado.')
+        appendLog('Este dispositivo táctil no soporta el modo de caminar. Usa una PC para esta parte.', 'warning')
+        return
+    }
     const card = document.getElementById('walk-start')
     if (card) card.style.display = 'none'
     entrarCaminar()

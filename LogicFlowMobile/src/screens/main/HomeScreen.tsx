@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useAuth } from '../../hooks/useAuth'
 import { obtenerProgreso, obtenerEstadisticas, ProgresoUsuario, Estadisticas } from '../../services/progress'
+import { contarNotifsNoLeidas } from '../../services/tutor'
 import { calculateXp, getLevelProgress, PC_COMPONENTS, COMPONENT_MAP } from '../../constants/components'
 import { XPBar } from '../../components/XPBar'
 import { StatCard } from '../../components/StatCard'
@@ -36,11 +37,13 @@ const ACTIONS: { id: string; label: string; sub: string; icon: IconName; route: 
 ]
 
 export function HomeScreen() {
-  const { userName } = useAuth()
+  const { userName, userRol } = useAuth()
+  const esTutor = (userRol || 'Estudiante').toLowerCase() === 'tutor'
   const [progreso, setProgreso] = useState<ProgresoUsuario | null>(null)
   const [stats, setStats] = useState<Estadisticas | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [notifCount, setNotifCount] = useState(0)
   const [tip] = useState(() => DAILY_TIPS[Math.floor(Math.random() * DAILY_TIPS.length)])
 
   const load = useCallback(async () => {
@@ -49,7 +52,8 @@ export function HomeScreen() {
     setStats(s)
     setLoading(false)
     setRefreshing(false)
-  }, [])
+    if (!esTutor) { try { setNotifCount(await contarNotifsNoLeidas()) } catch {} }
+  }, [esTutor])
 
   useEffect(() => { load() }, [load])
 
@@ -83,6 +87,57 @@ export function HomeScreen() {
   }
 
   const firstName = userName.split(' ')[0]
+
+  // Vista del docente: sin simulador ni gamificación de estudiante.
+  if (esTutor) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.overline}>{greeting()}</Text>
+              <Text style={styles.greeting}>{firstName}</Text>
+            </View>
+            {!esTutor && (
+              <TouchableOpacity onPress={() => router.push('/notificaciones' as any)} activeOpacity={0.85} style={styles.bell} hitSlop={8}>
+                <Ionicons name="notifications-outline" size={22} color={Colors.text} />
+                {notifCount > 0 && (
+                  <View style={styles.bellBadge}><Text style={styles.bellBadgeTxt}>{notifCount > 9 ? '9+' : notifCount}</Text></View>
+                )}
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.85}>
+              <View style={styles.avatar}><Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text></View>
+            </TouchableOpacity>
+          </View>
+
+          <Pressable
+            onPress={() => router.push('/(tabs)/classes' as any)}
+            style={({ pressed }) => [styles.hero, Shadow.lg, pressed && { transform: [{ scale: 0.99 }] }]}
+          >
+            <Text style={styles.heroOverline}>PANEL DEL DOCENTE</Text>
+            <Text style={styles.heroTitle}>Mis clases</Text>
+            <Text style={styles.heroSub}>Crea clases, comparte el código y sigue las calificaciones de tus estudiantes.</Text>
+            <View style={styles.heroCta}>
+              <Text style={styles.heroCtaText}>Ir a mis clases</Text>
+              <Ionicons name="arrow-forward" size={16} color={Colors.textInverse} />
+            </View>
+          </Pressable>
+
+          <GradientCard tone="accent" padded style={styles.tipCard}>
+            <View style={styles.tipHeader}>
+              <Ionicons name="information-circle-outline" size={18} color={Colors.accentDeep} />
+              <Text style={styles.tipTitle}>Cómo empezar</Text>
+            </View>
+            <Text style={styles.tipText}>
+              Crea una clase en la pestaña "Clases", comparte su código con tus estudiantes y verás aquí su avance:
+              notas de ensamble, retos, logros y tiempo.
+            </Text>
+          </GradientCard>
+        </ScrollView>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -149,6 +204,45 @@ export function HomeScreen() {
           <StatCard icon="🎯" label="Precisión" value={precision !== null ? `${precision}%` : '—'} color={Colors.success} />
           <StatCard icon="🏆" label="Builds" value={progreso?.simulaciones_completadas || 0} color={Colors.accent} />
         </View>
+
+        {/* Certificado */}
+        {(() => {
+          const webOk = !!progreso?.web_aprobado_at
+          const appOk = !!progreso?.movil_completado_at
+          const both = webOk && appOk
+          return (
+            <Pressable
+              onPress={() => router.push('/certificate' as any)}
+              style={({ pressed }) => [styles.certBanner, both && styles.certBannerReady, pressed && { transform: [{ scale: 0.99 }] }]}
+            >
+              <View style={styles.certIcon}>
+                <Text style={{ fontSize: 24 }}>{both ? '🎓' : '🔒'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.certTitle}>{both ? 'Certificado disponible' : 'Certificado en progreso'}</Text>
+                <Text style={styles.certSub}>
+                  {both
+                    ? 'Genera y comparte tu certificado con la foto de tu PC.'
+                    : `Web ${webOk ? '✓' : '·'}  ·  App ${appOk ? '✓' : '·'} — completa ambas etapas.`}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={both ? Colors.success : Colors.textMuted} />
+            </Pressable>
+          )
+        })()}
+
+        {/* Mis tareas */}
+        <Pressable
+          onPress={() => router.push('/tareas' as any)}
+          style={({ pressed }) => [styles.certBanner, pressed && { transform: [{ scale: 0.99 }] }]}
+        >
+          <View style={styles.certIcon}><Text style={{ fontSize: 22 }}>📋</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.certTitle}>Mis tareas</Text>
+            <Text style={styles.certSub}>Tareas asignadas por tus tutores.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+        </Pressable>
 
         {/* Quick actions */}
         <SectionTitle>Explorar</SectionTitle>
@@ -242,6 +336,18 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontFamily: Fonts.serif, fontSize: 20, color: Colors.textInverse },
 
+  bell: {
+    width: 44, height: 44, borderRadius: 14, marginRight: Spacing.sm,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  bellBadge: {
+    position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, paddingHorizontal: 4,
+    borderRadius: 9, backgroundColor: Colors.error, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: Colors.background,
+  },
+  bellBadgeTxt: { fontFamily: Fonts.sansBold, fontSize: 10, color: Colors.white },
+
   hero: {
     backgroundColor: Colors.primaryDeep,
     borderRadius: Radius.xl,
@@ -262,6 +368,16 @@ const styles = StyleSheet.create({
 
   xpCard: { marginBottom: Spacing.md },
   statsRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg },
+
+  certBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border,
+    padding: Spacing.md, marginBottom: Spacing.lg,
+  },
+  certBannerReady: { borderColor: Colors.success, backgroundColor: Colors.successSoft },
+  certIcon: { width: 46, height: 46, borderRadius: 13, backgroundColor: Colors.surfaceSunken, alignItems: 'center', justifyContent: 'center' },
+  certTitle: { fontFamily: Fonts.sansBold, fontSize: 15, color: Colors.text },
+  certSub: { ...Typography.caption, marginTop: 2 },
 
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
   actionCard: {

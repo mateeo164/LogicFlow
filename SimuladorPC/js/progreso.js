@@ -1,5 +1,3 @@
-
-
 import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, supabaseAuthRequest } from './supabase-config.js'
 
 const TIMEOUT = 12000
@@ -163,7 +161,7 @@ export async function actualizarPerfil({ full_name, institucion }) {
     }
 }
 
-export async function registrarEvento({ tipo, componenteId = null, componenteEsperado = null, segundos = 0 }) {
+export async function registrarEvento({ tipo, componenteId = null, componenteEsperado = null, segundos = 0, detalle = null }) {
     const userId = getUserId()
     if (!userId || !tipo) return false
 
@@ -176,7 +174,8 @@ export async function registrarEvento({ tipo, componenteId = null, componenteEsp
                 tipo,
                 componente: componenteId,
                 componente_esperado: componenteEsperado,
-                segundos: Math.max(0, Math.round(segundos || 0))
+                segundos: Math.max(0, Math.round(segundos || 0)),
+                detalle: detalle || null
             }
         })
         return true
@@ -186,16 +185,65 @@ export async function registrarEvento({ tipo, componenteId = null, componenteEsp
     }
 }
 
+export async function marcarAprobacionWeb({ nota, fotoPath = null }) {
+    const userId = getUserId()
+    if (!userId) return false
+
+    try {
+        const campos = {
+            nota_web: Math.max(0, Math.min(10, Number(nota) || 0)),
+            web_aprobado_at: new Date().toISOString()
+        }
+        if (fotoPath) campos.foto_simulador_path = fotoPath
+
+        await dataRequest(`/progreso_usuario?user_id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: campos
+        })
+        return true
+    } catch (err) {
+        console.warn('[LogicFlow] No se pudo marcar la aprobación web:', err.message)
+        return false
+    }
+}
+
+export async function subirFotoSimulador(blob) {
+    const userId = getUserId()
+    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    if (!userId || !token || !blob) return null
+
+    const path = `${userId}/simulador.png`
+    try {
+        const res = await fetch(`${SUPABASE_URL}/storage/v1/object/ensambles/${path}`, {
+            method: 'POST',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'image/png',
+                'x-upsert': 'true'
+            },
+            body: blob
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return path
+    } catch (err) {
+        console.warn('[LogicFlow] No se pudo subir la foto del simulador:', err.message)
+        return null
+    }
+}
+
 export async function obtenerEstadisticas({ limite = 1000 } = {}) {
     try {
         const data = await dataRequest(
-            `/eventos_simulacion?select=tipo,componente,componente_esperado,segundos,created_at` +
+            `/eventos_simulacion?select=tipo,componente,componente_esperado,segundos,detalle,created_at` +
             `&order=created_at.desc&limit=${limite}`
         )
         const eventos = Array.isArray(data) ? data : []
 
         const aciertos = eventos.filter(e => e.tipo === 'acierto')
-        const errores  = eventos.filter(e => e.tipo === 'error_pieza')
+
+        const errores  = eventos.filter(e => e.tipo === 'error_pieza' || e.tipo === 'error_ensamble')
         const demoras  = eventos.filter(e => e.tipo === 'demora')
 
         const totalIntentos = aciertos.length + errores.length

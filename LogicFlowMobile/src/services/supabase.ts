@@ -31,6 +31,10 @@ export type Database = {
           completed_at: string | null
           created_at: string
           updated_at: string
+          nota_web: number | null
+          foto_simulador_path: string | null
+          web_aprobado_at: string | null
+          movil_completado_at: string | null
         }
         Insert: Partial<Database['public']['Tables']['progreso_usuario']['Row']>
         Update: Partial<Database['public']['Tables']['progreso_usuario']['Row']>
@@ -39,13 +43,36 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          tipo: 'acierto' | 'error_pieza' | 'demora'
+          tipo: 'acierto' | 'error_pieza' | 'demora' | 'error_ensamble' | 'acierto_ensamble'
           componente: string | null
           componente_esperado: string | null
           segundos: number
+          detalle: string | null
           created_at: string
         }
         Insert: Partial<Database['public']['Tables']['eventos_simulacion']['Row']>
+      }
+      logros_usuario: {
+        Row: {
+          user_id: string
+          logro_id: string
+          contexto: string | null
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['logros_usuario']['Row']>
+      }
+      certificados: {
+        Row: {
+          user_id: string
+          emitido_at: string
+          tiempo_total_segundos: number
+          nota_web: number | null
+          foto_simulador_path: string | null
+          foto_real_path: string | null
+          logros_total: number
+        }
+        Insert: Partial<Database['public']['Tables']['certificados']['Row']>
+        Update: Partial<Database['public']['Tables']['certificados']['Row']>
       }
     }
   }

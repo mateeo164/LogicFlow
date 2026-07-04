@@ -15,7 +15,13 @@
         (function() {
             var token = localStorage.getItem('logicflow_access_token');
             var refresh = localStorage.getItem('logicflow_refresh_token');
-            if (!token && !refresh) { window.location.replace('login.html'); }
+            if (!token && !refresh) { window.location.replace('login.html'); return; }
+            try {
+                var u = JSON.parse(localStorage.getItem('logicflow_user') || 'null');
+                if (u && u.user_metadata && u.user_metadata.rol === 'Tutor') {
+                    window.location.replace('menu.html');
+                }
+            } catch (e) {}
         })();
 </script>
     <script type="importmap">
@@ -192,13 +198,17 @@
             <svg class="lf-theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             <svg class="lf-theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
+        <button type="button" class="lf-sound-toggle" id="sound-toggle" aria-label="Silenciar sonido" title="Silenciar sonido">
+            <svg class="lf-sound-icon--on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            <svg class="lf-sound-icon--off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </button>
     </div>
 </header>
 
 <div id="drone-float" class="drone-float" hidden>
     <div class="drone-wrapper drone-wrapper--md" id="drone-float-svg"></div>
     <div class="drone-float-bubble" id="drone-float-msg">
-        Selecciona un componente del cajón.
+        Selecciona un componente de la vitrina.
     </div>
 </div>
 
@@ -223,7 +233,7 @@
 
         <div class="instruction-card">
             <h3>Instrucción actual</h3>
-            <p id="instruction-p">Selecciona un componente del cajón inferior para comenzar.</p>
+            <p id="instruction-p">Haz clic en un componente de la vitrina para comenzar.</p>
         </div>
 
         <div class="checklist-box">
@@ -240,9 +250,9 @@
         <div id="crosshair" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:22px;line-height:1;color:rgba(255,255,255,0.75);pointer-events:none;display:none;z-index:30;text-shadow:0 1px 4px rgba(0,0,0,0.9);font-weight:300;user-select:none;letter-spacing:0;">+</div>
 
         <div id="walk-start" style="position:absolute;inset:0;z-index:24;display:none;align-items:center;justify-content:center;pointer-events:none;">
-            <button id="walk-start-btn" type="button" style="pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center;padding:18px 28px;border:0;border-radius:14px;background:rgba(15,23,42,0.85);color:#eaf2ff;backdrop-filter:blur(6px);box-shadow:0 10px 30px rgba(0,0,0,0.35);">
-                <span style="font-size:1.05rem;font-weight:700;">▶ Explorar el taller</span>
-                <span style="font-size:0.8rem;opacity:0.85;">Clic para caminar · <b>WASD</b> moverse · <b>Esc</b> para los menús</span>
+            <button id="walk-start-btn" type="button" style="pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center;padding:18px 28px;border:0;border-radius:14px;background:rgba(15,23,42,0.85);color:#eaf2ff;backdrop-filter:blur(6px);box-shadow:0 10px 30px rgba(0,0,0,0.35);max-width:min(90vw, 340px);">
+                <span id="walk-start-title" style="font-size:1.05rem;font-weight:700;">▶ Explorar el taller</span>
+                <span id="walk-start-sub" style="font-size:0.8rem;opacity:0.85;text-align:center;">Clic para caminar · <b>WASD</b> moverse · <b>Esc</b> para los menús</span>
             </button>
         </div>
 

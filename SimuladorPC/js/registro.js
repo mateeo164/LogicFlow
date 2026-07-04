@@ -17,7 +17,7 @@ import {
 } from './auth-validations.js'
 
 document.addEventListener('DOMContentLoaded', function() {
-    
+
     redirigirSiAutenticado()
 
     const form = document.getElementById('form-registro')
@@ -78,4 +78,3 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     })
 })
-

@@ -1,0 +1,173 @@
+.retos-main {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 34px;
+}
+
+.retos-hero {
+    background: linear-gradient(135deg, rgba(15, 118, 216, 0.10), rgba(34, 197, 94, 0.06));
+    border: 1px solid var(--border-light, #dde5f0);
+    border-radius: 18px;
+    padding: 30px 34px;
+}
+
+.retos-hero h1 {
+    margin: 8px 0 10px;
+    font-size: 2rem;
+    color: var(--text-900, #12212f);
+}
+
+.retos-hero p {
+    max-width: 640px;
+    color: var(--text-700, #3a4a5e);
+    line-height: 1.6;
+    margin: 0 0 18px;
+}
+
+.retos-resumen {
+    display: flex;
+    gap: 26px;
+    flex-wrap: wrap;
+}
+
+.retos-resumen__item {
+    display: flex;
+    flex-direction: column;
+}
+
+.retos-resumen__item strong {
+    font-size: 1.5rem;
+    color: var(--blue-600, #0f76d8);
+}
+
+.retos-resumen__item span {
+    font-size: 0.8rem;
+    color: var(--text-500, #67788c);
+}
+
+.retos-seccion-titulo {
+    font-size: 1.15rem;
+    margin: 0 0 14px;
+    color: var(--text-900, #12212f);
+}
+
+.retos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 18px;
+}
+
+.reto-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border-light, #dde5f0);
+    border-radius: 16px;
+    padding: 20px 22px;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.reto-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(15, 30, 60, 0.10);
+}
+
+.reto-card__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.reto-card__icono { font-size: 1.9rem; }
+
+.reto-card__dificultad {
+    font-size: 0.78rem;
+    color: #f59e0b;
+    letter-spacing: 2px;
+}
+
+.reto-card h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--text-900, #12212f);
+}
+
+.reto-card__cliente {
+    font-size: 0.84rem;
+    font-style: italic;
+    color: var(--text-500, #67788c);
+    line-height: 1.5;
+    margin: 0;
+    border-left: 3px solid rgba(15, 118, 216, 0.35);
+    padding-left: 10px;
+}
+
+.reto-card__estado {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-light, #dde5f0);
+    font-size: 0.82rem;
+}
+
+.reto-card__nota--ok   { color: #16a34a; font-weight: 700; }
+.reto-card__nota--mal  { color: #dc2626; font-weight: 700; }
+.reto-card__nota--none { color: var(--text-500, #67788c); }
+
+.logros-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 14px;
+}
+
+.logro-card {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border-light, #dde5f0);
+    border-radius: 14px;
+    padding: 14px 16px;
+}
+
+.logro-card--locked { opacity: 0.45; filter: grayscale(0.9); }
+
+.logro-card__icono { font-size: 1.6rem; }
+
+.logro-card strong {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-900, #12212f);
+}
+
+.logro-card span {
+    font-size: 0.78rem;
+    color: var(--text-500, #67788c);
+    line-height: 1.4;
+}
+
+.retos-cargando {
+    color: var(--text-500, #67788c);
+    font-size: 0.9rem;
+}
+
+.retos-aviso-bd {
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #92600a;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+    .retos-hero { padding: 22px; }
+    .retos-hero h1 { font-size: 1.5rem; }
+}

@@ -1,5 +1,3 @@
-
-
 export const LEVELS = [
   { name: 'Novato',        minXp: 0,   color: '#94a3b8', icon: '🌱' },
   { name: 'Aprendiz',      minXp: 100, color: '#3b82f6', icon: '🔧' },
@@ -123,25 +121,56 @@ export const BADGES = [
   }
 ]
 
-export function getBadges(progreso = {}, stats = {}, xp = 0) {
-  return BADGES.map(badge => ({
+export const GRANULAR_LOGROS = [
+  { id: 'cpu_alineado',    title: 'Pulso de cirujano',   description: 'Alineaste y colocaste el procesador sin un solo error.', icon: '🎯' },
+  { id: 'cooler_montado',  title: 'Maestro térmico',     description: 'Montaste el disipador y aplicaste la pasta sin errores.', icon: '❄️' },
+  { id: 'ram_dual',        title: 'Dual channel',        description: 'Insertaste la RAM en los slots correctos sin errores.',   icon: '📊' },
+  { id: 'mb_montada',      title: 'Base firme',          description: 'Montaste la placa base sin errores.',                     icon: '🧩' },
+  { id: 'gpu_instalada',   title: 'Potencia gráfica',    description: 'Aseguraste y alimentaste la GPU sin errores.',            icon: '🎮' },
+  { id: 'cables_maestro',  title: 'Domador de cables',   description: 'Conectaste todos los cables de poder sin equivocarte.',   icon: '🔌' },
+  { id: 'ensamble_perfecto', title: 'Ensamble impecable', description: 'Completaste un procedimiento guiado con cero errores.',   icon: '💠' }
+]
+
+export const PROC_LOGRO = {
+  cpu:    'cpu_alineado',
+  cooler: 'cooler_montado',
+  ram:    'ram_dual',
+  mb:     'mb_montada',
+  gpu:    'gpu_instalada',
+  power:  'cables_maestro'
+}
+
+export const LOGRO_BONO_UNIT = 0.05
+export const LOGRO_BONO_MAX = 0.5
+
+export function bonoPorLogros(cantidad = 0) {
+  return Math.min(LOGRO_BONO_MAX, Math.max(0, cantidad) * LOGRO_BONO_UNIT)
+}
+
+export function notaConBono(notaBase = 0, cantidadLogros = 0) {
+  return Math.min(10, Math.max(0, notaBase) + bonoPorLogros(cantidadLogros))
+}
+
+export function getBadges(progreso = {}, stats = {}, xp = 0, unlockedLogroIds = []) {
+  const set = new Set(unlockedLogroIds)
+  const computados = BADGES.map(badge => ({
     ...badge,
     unlocked: badge.condition(progreso, stats, xp)
   }))
+  const granulares = GRANULAR_LOGROS.map(l => ({
+    ...l,
+    unlocked: set.has(l.id)
+  }))
+  return [...computados, ...granulares]
 }
 
-export function getRecentBadges(progreso = {}, stats = {}, xp = 0, limit = 3) {
-  return getBadges(progreso, stats, xp)
-    .filter(b => b.unlocked)
-    .slice(0, limit)
-}
-
-export function getProgressSummary(progreso = {}, stats = {}) {
+export function getProgressSummary(progreso = {}, stats = {}, unlockedLogroIds = []) {
   const xp = calculateTotalXp(progreso, stats)
   const level = getLevel(xp)
   const xpInfo = getXpToNextLevel(xp)
-  const badges = getBadges(progreso, stats, xp)
-  const unlockedCount = badges.filter(b => b.unlocked).length
+  const badges = getBadges(progreso, stats, xp, unlockedLogroIds)
+  const unlocked = badges.filter(b => b.unlocked)
+  const unlockedCount = unlocked.length
 
   return {
     xp,
@@ -150,7 +179,8 @@ export function getProgressSummary(progreso = {}, stats = {}) {
     badges,
     unlockedCount,
     totalBadges: badges.length,
-    recentBadges: getRecentBadges(progreso, stats, xp)
+    recentBadges: unlocked.slice(0, 3),
+    bono: bonoPorLogros(unlockedCount)
   }
 }
 

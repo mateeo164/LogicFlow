@@ -1,5 +1,3 @@
-
-
 .tools-body {
   background: var(--lf-paper);
   min-height: 100vh;
@@ -184,7 +182,7 @@
 }
 
 [data-theme="dark"] .psu-big-number span {
-  color: var(--lf-paper);
+  color: var(--lf-text-primary);
 }
 
 .psu-big-number small {

@@ -42,7 +42,6 @@ function traducirErrorSupabase(mensaje) {
 function manejarErrorAutenticacion(error) {
     if (!error) return { exito: false, mensaje: '✗ Ocurrió un error inesperado. Intenta de nuevo.' }
 
-    
     if (esErrorDeRed(error)) {
         return { exito: false, mensaje: `✗ ${error.message}`, esRed: true }
     }
@@ -182,11 +181,10 @@ export function establecerSesionDesdeHash() {
         expires_in: params.get('expires_in') ? Number(params.get('expires_in')) : undefined
     })
 
-    
     try {
         history.replaceState(null, '', window.location.pathname + window.location.search)
     } catch (error) {
-        
+
     }
 
     return true
@@ -204,7 +202,6 @@ export async function protegerRuta() {
         return null
     }
 
-    
     if (tokenExpirado()) {
         const refrescada = await refreshSession()
         if (!refrescada) {

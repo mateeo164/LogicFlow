@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { obtenerProgreso, obtenerEstadisticas, ProgresoUsuario, Estadisticas } from '../../services/progress'
-import { calculateXp, getLevelProgress, LEVELS } from '../../constants/components'
+import { obtenerLogrosUsuario, otorgarLogros } from '../../services/logros'
+import { calculateXp, getLevelProgress, LEVELS, GRANULAR_LOGROS, bonoPorLogros } from '../../constants/components'
 import { XPBar } from '../../components/XPBar'
 import { GradientCard } from '../../components/GradientCard'
 import { SectionTitle } from '../../components/ui'
@@ -39,16 +40,36 @@ function computeBadges(p: ProgresoUsuario | null, s: Estadisticas | null): Badge
   ]
 }
 
+// Logros granulares persistidos en BD (escáner, quizzes, instalación real).
+function granularBadges(logros: string[]): Badge[] {
+  const set = new Set(logros)
+  return GRANULAR_LOGROS.map(l => ({
+    id: l.id, name: l.title, description: l.description, icon: l.icon,
+    unlocked: set.has(l.id), xpReward: 50,
+  }))
+}
+
 export function BadgesScreen() {
   const [progreso, setProgreso] = useState<ProgresoUsuario | null>(null)
   const [stats, setStats] = useState<Estadisticas | null>(null)
+  const [logros, setLogros] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([obtenerProgreso(), obtenerEstadisticas()]).then(([p, s]) => {
+    Promise.all([obtenerProgreso(), obtenerEstadisticas(), obtenerLogrosUsuario()]).then(([p, s, l]) => {
       setProgreso(p)
       setStats(s)
+      setLogros(l)
       setLoading(false)
+
+      // Persistir los logros calculados que ya están desbloqueados, para que
+      // cuenten en el bono de nota y queden en el historial del usuario.
+      const computados = computeBadges(p, s).filter(b => b.unlocked).map(b => b.id)
+      const nuevos = computados.filter(id => !l.includes(id))
+      if (nuevos.length) {
+        otorgarLogros(nuevos, 'badges')
+        setLogros(prev => Array.from(new Set([...prev, ...nuevos])))
+      }
     })
   }, [])
 
@@ -62,9 +83,10 @@ export function BadgesScreen() {
 
   const instalados = progreso?.componentes_instalados || []
   const xp = calculateXp(progreso?.simulaciones_completadas || 0, instalados)
-  const badges = computeBadges(progreso, stats)
+  const badges = [...computeBadges(progreso, stats), ...granularBadges(logros)]
   const unlocked = badges.filter(b => b.unlocked)
   const locked = badges.filter(b => !b.unlocked)
+  const bono = bonoPorLogros(unlocked.length)
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -72,7 +94,7 @@ export function BadgesScreen() {
         <View style={styles.header}>
           <Text style={Typography.overline}>COLECCIÓN</Text>
           <Text style={Typography.h1}>Mis logros</Text>
-          <Text style={styles.headerSub}>{unlocked.length} de {badges.length} insignias desbloqueadas</Text>
+          <Text style={styles.headerSub}>{unlocked.length} de {badges.length} insignias · bono de nota +{bono.toFixed(2)}</Text>
         </View>
 
         <GradientCard style={{ marginBottom: Spacing.lg }}>

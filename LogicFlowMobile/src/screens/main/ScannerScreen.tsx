@@ -1,26 +1,45 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView,
   Animated, Alert, ActivityIndicator, Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { CameraView, useCameraPermissions } from 'expo-camera'
+import {
+  useAudioRecorder, useAudioRecorderState, RecordingPresets,
+  setAudioModeAsync, requestRecordingPermissionsAsync,
+} from 'expo-audio'
+import { File } from 'expo-file-system'
+import * as Speech from 'expo-speech'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { PC_COMPONENTS, PCComponent } from '../../constants/components'
 import { guardarProgreso, registrarEvento } from '../../services/progress'
+import { otorgarLogros } from '../../services/logros'
+import { detectarComponente, preguntarSobreComponente, RateLimitedError } from '../../services/ai'
+import { sfx } from '../../services/sound'
 import { Colors, Spacing, Typography, Radius, Fonts, Shadow } from '../../constants/theme'
 import { PrimaryButton } from '../../components/PrimaryButton'
 import { GradientCard } from '../../components/GradientCard'
 import { Pill } from '../../components/ui'
 
-type ScanState = 'idle' | 'scanning' | 'result' | 'quiz'
+type ScanState = 'idle' | 'scanning' | 'result' | 'quiz' | 'listening' | 'thinking'
+type Turno = { rol: 'ia' | 'usuario'; texto: string }
 
-async function simulateAIDetection(instalados: string[]): Promise<PCComponent> {
-  await new Promise(r => setTimeout(r, 2200))
-  const pending = PC_COMPONENTS.filter(c => !instalados.includes(c.id))
-  if (pending.length === 0) return PC_COMPONENTS[Math.floor(Math.random() * PC_COMPONENTS.length)]
-  return pending[Math.floor(Math.random() * Math.min(pending.length, 3))]
+const COOLDOWN_MS = 3000
+
+function hablar(texto: string) {
+  if (!texto) return
+  Speech.stop()
+  Speech.speak(texto, { language: 'es-ES' })
+}
+
+function mostrarErrorIA(err: unknown, mensajeGenerico: string) {
+  if (err instanceof RateLimitedError) {
+    Alert.alert('Mucha demanda', 'Hay mucha gente usando el escáner ahora mismo. Espera unos segundos e intenta de nuevo.')
+  } else {
+    Alert.alert('Error', mensajeGenerico)
+  }
 }
 
 export function ScannerScreen() {
@@ -31,7 +50,24 @@ export function ScannerScreen() {
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null)
   const [quizFeedback, setQuizFeedback] = useState<'correct' | 'wrong' | null>(null)
   const [saving, setSaving] = useState(false)
+  const [conversacion, setConversacion] = useState<Turno[]>([])
   const scanAnim = useRef(new Animated.Value(0)).current
+  const cameraRef = useRef<CameraView>(null)
+  const lastPhotoBase64 = useRef<string | null>(null)
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
+  const recorderState = useAudioRecorderState(recorder)
+  const [cooldown, setCooldown] = useState(false)
+  const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const startCooldown = useCallback(() => {
+    setCooldown(true)
+    if (cooldownTimer.current) clearTimeout(cooldownTimer.current)
+    cooldownTimer.current = setTimeout(() => setCooldown(false), COOLDOWN_MS)
+  }, [])
+
+  useEffect(() => () => {
+    if (cooldownTimer.current) clearTimeout(cooldownTimer.current)
+  }, [])
 
   const startScanAnimation = useCallback(() => {
     scanAnim.setValue(0)
@@ -44,20 +80,91 @@ export function ScannerScreen() {
   }, [scanAnim])
 
   async function handleScan() {
+    if (!cameraRef.current || cooldown) return
     setScanState('scanning')
     startScanAnimation()
+    sfx.shutter()
     try {
-      const component = await simulateAIDetection(instalados)
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 })
+      if (!photo?.base64) throw new Error('Sin datos de imagen')
+
+      const res = await detectarComponente({ imageBase64: photo.base64, installedIds: instalados })
+      const component = res.componentId ? PC_COMPONENTS.find(c => c.id === res.componentId) ?? null : null
+
+      if (!component) {
+        setScanState('idle')
+        sfx.error()
+        const mensaje = res.reply || 'No reconozco un componente de PC en la imagen. Apunta a una pieza real e intenta de nuevo.'
+        hablar(mensaje)
+        Alert.alert('No reconocido', mensaje)
+        return
+      }
+
+      lastPhotoBase64.current = photo.base64
       setDetected(component)
+      setConversacion([{ rol: 'ia', texto: res.reply }])
       setScanState('result')
-    } catch {
+      sfx.success()
+      hablar(res.reply)
+      otorgarLogros(['escaner_novato'], 'scanner')
+    } catch (err) {
       setScanState('idle')
-      Alert.alert('Error', 'No se pudo procesar la imagen. Intenta de nuevo.')
+      sfx.error()
+      mostrarErrorIA(err, 'No se pudo procesar la imagen. Intenta de nuevo.')
+    } finally {
+      startCooldown()
+    }
+  }
+
+  async function handleAskStart() {
+    if (cooldown) return
+    sfx.tap()
+    const perm = await requestRecordingPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Permiso de micrófono', 'Actívalo para poder hacerle preguntas a la IA por voz.')
+      return
+    }
+    try {
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
+      await recorder.prepareToRecordAsync()
+      recorder.record()
+      setScanState('listening')
+    } catch {
+      Alert.alert('Error', 'No se pudo iniciar la grabación.')
+    }
+  }
+
+  async function handleAskStop() {
+    if (!recorderState.isRecording) { setScanState('result'); return }
+    setScanState('thinking')
+    try {
+      await recorder.stop()
+      const uri = recorder.uri
+      if (!uri || !detected || !lastPhotoBase64.current) throw new Error('Falta contexto de la grabación')
+
+      const audioBase64 = await new File(uri).base64()
+      const res = await preguntarSobreComponente({
+        imageBase64: lastPhotoBase64.current,
+        audioBase64,
+        audioMimeType: 'audio/aac',
+        componentId: detected.id,
+      })
+
+      setConversacion(prev => [...prev, { rol: 'usuario', texto: '🎤 Pregunta por voz' }, { rol: 'ia', texto: res.reply }])
+      sfx.success()
+      hablar(res.reply)
+    } catch (err) {
+      sfx.error()
+      mostrarErrorIA(err, 'No se pudo procesar tu pregunta. Intenta de nuevo.')
+    } finally {
+      setScanState('result')
+      startCooldown()
     }
   }
 
   async function handleInstall() {
     if (!detected) return
+    Speech.stop()
     setSaving(true)
     const start = Date.now()
     await guardarProgreso({ componenteId: detected.id, segundos: 0 })
@@ -67,6 +174,7 @@ export function ScannerScreen() {
     setScanState('quiz')
     setQuizAnswer(null)
     setQuizFeedback(null)
+    sfx.success()
   }
 
   function handleQuizAnswer(idx: number) {
@@ -74,14 +182,24 @@ export function ScannerScreen() {
     setQuizAnswer(idx)
     const correct = idx === detected?.quizAnswerIndex
     setQuizFeedback(correct ? 'correct' : 'wrong')
-    if (!correct && detected) registrarEvento({ tipo: 'error_pieza', componenteId: detected.id })
+    if (correct) sfx.success(); else sfx.error()
+    if (detected) {
+      if (correct) {
+        otorgarLogros(['quiz_perfecto'], `quiz:${detected.id}`)
+      } else {
+        registrarEvento({ tipo: 'error_ensamble', componenteId: detected.id, detalle: `Quiz: ${detected.label}` })
+      }
+    }
   }
 
   function handleClose() {
+    Speech.stop()
     setScanState('idle')
     setDetected(null)
     setQuizAnswer(null)
     setQuizFeedback(null)
+    setConversacion([])
+    lastPhotoBase64.current = null
   }
 
   if (!permission) {
@@ -111,7 +229,7 @@ export function ScannerScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView style={StyleSheet.absoluteFill} facing="back" />
+      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <View style={[StyleSheet.absoluteFill, styles.scrim]} />
@@ -143,7 +261,8 @@ export function ScannerScreen() {
             )}
           </View>
           <Text style={styles.frameHint}>
-            {scanState === 'idle' ? 'Apunta hacia un componente de PC' :
+            {scanState === 'idle' && cooldown ? 'Espera un momento…' :
+             scanState === 'idle' ? 'Apunta hacia un componente de PC' :
              scanState === 'scanning' ? 'Analizando componente…' : ''}
           </Text>
         </View>
@@ -153,8 +272,14 @@ export function ScannerScreen() {
           {scanState === 'idle' && (
             <>
               <Text style={styles.bottomTitle}>Detección por IA</Text>
-              <Text style={styles.bottomSub}>Apunta la cámara a un componente y presiona escanear.</Text>
-              <Pressable onPress={handleScan} style={({ pressed }) => [styles.shutter, pressed && { transform: [{ scale: 0.95 }] }]}>
+              <Text style={styles.bottomSub}>
+                {cooldown ? 'Espera un momento antes de volver a escanear.' : 'Apunta la cámara a un componente y presiona escanear.'}
+              </Text>
+              <Pressable
+                onPress={handleScan}
+                disabled={cooldown}
+                style={({ pressed }) => [styles.shutter, cooldown && styles.shutterDisabled, pressed && !cooldown && { transform: [{ scale: 0.95 }] }]}
+              >
                 <View style={styles.shutterInner}>
                   <Ionicons name="scan" size={30} color={Colors.primaryDeep} />
                 </View>
@@ -172,7 +297,11 @@ export function ScannerScreen() {
       </SafeAreaView>
 
       {/* Result sheet */}
-      <Modal visible={scanState === 'result' && detected !== null} animationType="slide" transparent>
+      <Modal
+        visible={(scanState === 'result' || scanState === 'listening' || scanState === 'thinking') && detected !== null}
+        animationType="slide"
+        transparent
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -209,6 +338,33 @@ export function ScannerScreen() {
                   </View>
                 ))}
               </GradientCard>
+
+              <View style={styles.chatSection}>
+                <Text style={styles.specsTitle}>Pregúntale a la IA</Text>
+                {conversacion.map((turno, i) => (
+                  <View key={i} style={[styles.chatBubble, turno.rol === 'usuario' ? styles.chatBubbleUser : styles.chatBubbleIA]}>
+                    <Text style={styles.chatBubbleText}>{turno.texto}</Text>
+                  </View>
+                ))}
+                {scanState === 'thinking' && (
+                  <View style={styles.chatThinking}>
+                    <ActivityIndicator color={Colors.primary} size="small" />
+                    <Text style={styles.bottomSubDark}>Pensando…</Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={[styles.micBtn, scanState === 'listening' && styles.micBtnActive, cooldown && scanState !== 'listening' && styles.micBtnDisabled]}
+                  onPress={scanState === 'listening' ? handleAskStop : handleAskStart}
+                  disabled={scanState === 'thinking' || (cooldown && scanState !== 'listening')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name={scanState === 'listening' ? 'stop-circle' : 'mic'} size={20} color={Colors.white} />
+                  <Text style={styles.micBtnText}>
+                    {scanState === 'listening' ? 'Detener y enviar' :
+                     cooldown ? 'Espera un momento…' : 'Preguntar por voz'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
               <View style={{ gap: Spacing.sm, marginTop: Spacing.lg }}>
                 <PrimaryButton label={saving ? 'Instalando…' : `Instalar ${detected?.label}`} icon="✓" onPress={handleInstall} loading={saving} />
@@ -302,6 +458,7 @@ const styles = StyleSheet.create({
   bottomTitle: { fontFamily: Fonts.serif, fontSize: 19, color: Colors.white, textAlign: 'center' },
   bottomSub: { fontFamily: Fonts.sans, fontSize: 13, color: 'rgba(255,255,255,0.72)', textAlign: 'center' },
   shutter: { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
+  shutterDisabled: { opacity: 0.4 },
   shutterInner: { width: 66, height: 66, borderRadius: 33, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center' },
 
   modalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'flex-end' },
@@ -320,6 +477,18 @@ const styles = StyleSheet.create({
   specValue: { fontFamily: Fonts.sansSemi, fontSize: 14, color: Colors.primary, maxWidth: '58%', textAlign: 'right' },
   skipBtn: { alignItems: 'center', padding: Spacing.sm },
   skipText: { fontFamily: Fonts.sansSemi, fontSize: 14, color: Colors.textSecondary },
+
+  chatSection: { marginTop: Spacing.lg, gap: Spacing.sm },
+  chatBubble: { padding: Spacing.sm, borderRadius: Radius.md, maxWidth: '90%' },
+  chatBubbleIA: { backgroundColor: Colors.primarySoft, alignSelf: 'flex-start' },
+  chatBubbleUser: { backgroundColor: Colors.surface, alignSelf: 'flex-end', borderWidth: 1, borderColor: Colors.border },
+  chatBubbleText: { fontFamily: Fonts.sans, fontSize: 13.5, color: Colors.text, lineHeight: 20 },
+  chatThinking: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bottomSubDark: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.textSecondary },
+  micBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: 12, marginTop: Spacing.xs },
+  micBtnActive: { backgroundColor: Colors.error },
+  micBtnDisabled: { opacity: 0.4 },
+  micBtnText: { fontFamily: Fonts.sansSemi, fontSize: 14, color: Colors.white },
 
   quizSheet: { backgroundColor: Colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: Spacing.lg, paddingBottom: Spacing.xl, gap: Spacing.sm },
   quizBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center' },

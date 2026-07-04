@@ -55,13 +55,11 @@ export function validarConfirmacion(password, confirmacion) {
 export function validarFormularioRegistro(datos) {
     const errores = {}
 
-    
     if (!datos.nombres) errores.nombres = '✗ El nombre completo es obligatorio.'
     if (!datos.correo) errores.correo = '✗ El correo electrónico es obligatorio.'
     if (!datos.password) errores.password = '✗ La contraseña es obligatoria.'
     if (!datos.confirm_password) errores.confirm_password = '✗ Debe confirmar la contraseña.'
 
-    
     if (Object.keys(errores).length > 0) {
         return {
             valido: false,
@@ -104,11 +102,9 @@ export function validarFormularioRegistro(datos) {
 export function validarFormularioLogin(datos) {
     const errores = {}
 
-    
     if (!datos.correo) errores.correo = '✗ El correo electrónico es obligatorio.'
     if (!datos.password) errores.password = '✗ La contraseña es obligatoria.'
 
-    
     if (Object.keys(errores).length > 0) {
         return {
             valido: false,

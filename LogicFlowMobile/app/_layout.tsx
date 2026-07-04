@@ -18,11 +18,16 @@ import {
 } from '@expo-google-fonts/inter'
 import { useAuth } from '../src/hooks/useAuth'
 import { Colors } from '../src/constants/theme'
+import { loadSoundPref } from '../src/services/sound'
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
 export default function RootLayout() {
   const { session, loading } = useAuth()
+
+  useEffect(() => {
+    loadSoundPref()
+  }, [])
   const [fontsLoaded, fontError] = useFonts({
     PlayfairDisplay_600SemiBold,
     PlayfairDisplay_700Bold,
@@ -52,6 +57,9 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
         <Stack.Screen name="auth" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="certificate" options={{ presentation: 'card' }} />
+        <Stack.Screen name="tareas" options={{ presentation: 'card' }} />
+        <Stack.Screen name="notificaciones" options={{ presentation: 'card' }} />
       </Stack>
     </GestureHandlerRootView>
   )

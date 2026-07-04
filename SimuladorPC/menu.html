@@ -31,6 +31,10 @@
                 <div class="avatar avatar--sm" id="header-avatar">??</div>
                 <span id="header-nombre" class="header-user-name">Cargando…</span>
             </div>
+            <button type="button" class="lf-notif-bell student-only" id="notif-bell" aria-label="Notificaciones" title="Notificaciones" hidden>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <span class="lf-notif-badge" id="notif-badge" hidden>0</span>
+            </button>
             <button type="button" class="lf-theme-toggle" id="theme-toggle" aria-label="Cambiar tema" title="Cambiar tema">
                 <svg class="lf-theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 <svg class="lf-theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -58,14 +62,105 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Editar perfil
                 </button>
-                <a href="juego.html" class="btn btn-primary">
+                <a href="juego.html" class="btn btn-primary student-only">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     Ir al laboratorio 3D
                 </a>
             </div>
         </section>
 
-        <div class="stats-strip">
+        <section class="tutor-only tutor-dashboard" id="tutor-dashboard">
+            <div class="tutor-dashboard__head">
+                <div>
+                    <h2>Panel del docente</h2>
+                    <p>Crea clases, comparte el código y sigue las calificaciones de tus estudiantes.</p>
+                </div>
+            </div>
+
+            <div class="tutor-kpis" id="tutor-kpis">
+                <div class="tutor-kpi"><strong id="kpi-clases">—</strong><span>Clases</span></div>
+                <div class="tutor-kpi"><strong id="kpi-estudiantes">—</strong><span>Estudiantes</span></div>
+                <div class="tutor-kpi"><strong id="kpi-promedio">—</strong><span>Promedio ensamble (clase)</span></div>
+                <div class="tutor-kpi"><strong id="kpi-certificados">—</strong><span>Ecosistema completo (clase)</span></div>
+            </div>
+
+            <div class="tutor-cols">
+                <div class="tutor-clases-col">
+                    <form id="form-crear-clase" class="tutor-crear" novalidate>
+                        <input type="text" id="input-clase-nombre" placeholder="Nombre de la clase (ej. 6to A · Hardware)" maxlength="60" required>
+                        <button type="submit" class="btn btn-primary" id="btn-crear-clase">Crear clase</button>
+                    </form>
+                    <div id="tutor-crear-msg" class="tutor-msg" hidden></div>
+                    <ul class="tutor-clases-list" id="tutor-clases-list">
+                        <li class="tutor-clase-empty">Cargando tus clases…</li>
+                    </ul>
+                </div>
+
+                <div class="tutor-detalle-col">
+                    <div class="tutor-detalle-head">
+                        <div class="tutor-detalle-head__left">
+                            <h3 id="tutor-detalle-titulo">Selecciona una clase</h3>
+                            <span class="tutor-codigo-chip tutor-codigo-chip--big" id="tutor-detalle-codigo" hidden></span>
+                        </div>
+                        <div class="tutor-detalle-actions" id="tutor-detalle-actions" hidden>
+                            <button type="button" class="tutor-icon-btn" id="btn-copiar-codigo" title="Copiar código">📋 Copiar código</button>
+                            <button type="button" class="tutor-icon-btn" id="btn-exportar-csv" title="Exportar calificaciones a CSV">⬇ CSV</button>
+                            <button type="button" class="tutor-icon-btn" id="btn-renombrar-clase" title="Renombrar clase">✎</button>
+                            <button type="button" class="tutor-icon-btn tutor-icon-btn--danger" id="btn-eliminar-clase" title="Eliminar clase">🗑</button>
+                        </div>
+                    </div>
+
+                    <div class="tutor-tabs" id="tutor-tabs" hidden>
+                        <button type="button" class="tutor-tab is-active" data-view="estudiantes">Calificaciones</button>
+                        <button type="button" class="tutor-tab" data-view="tareas">Tareas</button>
+                    </div>
+
+                    <div id="tutor-view-estudiantes">
+                        <div class="tutor-resumen" id="tutor-resumen" hidden>
+                            <div class="tutor-resumen__item"><strong id="res-aprobados">—</strong><span>Aprobaron ensamble</span></div>
+                            <div class="tutor-resumen__item"><strong id="res-app">—</strong><span>Completaron app</span></div>
+                            <div class="tutor-resumen__item"><strong id="res-retos">—</strong><span>Retos superados</span></div>
+                            <div class="tutor-resumen__item"><strong id="res-tiempo">—</strong><span>Tiempo total clase</span></div>
+                        </div>
+                        <div class="tutor-tabla-wrap">
+                            <table class="tutor-tabla" id="tutor-tabla">
+                                <thead>
+                                    <tr>
+                                        <th>Estudiante</th>
+                                        <th>Ensamble</th>
+                                        <th>Mejor reto</th>
+                                        <th>Retos</th>
+                                        <th>Logros</th>
+                                        <th>Tiempo</th>
+                                        <th>Certificado</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tutor-tabla-body">
+                                    <tr><td colspan="8" class="tutor-tabla-empty">Elige una clase de la izquierda para ver a sus estudiantes.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="tutor-view-tareas" hidden>
+                        <form id="form-crear-tarea" class="tutor-tarea-form" novalidate>
+                            <input type="text" id="tarea-titulo" placeholder="Título de la tarea" maxlength="80" required>
+                            <textarea id="tarea-desc" placeholder="Descripción (opcional)" rows="2" maxlength="400"></textarea>
+                            <div class="tutor-tarea-form__row">
+                                <input type="number" id="tarea-puntaje" placeholder="Puntaje máx." min="1" max="100" value="10">
+                                <input type="date" id="tarea-vence" title="Fecha límite (opcional)">
+                                <button type="submit" class="btn btn-primary" id="btn-crear-tarea">Crear tarea</button>
+                            </div>
+                        </form>
+                        <div id="tarea-crear-msg" class="tutor-msg" hidden></div>
+                        <ul class="tutor-tareas-list" id="tutor-tareas-list"></ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="stats-strip student-only">
             <div class="stats-strip__item">
                 <strong id="stat-componentes">—</strong>
                 <span>Componentes instalados</span>
@@ -84,7 +179,18 @@
             </div>
         </div>
 
-        <div class="panel-column" style="grid-column: 1;">
+        <div class="panel-column student-only" style="grid-column: 1;">
+
+            <section class="progreso-card" id="notificaciones-card" hidden>
+                <div class="progreso-card__header" style="margin-bottom: 14px;">
+                    <div>
+                        <h2>🔔 Notificaciones</h2>
+                        <p id="notif-sub">Avisos de tus tutores.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-notif-leidas">Marcar todas leídas</button>
+                </div>
+                <ul class="notif-list" id="notif-list"></ul>
+            </section>
 
             <section class="progreso-card">
                 <div class="progreso-card__header">
@@ -143,9 +249,61 @@
 
                 </ul>
             </section>
+
+            <section class="progreso-card" id="notas-card">
+                <div class="progreso-card__header" style="margin-bottom: 18px;">
+                    <div>
+                        <h2>Notas y certificado</h2>
+                        <p>Tus calificaciones y el camino para desbloquear el certificado final.</p>
+                    </div>
+                </div>
+
+                <div class="notas-grid">
+                    <div class="nota-box">
+                        <span class="nota-box__valor" id="nota-ensamble">—</span>
+                        <span class="nota-box__label">Ensamble 3D</span>
+                        <span class="nota-box__detalle" id="nota-ensamble-detalle">Sin registrar aún</span>
+                    </div>
+                    <div class="nota-box">
+                        <span class="nota-box__valor" id="nota-retos-mejor">—</span>
+                        <span class="nota-box__label">Mejor reto</span>
+                        <span class="nota-box__detalle" id="nota-retos-superados">0 retos superados</span>
+                    </div>
+                    <div class="nota-box">
+                        <span class="nota-box__valor" id="nota-bono">+0.00</span>
+                        <span class="nota-box__label">Bono por logros</span>
+                        <span class="nota-box__detalle" id="nota-bono-detalle">0 logros</span>
+                    </div>
+                </div>
+
+                <div class="cert-track">
+                    <div class="cert-track__head">
+                        <strong>Progreso del certificado</strong>
+                        <span id="cert-pct">0%</span>
+                    </div>
+                    <div class="progreso-barra-bg">
+                        <div class="progreso-barra-fill" id="cert-progress-fill" style="width:0%"></div>
+                    </div>
+                    <div class="cert-track__steps">
+                        <span class="cert-step" id="cert-web"><span class="cert-step__dot"></span> Ensamble web aprobado</span>
+                        <span class="cert-step" id="cert-app"><span class="cert-step__dot"></span> Instalación real (app móvil)</span>
+                    </div>
+                    <p class="cert-track__hint" id="cert-hint">Completa el ensamble web y la instalación real en la app móvil para emitir tu certificado.</p>
+                </div>
+            </section>
+
+            <section class="progreso-card" id="mis-tareas-card" hidden>
+                <div class="progreso-card__header" style="margin-bottom: 14px;">
+                    <div>
+                        <h2>Mis tareas</h2>
+                        <p>Tareas asignadas por tus tutores.</p>
+                    </div>
+                </div>
+                <ul class="mis-tareas-list" id="mis-tareas-list"></ul>
+            </section>
         </div>
 
-        <div class="panel-column" style="grid-column: 2;">
+        <div class="panel-column student-only" style="grid-column: 2;">
 
             <section class="level-widget">
                 <div class="level-widget__header">
@@ -180,6 +338,21 @@
             </section>
 
             <section class="progreso-card">
+                <div class="progreso-card__header" style="margin-bottom: 14px;">
+                    <div>
+                        <h2>Mi clase</h2>
+                        <p id="mi-clase-sub">¿Tu tutor te compartió un código? Únete a su clase.</p>
+                    </div>
+                </div>
+                <form id="form-unirse-clase" class="tutor-crear" novalidate>
+                    <input type="text" id="input-codigo-clase" placeholder="Código de clase (ej. ABC123)" maxlength="8" style="text-transform:uppercase" required>
+                    <button type="submit" class="btn btn-primary" id="btn-unirse-clase">Unirme</button>
+                </form>
+                <div id="unirse-msg" class="tutor-msg" hidden></div>
+                <ul class="mis-clases-list" id="mis-clases-list"></ul>
+            </section>
+
+            <section class="progreso-card">
                 <div class="progreso-card__header" style="margin-bottom: 18px;">
                     <div>
                         <h2>Herramientas educativas</h2>
@@ -187,6 +360,11 @@
                     </div>
                 </div>
                 <div class="tools-grid">
+                    <a href="retos.html" class="tool-card">
+                        <div class="tool-card__icon">🔧</div>
+                        <span class="tool-card__title">Retos de reparación</span>
+                        <span class="tool-card__desc">Diagnostica y repara PCs con fallas.</span>
+                    </a>
                     <a href="calculadora.html" class="tool-card">
                         <div class="tool-card__icon">⚡</div>
                         <span class="tool-card__title">Calculadora PSU</span>

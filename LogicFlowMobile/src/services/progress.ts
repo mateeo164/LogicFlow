@@ -11,7 +11,13 @@ export interface ProgresoUsuario {
   tiempo_total_segundos: number
   completed_at: string | null
   updated_at?: string
+  nota_web?: number | null
+  foto_simulador_path?: string | null
+  web_aprobado_at?: string | null
+  movil_completado_at?: string | null
 }
+
+export type EventoTipo = 'acierto' | 'error_pieza' | 'demora' | 'error_ensamble' | 'acierto_ensamble'
 
 export interface Estadisticas {
   aciertos: number
@@ -24,10 +30,11 @@ export interface Estadisticas {
 }
 
 export interface EventoSimulacion {
-  tipo: 'acierto' | 'error_pieza' | 'demora'
+  tipo: EventoTipo
   componente: string | null
   componente_esperado: string | null
   segundos: number
+  detalle?: string | null
   created_at: string
 }
 
@@ -76,6 +83,8 @@ export async function guardarProgreso(params: {
       tiempo_total_segundos: (actual?.tiempo_total_segundos || 0) + Math.max(0, Math.round(segundos)),
       updated_at: ahora,
       ...(completado && !actual?.completed_at ? { completed_at: ahora } : {}),
+      // Marca de finalización móvil (condición del certificado).
+      ...(completado && !actual?.movil_completado_at ? { movil_completado_at: ahora } : {}),
     }
 
     if (actual?.id) {
@@ -126,10 +135,11 @@ export async function reiniciarProgreso(): Promise<boolean> {
 }
 
 export async function registrarEvento(params: {
-  tipo: 'acierto' | 'error_pieza' | 'demora'
+  tipo: EventoTipo
   componenteId?: string
   componenteEsperado?: string
   segundos?: number
+  detalle?: string
 }): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return false
@@ -141,11 +151,31 @@ export async function registrarEvento(params: {
       componente: params.componenteId || null,
       componente_esperado: params.componenteEsperado || null,
       segundos: Math.max(0, Math.round(params.segundos || 0)),
+      detalle: params.detalle || null,
     })
     if (error) throw error
     return true
   } catch (err: any) {
     console.warn('[LogicFlow] Error registrando evento:', err.message)
+    return false
+  }
+}
+
+// Marca la finalización de la instalación real en el móvil (una de las dos
+// condiciones del certificado). Idempotente: solo escribe la primera vez.
+export async function marcarMovilCompletado(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
+  try {
+    const { error } = await supabase
+      .from('progreso_usuario')
+      .update({ movil_completado_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .is('movil_completado_at', null)
+    if (error) throw error
+    return true
+  } catch (err: any) {
+    console.warn('[LogicFlow] Error marcando móvil completado:', err.message)
     return false
   }
 }

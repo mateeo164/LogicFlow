@@ -1,5 +1,3 @@
-
-
 import { CPU_WATTAGE, GPU_WATTAGE, calculateWattage, getEfficiencyRating } from './learning-tools.js'
 
 function populateSelect(selectId, optionsMap) {

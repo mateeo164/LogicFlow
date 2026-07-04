@@ -10,7 +10,7 @@ import {
 import { validarFormularioLogin, validarCorreo } from './auth-validations.js'
 
 document.addEventListener('DOMContentLoaded', function() {
-    
+
     redirigirSiAutenticado()
 
     const form = document.getElementById('form-login')
@@ -64,4 +64,3 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     })
 })
-

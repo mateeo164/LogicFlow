@@ -86,7 +86,8 @@ La app usa las **mismas credenciales y tablas** que la aplicación web LogicFlow
 
 ### 3. Escáner AR con IA
 - Cámara en tiempo real con overlay de RA
-- Detección simulada de componentes (preparado para integrar modelo TFLite/Roboflow)
+- Detección real por IA (Google Gemini, multimodal): se toma una foto y se envía a una Supabase Edge Function que la clasifica entre los 8 componentes conocidos
+- Conversación por voz: el estudiante puede grabar una pregunta de seguimiento sobre el componente detectado; la IA la responde y se lee en voz alta con `expo-speech`
 - Ficha educativa del componente detectado: descripción, especificaciones, analogía, dato curioso
 - Quiz de comprensión post-instalación
 - Registro de aciertos/errores en Supabase
@@ -113,18 +114,54 @@ La app usa las **mismas credenciales y tablas** que la aplicación web LogicFlow
 - Preferencias (notificaciones, efectos de sonido)
 - Cierre de sesión
 
-## Integración de IA para el Escáner (Post-MVP)
+## Integración de IA del Escáner (Gemini + Supabase Edge Function)
 
-Para reemplazar la detección simulada con un modelo real:
+El escáner ya no simula la detección: toma una foto real (`expo-camera`), opcionalmente graba
+una pregunta hablada (`expo-audio`), y envía ambas a la Edge Function `scan-component`
+(`supabase/functions/scan-component/index.ts`), que llama a la API de Gemini con la
+`GEMINI_API_KEY` guardada como secreto de servidor — la key **nunca** viaja al cliente.
+La respuesta se lee en voz alta con `expo-speech` (`src/services/ai.ts` expone
+`detectarComponente()` y `preguntarSobreComponente()`).
 
-1. **Opción A — TensorFlow.js**: 
-   - Instala `@tensorflow/tfjs-react-native` y `@tensorflow-models/coco-ssd`
-   - Reemplaza `simulateAIDetection()` en `ScannerScreen.tsx` con inferencia real
-   
-2. **Opción B — Roboflow API**:
-   - Entrena un modelo con fotos de componentes de PC en `roboflow.com`
-   - Llama su API REST desde `simulateAIDetection()`
+### Desplegar la Edge Function (una sola vez, o cada vez que cambie `index.ts`)
 
-3. **Opción C — Google ML Kit**:
-   - Usa `@react-native-ml-kit/image-labeling`
-   - Mapea las etiquetas detectadas a IDs de componentes
+```bash
+cd LogicFlowMobile
+
+# 1. Iniciar sesión con tu cuenta de Supabase (abre el navegador)
+npx supabase login
+
+# 2. Vincular este proyecto local con el proyecto de Supabase de LogicFlow
+#    (project ref = el subdominio de la URL: https://<project-ref>.supabase.co)
+npx supabase link --project-ref kgyhbimpwwtnkiozymyr
+
+# 3. Guardar la API key de Gemini como secreto del proyecto (nunca la subas al repo)
+npx supabase secrets set GEMINI_API_KEY=tu_api_key_de_google_ai_studio
+
+# 4. Desplegar la función
+npx supabase functions deploy scan-component
+```
+
+Consigue una API key gratuita en [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
+
+La función verifica el JWT de Supabase por defecto, así que solo usuarios autenticados de la
+app (mismo login que la web) pueden invocarla — esto evita que alguien externo consuma tu cuota
+de Gemini.
+
+### Probar localmente antes de desplegar (opcional)
+
+```bash
+npx supabase functions serve scan-component --env-file ./supabase/.env.local
+```
+
+Crea `supabase/.env.local` con `GEMINI_API_KEY=...` (ya está en `.gitignore` — nunca lo
+commitees). Apunta la app a `http://localhost:54321` cambiando temporalmente la URL en
+`src/services/supabase.ts`, o usa `supabase status` para ver la URL local exacta.
+
+### Cambiar de modelo
+
+El modelo por defecto es `gemini-2.5-flash`. Para usar otro, define el secreto `GEMINI_MODEL`:
+
+```bash
+npx supabase secrets set GEMINI_MODEL=gemini-2.5-pro
+```
