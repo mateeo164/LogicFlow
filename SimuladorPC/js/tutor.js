@@ -141,7 +141,7 @@ export async function initTutorPanel() {
             document.getElementById('tutor-detalle-actions').hidden = true
             document.getElementById('tutor-tabs').hidden = true
             document.getElementById('tutor-resumen').hidden = true
-            document.getElementById('tutor-tabla-body').innerHTML = `<tr><td colspan="8" class="tutor-tabla-empty">Elige una clase de la izquierda.</td></tr>`
+            document.getElementById('tutor-tabla-body').innerHTML = `<tr><td colspan="10" class="tutor-tabla-empty">Elige una clase de la izquierda.</td></tr>`
             await cargarClasesTutor()
         } catch (err) { toast('Error: ' + err.message) }
     })
@@ -151,12 +151,13 @@ export async function initTutorPanel() {
 
 function exportarCSV() {
     if (!claseActual?.filas?.length) { toast('No hay estudiantes que exportar'); return }
-    const cols = ['Estudiante', 'Email', 'Nota ensamble', 'Comprension (%)', 'Ganancia aprendizaje', 'Aprobo web', 'Completo app', 'Mejor reto', 'Retos superados', 'Logros', 'Tiempo (s)']
+    const cols = ['Estudiante', 'Email', 'Nota ensamble', 'Comprension (%)', 'Ganancia aprendizaje', 'Academia (lecciones)', 'Aprobo web', 'Completo app', 'Mejor reto', 'Retos superados', 'Logros', 'Tiempo (s)']
     const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
     const filas = claseActual.filas.map(f => [
         f.nombre, f.email, f.nota_web ?? '',
         f.comprension_pct != null ? Math.round(Number(f.comprension_pct)) : '',
         f.ganancia != null ? Math.round(Number(f.ganancia) * 100) + '%' : '',
+        `${Number(f.academia_completadas) || 0}/13`,
         f.web_aprobado ? 'Si' : 'No', f.movil_completado ? 'Si' : 'No',
         f.mejor_nota_reto ?? '', f.retos_superados, f.logros_total, f.tiempo_total_segundos
     ].map(esc).join(','))
@@ -371,6 +372,8 @@ async function seleccionarClase(id, nombre, codigo) {
         const compCls = compVal == null ? '' : (compVal >= 70 ? 'ok' : compVal >= 40 ? 'medio' : 'bajo')
         const ganTxt = f.ganancia != null ? `<span class="tutor-gan" title="Ganancia de aprendizaje (pre→post)">${Number(f.ganancia) >= 0 ? '▲' : '▼'} ${Math.round(Number(f.ganancia) * 100)}%</span>` : ''
         const compCell = compVal == null ? '—' : `<span class="tutor-nota ${compCls}">${compVal}%</span>${ganTxt}`
+        const acad = Number(f.academia_completadas) || 0
+        const acadCell = `<span class="tutor-nota ${acad >= 10 ? 'ok' : acad > 0 ? 'medio' : ''}">${acad}/13</span>`
         const cert = `<span class="cert-mini ${f.web_aprobado ? 'on' : ''}">Web</span><span class="cert-mini ${f.movil_completado ? 'on' : ''}">App</span>`
         return `
         <tr data-est="${f.estudiante_id}" data-nombre="${encodeURIComponent(f.nombre)}">
@@ -385,6 +388,7 @@ async function seleccionarClase(id, nombre, codigo) {
             </td>
             <td><span class="tutor-nota ${notaCls}">${nota}${f.nota_web != null ? '/10' : ''}</span></td>
             <td>${compCell}</td>
+            <td>${acadCell}</td>
             <td>${mejor}${f.mejor_nota_reto != null ? '/10' : ''}</td>
             <td>${f.retos_superados}</td>
             <td>${f.logros_total}</td>

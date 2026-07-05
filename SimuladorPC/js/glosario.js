@@ -27,9 +27,17 @@ function renderTerminos(terminos) {
 }
 
 function init() {
-  renderTerminos(GLOSARIO)
-
   const search = document.getElementById('glosario-search')
+
+  // Si llega ?q= (p. ej. desde una lección de la Academia), pre-filtra el glosario.
+  const q = new URLSearchParams(window.location.search).get('q')
+  if (q && search) {
+    search.value = q
+    renderTerminos(filterGlosario(q))
+  } else {
+    renderTerminos(GLOSARIO)
+  }
+
   if (search) {
     search.addEventListener('input', (e) => {
       renderTerminos(filterGlosario(e.target.value))

@@ -8,7 +8,7 @@
 //   • Google Fonts (cross-origin) → cache-first para funcionar offline.
 //   • Resto cross-origin (YouTube, Supabase) → directo a la red.
 
-const CACHE_VERSION = 'v25';
+const CACHE_VERSION = 'v28';
 const CACHE_NAME = `logicflow-${CACHE_VERSION}`;
 
 // App shell precacheado en install para arranque offline.
@@ -25,6 +25,8 @@ const PRECACHE = [
   '/retos.html',
   '/calculadora.html',
   '/glosario.html',
+  '/academia.html',
+  '/leccion.html',
   '/manifest.json',
   '/favicon.svg',
   '/assets/icon.svg',
@@ -36,13 +38,19 @@ const PRECACHE = [
   '/css/sim-v2.css',
   '/css/tools-v2.css',
   '/css/retos.css',
+  '/css/academia.css',
   '/js/theme.js',
   '/js/ui-effects.js',
   '/js/menu.js',
   '/js/achievements.js',
   '/js/learning-tools.js',
   '/js/calculadora.js',
-  '/js/glosario.js'
+  '/js/glosario.js',
+  '/js/academia.js',
+  '/js/academia-data.js',
+  '/js/academia-api.js',
+  '/js/leccion.js',
+  '/js/quiz-data.js'
 ];
 
 function esNavegacion(request) {

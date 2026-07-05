@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { obtenerReto, calcularNotaReto, LOGROS_RETO, NOTA_MINIMA_RETO } from './retos-data.js'
@@ -66,6 +67,13 @@ let slotDiscs = []
 let modelos3D = {}
 const animacionesCaida = []
 let motorListo = false
+
+// Ambiente del taller (fase de rediseño): mixers de animación (fans, monitor…),
+// props reales cargados por id (para calibración por consola) y un cargador de
+// texturas PBR compartido para piso/paredes.
+const mixers = []
+const propsTaller = {}
+const _texLoader = new THREE.TextureLoader()
 
 const ES_TACTIL = window.matchMedia('(pointer: coarse)').matches || !window.matchMedia('(pointer: fine)').matches
 
@@ -1026,8 +1034,18 @@ function initMotor3D() {
     renderer.shadowMap.needsUpdate = true
 
     const pmrem = new THREE.PMREMGenerator(renderer)
+    // Entorno neutro inmediato (se ve algo antes de que llegue el HDRI).
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
-    pmrem.dispose()
+    // HDRI real de un taller de máquinas (CC0, Poly Haven): da reflejos
+    // característicos en los metales del hardware en vez de un gris plano.
+    new RGBELoader().load('assets/hdri/machine_shop_01_1k.hdr', (hdr) => {
+        hdr.mapping = THREE.EquirectangularReflectionMapping
+        const envMap = pmrem.fromEquirectangular(hdr).texture
+        scene.environment = envMap
+        hdr.dispose()
+        pedirActualizarSombras()
+        appendLog('Entorno HDRI del taller cargado.', 'success')
+    }, undefined, () => appendLog('HDRI del taller no disponible; se usa entorno neutro.', 'system'))
 
     crosshairEl = document.getElementById('crosshair')
 
@@ -1057,7 +1075,19 @@ function initMotor3D() {
         get camera() { return camera },
         get controls() { return controls },
         get renderer() { return renderer },
-        modelos3D, PASOS, THREE,
+        modelos3D, PASOS, THREE, propsTaller, mixers,
+        setProp(id, o = {}) {
+            const g = propsTaller[id]
+            if (!g) return `no existe prop "${id}" (ids: ${Object.keys(propsTaller).join(', ')})`
+            if (o.x != null) g.position.x = o.x
+            if (o.y != null) g.position.y = o.y
+            if (o.z != null) g.position.z = o.z
+            if (o.ry != null) g.rotation.y = o.ry
+            if (o.s != null) g.children[0]?.scale.multiplyScalar(o.s)
+            pedirActualizarSombras()
+            const r = n => Math.round(n * 1000) / 1000
+            return { pos: g.position.toArray().map(r), ry: r(g.rotation.y) }
+        },
         medir() {
             const r = n => Math.round(n * 1000) / 1000
             const o = {}
@@ -2638,13 +2668,41 @@ const VITRINA = (() => {
     }
 })()
 
+// Devuelve un set de mapas PBR (baseColor/normal/AO-Rough-Metal empacado) para
+// piso/paredes del taller. Cachea por `base` y comparte las texturas entre las
+// 4 paredes (repeat compartido) para no multiplicar la VRAM. El `arm` empacado
+// se usa como roughnessMap+metalnessMap (three lee rough=verde, metal=azul).
+const _pbrCache = {}
+function pbrTaller(base, rx, ry) {
+    if (!_pbrCache[base]) {
+        const cfg = (file, srgb) => {
+            const t = _texLoader.load(`assets/textures/${base}_${file}.webp`)
+            t.wrapS = t.wrapT = THREE.RepeatWrapping
+            t.anisotropy = _maxAniso
+            if (srgb) t.colorSpace = THREE.SRGBColorSpace
+            return t
+        }
+        const arm = cfg('arm', false)
+        _pbrCache[base] = {
+            map: cfg('diff', true),
+            normalMap: cfg('nor_gl', false),
+            roughnessMap: arm,
+            metalnessMap: arm
+        }
+    }
+    const s = _pbrCache[base]
+    ;[s.map, s.normalMap, s.roughnessMap].forEach(t => t.repeat.set(rx, ry))
+    return { ...s }
+}
+
 function construirEntorno() {
     const grupo = new THREE.Group()
     crearSalaTaller(grupo)
     crearLucesTecho(grupo)
     crearBanco(grupo)
     crearTapete(grupo)
-    crearPanelPegboard(grupo)
+    // El pegboard procedural se reemplaza por el panel de herramientas real
+    // (tool_storage_board) en cargarPropsTaller, en el mismo hueco de pared.
     crearEstanteria(grupo, SALA.xMin + 0.32, -1.6, Math.PI / 2)
     crearEstanteria(grupo, SALA.xMax - 0.32, -0.6, -Math.PI / 2)
     crearDecoracionPared(grupo)
@@ -2662,6 +2720,118 @@ function construirEntorno() {
     const vitrina = new THREE.Group()
     crearVitrinaComponentes(vitrina)
     scene.add(vitrina)
+
+    cargarPropsTaller()
+}
+
+const RUTA_PROP = 'assets/3d_models/'
+
+// Carga un .glb de utilería del taller: lo escala a `size` (por su dimensión
+// mayor), centra su geometría, apoya la base en `y` (piso por defecto), aplica
+// sombras/anisotropía, reproduce en bucle sus animaciones (fans, etc.) y —si se
+// pasa `fact`— lo hace interactivo (el dron comenta al hacer clic). Las
+// posiciones son aproximadas: se pueden afinar por consola con `__lab.props`.
+function cargarProp(archivo, opts = {}) {
+    const {
+        size = 1, x = 0, z = 0, y = SALA.y0, rotY = 0, rotX = 0,
+        fact = null, id = null, anim = true, centroY = null, onReady = null
+    } = opts
+    crearGLTFLoader().load(RUTA_PROP + archivo, (gltf) => {
+        const inner = gltf.scene
+        let box = new THREE.Box3().setFromObject(inner)
+        const dim = box.getSize(new THREE.Vector3())
+        const s = size / (Math.max(dim.x, dim.y, dim.z) || 1)
+        inner.scale.setScalar(s)
+        box = new THREE.Box3().setFromObject(inner)
+        inner.position.sub(box.getCenter(new THREE.Vector3()))   // geometría al origen
+        const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5)
+        optimizarMateriales(inner)
+
+        const g = new THREE.Group()
+        g.add(inner)
+        g.rotation.set(rotX, rotY, 0)
+        g.position.set(x, centroY != null ? centroY : y + half.y, z)
+        scene.add(g)
+
+        if (anim && gltf.animations?.length) {
+            const mixer = new THREE.AnimationMixer(inner)
+            gltf.animations.forEach(cl => mixer.clipAction(cl).play())
+            mixers.push(mixer)
+        }
+        if (fact) { g.userData.fact = fact; propsInteractivos.push(g) }
+        if (id) propsTaller[id] = g
+        pedirActualizarSombras()
+        if (onReady) onReady(g, half)
+    }, undefined, () => appendLog(`Prop del taller no disponible: ${archivo}`, 'system'))
+}
+
+// Plano del taller (top-down). Sala: X[-5,5] (izq→der), Z[-4,5] (frente→fondo),
+// piso y=-1.0, superficie del escritorio y=0. Mesa de ensamble al centro (origen);
+// vitrina de componentes en la pared del fondo (z≈+4.7). Coordenadas deliberadas
+// para que nada se solape; se afinan por consola con `__lab.setProp(id, {...})`.
+function cargarPropsTaller() {
+    // ── Almacén: estantería de repuestos contra la pared izquierda, al fondo
+    //    (después de la ventana, sin pisar la planta ni la estantería procedural).
+    cargarProp('basket_shelving_for_store_or_warehouse.opt.glb', {
+        id: 'shelving', size: 2.4, x: -4.4, z: 3.4, rotY: Math.PI / 2,
+        fact: 'Estantería de repuestos: aquí guardamos componentes y cajas del taller.'
+    })
+
+    // ── Estación de pruebas contra la pared derecha (banco + periféricos).
+    montarEstacionPruebas()
+
+    // ── Taburete del técnico, frente a la mesa de ensamble.
+    cargarProp('bar_stool.opt.glb', {
+        id: 'stool', size: 1.05, x: 2.5, z: 2.6,
+        fact: 'Taburete del técnico. Trabajar a la altura correcta evita forzar los cables.'
+    })
+
+    // ── Panel de herramientas real en la pared frontal (reemplaza el pegboard
+    //    procedural, en el mismo hueco: ancho ~2.5, centrado en x=-1.4).
+    cargarProp('tool_storage_board.opt.glb', {
+        id: 'toolboard', size: 2.5, x: -1.4, z: -3.9, rotY: Math.PI / 2, centroY: 1.0,
+        fact: 'Panel de herramientas: destornilladores, pinzas y llaves siempre a mano.'
+    })
+
+    // ── Decoración viva: dos ventiladores RGB girando en el borde trasero de la
+    //    mesa (piezas de repuesto), lejos de la zona de ensamble.
+    cargarProp('rgb_pc_fan.opt.glb', {
+        id: 'fan1', size: 0.26, x: -0.95, z: -0.78, y: 0, rotY: 0.25,
+        fact: 'Ventilador RGB de repuesto: sus aspas mueven el aire para refrigerar el gabinete.'
+    })
+    cargarProp('rgb_fan.opt.glb', { id: 'fan2', size: 0.26, x: 0.95, z: -0.78, y: 0 })
+}
+
+// Banco de pruebas con periféricos encima. Se calcula la altura real de la
+// superficie del banco (onReady) para apoyar monitor/teclado/mouse sin adivinar.
+// El banco va contra la pared derecha con su lado largo paralelo a la pared
+// (rotY=0). Monitor al fondo y teclado al frente miran hacia el centro (rotY=-90°),
+// apilados en X para no encimarse en la poca profundidad del banco.
+function montarEstacionPruebas() {
+    const wbX = 4.25, wbZ = 1.9, faceCentro = -Math.PI / 2
+    cargarProp('workbench_low-poly.opt.glb', {
+        id: 'workbench', size: 1.9, x: wbX, z: wbZ, rotY: 0,
+        fact: 'Banco de pruebas: aquí se enciende la PC terminada para su primer arranque (POST).',
+        onReady: (g, half) => {
+            const topY = g.position.y + half.y
+            cargarProp('pc_monitor.opt.glb', {
+                id: 'monitor', size: 0.9, x: wbX + 0.16, z: wbZ, y: topY, rotY: faceCentro, anim: false,
+                fact: 'Monitor de pruebas: muestra el POST/BIOS cuando la PC arranca por primera vez.'
+            })
+            cargarProp('keyboard.opt.glb', {
+                id: 'keyboard', size: 0.55, x: wbX - 0.18, z: wbZ, y: topY, rotY: faceCentro, anim: false,
+                fact: 'Teclado de diagnóstico: con Supr o F2 se entra a la BIOS.'
+            })
+            cargarProp('mouse.opt.glb', {
+                id: 'mouse', size: 0.12, x: wbX - 0.18, z: wbZ + 0.34, y: topY, rotY: faceCentro,
+                fact: 'Mouse de pruebas.'
+            })
+            cargarProp('desk_lamp.opt.glb', {
+                id: 'lamp', size: 0.5, x: wbX + 0.12, z: wbZ - 0.7, y: topY, rotY: faceCentro,
+                fact: 'Lámpara de banco: buena luz para no equivocarse al conectar cables pequeños.'
+            })
+        }
+    })
 }
 
 function crearSalaTaller(grupo) {
@@ -2670,11 +2840,12 @@ function crearSalaTaller(grupo) {
     const cx = (xMin + xMax) / 2, cz = (zMin + zMax) / 2
     const top = y0 + h
 
-    const pisoTex = crearTexturaPisoModerno()
-    pisoTex.repeat.set(W / 2.4, D / 2.4)
     const suelo = new THREE.Mesh(
         new THREE.PlaneGeometry(W, D),
-        new THREE.MeshStandardMaterial({ map: pisoTex, roughness: 0.34, metalness: 0.12 })
+        new THREE.MeshStandardMaterial({
+            ...pbrTaller('floor', W / 3.2, D / 3.2),
+            color: 0xffffff, roughness: 1, metalness: 1
+        })
     )
     suelo.rotation.x = -Math.PI / 2
     suelo.position.set(cx, y0, cz)
@@ -2707,11 +2878,12 @@ function crearSalaTaller(grupo) {
 }
 
 function crearPared(grupo, w, h, pos, rotY) {
-    const tex = crearTexturaPared()
-    tex.repeat.set(Math.max(1, Math.round(w / 4)), 1)
     const pared = new THREE.Mesh(
         new THREE.PlaneGeometry(w, h),
-        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.96, metalness: 0, side: THREE.DoubleSide })
+        new THREE.MeshStandardMaterial({
+            ...pbrTaller('wall', Math.max(1, Math.round(w / 3)), Math.max(1, Math.round(h / 3))),
+            color: 0xf2efe9, roughness: 1, metalness: 0, side: THREE.DoubleSide
+        })
     )
     pared.position.set(pos[0], pos[1], pos[2])
     pared.rotation.y = rotY
@@ -2972,7 +3144,8 @@ function crearPlantas(grupo) {
         grupo.add(g)
         propsInteractivos.push(g)
     }
-    mkPlanta(SALA.xMin + 0.7, SALA.zMax - 1.1, 1.5)
+    // Esquina frontal izquierda (la estantería real ocupa el fondo izquierdo).
+    mkPlanta(SALA.xMin + 0.7, SALA.zMin + 0.9, 1.4)
     mkPlanta(SALA.xMax - 0.65, SALA.zMin + 0.7, 1.2)
 }
 
@@ -3490,6 +3663,8 @@ function animar() {
 
     const t = performance.now() * 0.003
     const delta = relojWalk.getDelta()
+
+    if (mixers.length) for (const m of mixers) m.update(delta)
 
     PASOS.forEach(p => {
         if (p.marker && p.marker.visible) {
