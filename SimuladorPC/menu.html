@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Tu panel de aprendizaje en LogicFlow: progreso, nivel, insignias y herramientas.">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title>Mi Panel — LogicFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/estilos.css">
     <link rel="stylesheet" href="css/logicflow-premium.css">
     <link rel="stylesheet" href="css/dashboard-v2.css">
@@ -23,7 +26,7 @@
 
     <header class="lf-header dashboard-header">
         <a href="index.html" class="logo-area" style="text-decoration:none;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f76d8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#566ab3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
             <span class="logo-text">LogicFlow</span>
         </a>
         <div class="dashboard-header-actions">
@@ -76,7 +79,7 @@
             <div class="tutor-dashboard__head">
                 <div>
                     <h2>Panel del docente</h2>
-                    <p>Crea clases, comparte el código y sigue las calificaciones de tus estudiantes.</p>
+                    <p>Crea clases y sigue a tus estudiantes.</p>
                 </div>
             </div>
 
@@ -197,7 +200,7 @@
                     <h2 class="retos-banner__title">Retos de reparación</h2>
                     <span class="retos-banner__badge" id="retos-banner-count">0 / 4</span>
                 </div>
-                <p class="retos-banner__sub" id="retos-banner-sub">Diagnostica y repara PCs con fallas reales. Superarlos es parte del 100% del simulador.</p>
+                <p class="retos-banner__sub" id="retos-banner-sub">Diagnostica y repara PCs con fallas reales.</p>
                 <div class="retos-banner__bar"><div class="retos-banner__fill" id="retos-banner-fill" style="width:0%"></div></div>
             </div>
             <a href="retos.html" class="btn retos-banner__btn" id="retos-banner-btn">🔧 Empezar retos</a>
@@ -242,7 +245,7 @@
                 <div class="progreso-card__header">
                     <div>
                         <h2>Estadísticas de desempeño</h2>
-                        <p id="desempeno-subtitulo">Registro continuo de tus aciertos, errores y demoras durante el ensamblaje.</p>
+                        <p id="desempeno-subtitulo">Aciertos, errores y demoras en el ensamblaje.</p>
                     </div>
                 </div>
 
@@ -278,7 +281,7 @@
                 <div class="progreso-card__header" style="margin-bottom: 18px;">
                     <div>
                         <h2>Notas y certificado</h2>
-                        <p>Tus calificaciones y el camino para desbloquear el certificado final.</p>
+                        <p>Tus calificaciones y el camino al certificado.</p>
                     </div>
                 </div>
 
@@ -348,9 +351,6 @@
                         <span id="level-next-xp">100 XP para Aprendiz</span>
                     </div>
                 </div>
-                <p style="font-size: 13px; color: var(--lf-text-muted); line-height: 1.5; margin-top: 8px;">
-                    Gana XP instalando componentes y completando simulaciones. Desbloquea insignias y sube de nivel.
-                </p>
                 <div class="recent-badges" id="recent-badges"></div>
             </section>
 
@@ -358,7 +358,7 @@
                 <div class="progreso-card__header" style="margin-bottom: 18px;">
                     <div>
                         <h2>Insignias</h2>
-                        <p id="badges-subtitulo">Logros desbloqueados en tu camino.</p>
+                        <p id="badges-subtitulo">Tus logros desbloqueados.</p>
                     </div>
                 </div>
                 <div class="badges-grid" id="badges-grid">
@@ -370,7 +370,7 @@
                 <div class="progreso-card__header" style="margin-bottom: 14px;">
                     <div>
                         <h2>Mi clase</h2>
-                        <p id="mi-clase-sub">¿Tu tutor te compartió un código? Únete a su clase.</p>
+                        <p id="mi-clase-sub">Únete con el código de tu tutor.</p>
                     </div>
                 </div>
                 <form id="form-unirse-clase" class="tutor-crear" novalidate>
@@ -384,8 +384,7 @@
             <section class="progreso-card">
                 <div class="progreso-card__header" style="margin-bottom: 18px;">
                     <div>
-                        <h2>Herramientas educativas</h2>
-                        <p>Recursos para potenciar tu aprendizaje.</p>
+                        <h2>Herramientas</h2>
                     </div>
                 </div>
                 <div class="tools-grid">
@@ -409,7 +408,6 @@
 
             <section class="tutor-panel" id="tutor-panel" hidden>
                 <h3>👨‍🏫 Panel de tutor</h3>
-                <p>Bienvenido, docente. Desde aquí puedes orientar a tus estudiantes y revisar los recursos didácticos disponibles.</p>
                 <a href="glosario.html" class="btn btn-secondary" style="width:100%;">Ver recursos didácticos</a>
             </section>
         </div>
@@ -417,7 +415,7 @@
     </main>
 
     <footer class="footer-dashboard">
-        <p>Universidad Central del Ecuador · Pedagogía de las Ciencias Experimentales — Informática &copy; 2026</p>
+        <p>&copy; 2026 LogicFlow · Universidad Central del Ecuador</p>
     </footer>
 
     <div class="modal-overlay" id="modal-editar" aria-modal="true" role="dialog" aria-labelledby="modal-title" hidden>
@@ -457,10 +455,6 @@
     <script src="js/theme.js"></script>
     <script src="js/ui-effects.js"></script>
     <script type="module" src="js/menu.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-        }
-</script>
+    <script src="js/sw-register.js"></script>
 </body>
 </html>

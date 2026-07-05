@@ -9,7 +9,7 @@ export const PASOS = [
         id: 'case', brand: 'NZXT', nombre: 'Gabinete',
         modelo: 'H510 Mid Tower', subtitulo: 'La estructura que protege y organiza',
         color: 0x60a5fa,
-        ruta: 'assets/3d_models/computer_case_based_off_of_nzxt_510b/scene.gltf',
+        ruta: 'assets/3d_models/computer_case_based_off_of_nzxt_510b/scene.opt.glb',
         size: 1.7, pos: new THREE.Vector3(0, 0.85, 0), rot: { x: 0, y: 0, z: 0 },
         specs: { 'Formato': 'Mid Tower ATX', 'Material': 'Acero + Vidrio templado', 'Bahías': '2.5" / 3.5"', 'Ventiladores': 'Hasta 7', 'Gestión de cables': 'Trasera' },
         hechos: [
@@ -30,7 +30,7 @@ export const PASOS = [
         id: 'mb', brand: 'ASUS ROG', nombre: 'Placa Base',
         modelo: 'Strix X570-E Gaming', subtitulo: 'El núcleo que conecta todo',
         color: 0x22c55e,
-        ruta: 'assets/3d_models/rog_strix_x370-f_motherboard/scene.gltf',
+        ruta: 'assets/3d_models/rog_strix_x370-f_motherboard/scene.opt.glb',
         size: 1.3, pos: new THREE.Vector3(-0.30, 1.03, -0.22), rot: { x: 0, y: 0, z: 0 },
 
         shelfRotX: -Math.PI / 18,
@@ -56,7 +56,7 @@ export const PASOS = [
         id: 'cpu', brand: 'AMD', nombre: 'Procesador (CPU)',
         modelo: 'Ryzen 9 5900X', subtitulo: 'El cerebro del computador',
         color: 0x00e5ff,
-        ruta: 'assets/3d_models/amd_ryzen/scene.gltf',
+        ruta: 'assets/3d_models/amd_ryzen/scene.opt.glb',
         size: 0.20, pos: new THREE.Vector3(-0.24, 1.26, -0.27), rot: { x: Math.PI / 2, y: 0, z: 0 },
         specs: { 'Núcleos/Hilos': '12C / 24T', 'Frecuencia Base': '3.7 GHz', 'Boost': '4.8 GHz', 'Caché L3': '64 MB', 'TDP': '105 W' },
         hechos: [
@@ -77,7 +77,7 @@ export const PASOS = [
         id: 'cooler', brand: 'AMD', nombre: 'Disipador (Cooler)',
         modelo: 'Wraith Stealth', subtitulo: 'Mantiene el CPU a temperatura segura',
         color: 0xf59e0b,
-        ruta: 'assets/3d_models/amd_wraith_stealth_cpu_cooler/scene.gltf',
+        ruta: 'assets/3d_models/amd_wraith_stealth_cpu_cooler/scene.opt.glb',
         size: 0.7, pos: new THREE.Vector3(-0.1, 1.28, -0.15), rot: { x: Math.PI / 2, y: 0, z: 0 },
         specs: { 'Tipo': 'Aire (torre baja)', 'Socket': 'AM4', 'Ventilador': '92 mm PWM', 'Disipación': 'Hasta 95 W TDP', 'Pasta térmica': 'Pre-aplicada' },
         hechos: [
@@ -98,7 +98,7 @@ export const PASOS = [
         id: 'ram', brand: 'G.Skill', nombre: 'Memoria RAM',
         modelo: 'Trident Z Neo 32 GB', subtitulo: 'El espacio de trabajo del CPU',
         color: 0x7c4dff,
-        ruta: 'assets/3d_models/ram_ddr4_g.skill_trident_z_neo/scene.gltf',
+        ruta: 'assets/3d_models/ram_ddr4_g.skill_trident_z_neo/scene.opt.glb',
         size: 0.60, pos: new THREE.Vector3(0.0, 1.27, -0.20), rot: { x: 0, y: 1.8, z: 1.5708 },
 
         specs: { 'Capacidad': '32 GB (2×16 GB)', 'Tipo': 'DDR4', 'Velocidad': '3600 MHz', 'Latencia': 'CL16', 'Voltaje': '1.35 V' },
@@ -120,7 +120,7 @@ export const PASOS = [
         id: 'storage', brand: 'Samsung', nombre: 'Almacenamiento NVMe',
         modelo: '990 PRO 1 TB', subtitulo: 'Velocidad de transferencia extrema',
         color: 0x26a69a,
-        ruta: 'assets/3d_models/m.2_nvme_ssd_samsung_990_pro_1tb_3d_model/scene.gltf',
+        ruta: 'assets/3d_models/m.2_nvme_ssd_samsung_990_pro_1tb_3d_model/scene.opt.glb',
         size: 0.3, pos: new THREE.Vector3(-0.05, 0.55, -0.28), rot: { x: 1.5708, y: 0, z: 0 },
         specs: { 'Capacidad': '1 TB', 'Factor Forma': 'M.2 2280', 'Interfaz': 'PCIe Gen 4.0 ×4', 'Lectura': '7450 MB/s', 'Escritura': '6900 MB/s' },
         hechos: [
@@ -141,7 +141,7 @@ export const PASOS = [
         id: 'gpu', brand: 'NVIDIA', nombre: 'Tarjeta Gráfica (GPU)',
         modelo: 'GeForce RTX 3090', subtitulo: 'Motor de procesamiento visual',
         color: 0x10b981,
-        ruta: 'assets/3d_models/nvidia_geforce_rtx_3090/scene.gltf',
+        ruta: 'assets/3d_models/nvidia_geforce_rtx_3090/scene.opt.glb',
         size: 1.0, pos: new THREE.Vector3(-0.36, 0.86, -0.06), rot: { x: -1.5708, y: 0, z: 0 },
         specs: { 'Arquitectura': 'Ampere', 'VRAM': '24 GB GDDR6X', 'CUDA Cores': '10496', 'Bus': '384-bit', 'Consumo': '350 W' },
         hechos: [
@@ -162,7 +162,7 @@ export const PASOS = [
         id: 'power', brand: 'EVGA', nombre: 'Fuente de Poder (PSU)',
         modelo: 'SuperNOVA 850 G6', subtitulo: 'El corazón eléctrico del sistema',
         color: 0xff5f7e,
-        ruta: 'assets/3d_models/psu_power_supply_unit/scene.gltf',
+        ruta: 'assets/3d_models/psu_power_supply_unit/scene.opt.glb',
         size: 0.8, pos: new THREE.Vector3(-0.48, 0.36, 0), rot: { x: 0, y: 1.5708, z: 0 },
         specs: { 'Potencia': '850 W', 'Certificación': '80 Plus Gold', 'Cableado': '100% Modular', 'Ventilador': '135 mm FDB', 'Protecciones': 'OCP / OVP / SCP' },
         hechos: [

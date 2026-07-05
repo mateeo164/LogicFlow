@@ -66,12 +66,19 @@
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
 
-    document.querySelectorAll(selector).forEach(el => {
+    const revealables = document.querySelectorAll(selector);
+    revealables.forEach(el => {
       el.style.opacity = '0';
       el.style.transform = 'translateY(24px)';
       el.style.transition = 'opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
       observer.observe(el);
     });
+
+    // Failsafe: si el observer no llega a disparar (pestaña en segundo plano al
+    // cargar, contenido muy largo, etc.) nunca dejar el contenido invisible.
+    setTimeout(() => {
+      revealables.forEach(el => el.classList.add('lf-is-visible'));
+    }, 2500);
   }
 
   function animateCounter(el, target, duration = 1500, suffix = '') {

@@ -3,6 +3,7 @@ import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, m
 import { PROC_LOGRO, notaConBono } from './achievements.js'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
@@ -16,6 +17,20 @@ import { PASOS } from './pasos-data.js'
 import { crearTexturaRadial, crearTexturaMadera, crearTexturaMaderaClara, crearTexturaLetreroComponentes, crearTexturaPisoModerno, crearTexturaPegboard, crearTexturaMat, crearTexturaEtiqueta, crearTexturaPared, crearTexturaCielo, crearTexturaCartel, crearTexturaBlueprint } from './texturas.js'
 
 const TOTAL = PASOS.length
+
+// Los modelos se sirven comprimidos con Draco (.opt.glb). Se necesita un
+// DRACOLoader con el decodificador WASM local para poder leerlos. Reutilizamos
+// una única instancia entre todos los GLTFLoader.
+let _dracoLoader = null
+function crearGLTFLoader() {
+    if (!_dracoLoader) {
+        _dracoLoader = new DRACOLoader()
+        _dracoLoader.setDecoderPath('/vendor/three/addons/libs/draco/gltf/')
+    }
+    const loader = new GLTFLoader()
+    loader.setDRACOLoader(_dracoLoader)
+    return loader
+}
 
 function normalizarVideoId(videoValor) {
     if (!videoValor) return null
@@ -3028,8 +3043,8 @@ function crearBanco(grupo) {
     const fallback = construirBancoProcedural()
     grupo.add(fallback)
 
-    new GLTFLoader().load(
-        'assets/3d_models/computer_desk/scene.gltf',
+    crearGLTFLoader().load(
+        'assets/3d_models/computer_desk/scene.opt.glb',
         (gltf) => {
             const desk = gltf.scene
 
@@ -3364,7 +3379,7 @@ function optimizarMateriales(obj) {
 }
 
 function precargarModelos() {
-    const loader = new GLTFLoader()
+    const loader = crearGLTFLoader()
     appendLog('Cargando modelos 3D de hardware…', 'system')
 
     if (renderer) _maxAniso = Math.min(4, renderer.capabilities.getMaxAnisotropy())
@@ -3463,6 +3478,16 @@ function colocarModelo(paso, conAnimacion) {
 
 function animar() {
     requestAnimationFrame(animar)
+
+    // Ahorro de GPU/batería: solo renderizamos cuando el laboratorio 3D está
+    // realmente a la vista (no cubierto por los overlays de bienvenida/video/
+    // quiz/final) y con la pestaña activa. Mantenemos el reloj al día para no
+    // provocar un salto de delta al reanudar.
+    if (fase !== '3d' || document.hidden) {
+        relojWalk.getDelta()
+        return
+    }
+
     const t = performance.now() * 0.003
     const delta = relojWalk.getDelta()
 

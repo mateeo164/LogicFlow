@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Laboratorio 3D de LogicFlow. Ensambla componentes de PC paso a paso.">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title>LogicFlow · Laboratorio Virtual de Ensamblaje</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/estilos.css">
     <link rel="stylesheet" href="css/logicflow-premium.css">
     <link rel="stylesheet" href="css/sim-v2.css">
@@ -27,8 +30,8 @@
     <script type="importmap">
     {
       "imports": {
-        "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        "three": "/vendor/three/three.module.js",
+        "three/addons/": "/vendor/three/addons/"
       }
     }
 </script>
@@ -78,13 +81,13 @@
 </template>
 
 <div id="loading-overlay" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:linear-gradient(160deg,#0c1626,#0a1018);color:#eaf2ff;font-family:'Inter','Segoe UI',sans-serif;">
-    <div class="logo-spin" style="width:62px;height:62px;border-radius:50%;border:4px solid rgba(120,180,255,0.18);border-top-color:#3a8bff;animation:lf-spin 0.9s linear infinite;"></div>
+    <div class="logo-spin" style="width:62px;height:62px;border-radius:50%;border:4px solid rgba(129,140,248,0.20);border-top-color:#818cf8;animation:lf-spin 0.9s linear infinite;"></div>
     <div style="text-align:center;">
-        <div style="font-size:1.35rem;font-weight:700;letter-spacing:.5px;"><span style="color:#3a8bff;">Logic</span>Flow</div>
+        <div style="font-size:1.35rem;font-weight:700;letter-spacing:.5px;"><span style="color:#818cf8;">Logic</span>Flow</div>
         <div id="loading-text" style="margin-top:6px;font-size:.95rem;color:#9fb3c8;">Preparando el laboratorio 3D…</div>
     </div>
     <div style="width:260px;max-width:70vw;height:8px;border-radius:99px;background:rgba(255,255,255,0.10);overflow:hidden;">
-        <div id="loading-bar-fill" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#3a8bff,#22c55e);transition:width .25s ease;"></div>
+        <div id="loading-bar-fill" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#566ab3,#2f9d90);transition:width .25s ease;"></div>
     </div>
     <div id="loading-count" style="font-size:.8rem;color:#6b7d92;">0 / 0 modelos</div>
 </div>
@@ -108,8 +111,7 @@
             <span class="lab-eyebrow">Laboratorio Virtual · UCE 2026</span>
             <h1 class="bienvenida-title">Ensambla tu<br>primer PC</h1>
             <p class="bienvenida-desc">
-                Antes de cada pieza verás un video explicativo. Luego la instalarás tú mismo en el entorno 3D.
-                Al terminar, tu progreso se guarda automáticamente.
+                Mira el video de cada pieza, instálala tú mismo en 3D y tu progreso se guarda solo.
             </p>
 
             <div class="bienvenida-steps" id="bienvenida-steps">
@@ -312,10 +314,6 @@
     <script src="js/theme.js"></script>
     <script src="js/ui-effects.js"></script>
     <script type="module" src="js/juego.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-        }
-</script>
+    <script src="js/sw-register.js"></script>
 </body>
 </html>

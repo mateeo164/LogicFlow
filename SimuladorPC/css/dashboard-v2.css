@@ -15,13 +15,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(253, 251, 247, 0.94);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--lf-border-light);
 }
 
 [data-theme="dark"] .lf-header.dashboard-header {
-  background: rgba(11, 18, 32, 0.94);
+  background: rgba(6, 10, 22, 0.8);
 }
 
 .logo-area {
@@ -750,7 +750,7 @@
 .nota-box__valor {
   font-size: 26px;
   font-weight: 800;
-  color: var(--lf-accent, #0f76d8);
+  color: var(--lf-accent-500);
   line-height: 1.1;
 }
 
@@ -878,7 +878,7 @@ body.is-tutor .tutor-only { display: block; }
   transition: border-color .15s, background .15s;
 }
 .tutor-clase-item:hover { border-color: var(--lf-border-strong, #c3ccd8); }
-.tutor-clase-item.is-active { border-color: #2b6cff; background: rgba(43, 108, 255, 0.06); }
+.tutor-clase-item.is-active { border-color: #6366f1; background: rgba(99, 102, 241, 0.08); }
 .tutor-clase-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .tutor-clase-main strong { font-size: 14px; color: var(--lf-text, #1a2233); }
 .tutor-clase-main span { font-size: 12px; color: var(--lf-text-muted, #7a8699); }
@@ -887,7 +887,7 @@ body.is-tutor .tutor-only { display: block; }
 .tutor-codigo-chip {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-weight: 700; letter-spacing: 1px;
-  font-size: 13px; color: #1d4ed8;
+  font-size: 13px; color: #4f46e5;
   background: rgba(43, 108, 255, 0.10);
   border-radius: 8px; padding: 5px 9px; white-space: nowrap;
 }
@@ -911,7 +911,7 @@ body.is-tutor .tutor-only { display: block; }
 .tutor-alumno { display: flex; align-items: center; gap: 10px; }
 .tutor-alumno__ava {
   width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
-  background: #2b6cff; color: #fff; font-size: 12px; font-weight: 700;
+  background: #6366f1; color: #fff; font-size: 12px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
 .tutor-alumno div { display: flex; flex-direction: column; min-width: 0; }
@@ -962,7 +962,7 @@ body.is-tutor .tutor-only { display: block; }
 .cert-mini.on { background: rgba(22, 163, 74, 0.14); color: #16a34a; }
 
 .mis-clase-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 13.5px; color: var(--lf-text, #1a2233); }
-.mis-clase-dot { width: 8px; height: 8px; border-radius: 50%; background: #2b6cff; flex-shrink: 0; }
+.mis-clase-dot { width: 8px; height: 8px; border-radius: 50%; background: #6366f1; flex-shrink: 0; }
 .mis-clase-item strong { flex: 1; font-weight: 600; }
 
 [data-theme="dark"] .tutor-dashboard,
@@ -980,7 +980,7 @@ body.is-tutor .tutor-only { display: block; }
   color: var(--lf-text-muted, #7a8699); font-size: 13px; font-weight: 600;
   padding: 7px 14px; border-radius: 999px; cursor: pointer;
 }
-.tutor-tab.is-active { background: #2b6cff; border-color: #2b6cff; color: #fff; }
+.tutor-tab.is-active { background: #6366f1; border-color: #6366f1; color: #fff; }
 
 .tutor-tarea-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 .tutor-tarea-form input, .tutor-tarea-form textarea {
@@ -996,7 +996,7 @@ body.is-tutor .tutor-only { display: block; }
 .tutor-tarea-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .tutor-tarea-head strong { font-size: 14.5px; color: var(--lf-text, #1a2233); }
 .tutor-tarea-meta { display: block; font-size: 12px; color: var(--lf-text-muted, #7a8699); margin-top: 2px; }
-.tutor-tarea-toggle { background: none; border: none; color: #2b6cff; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.tutor-tarea-toggle { background: none; border: none; color: #6366f1; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .tutor-tarea-desc { font-size: 13px; color: var(--lf-text-muted, #7a8699); margin: 8px 0 0; }
 .tutor-tarea-entregas { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 
@@ -1016,14 +1016,14 @@ body.is-tutor .tutor-only { display: block; }
 .mi-tarea-clase { display: block; font-size: 11.5px; color: var(--lf-text-muted, #7a8699); margin-top: 2px; }
 .mi-tarea-estado { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .mi-tarea-estado.pendiente { background: var(--lf-surface-1, #eef0f3); color: var(--lf-text-muted, #7a8699); }
-.mi-tarea-estado.entregada { background: rgba(43,108,255,0.12); color: #1d4ed8; }
+.mi-tarea-estado.entregada { background: rgba(99,102,241,0.12); color: #4f46e5; }
 .mi-tarea-estado.calificada { background: rgba(22,163,74,0.14); color: #16a34a; }
 .mi-tarea-estado.vencida { background: rgba(220,38,38,0.12); color: #dc2626; }
 .mi-tarea-vencida-aviso { font-size: 12px; color: #dc2626; margin: 8px 0 0; }
 .mi-tarea-desc { font-size: 12.5px; color: var(--lf-text-muted, #7a8699); margin: 8px 0 0; }
 .mi-tarea-coment { font-size: 12.5px; color: var(--lf-text, #1a2233); margin: 6px 0 0; background: var(--lf-surface-1, #f6f7f9); padding: 8px 10px; border-radius: 8px; }
 .mi-tarea-archivo { font-size: 12.5px; margin: 8px 0 0; }
-.mi-tarea-archivo a, .entrega-archivo { color: var(--lf-primary, #2b6cff); text-decoration: none; font-weight: 600; }
+.mi-tarea-archivo a, .entrega-archivo { color: var(--lf-primary-500); text-decoration: none; font-weight: 600; }
 .mi-tarea-archivo a:hover, .entrega-archivo:hover { text-decoration: underline; }
 .entrega-archivo { font-size: 11.5px; }
 
@@ -1055,7 +1055,7 @@ body.is-tutor .tutor-only { display: block; }
   background: var(--lf-surface-0, #fff);
 }
 [data-theme="dark"] .tutor-kpi { background: rgba(255,255,255,0.03); }
-.tutor-kpi strong { font-size: 24px; font-weight: 800; color: #2b6cff; line-height: 1.1; }
+.tutor-kpi strong { font-size: 24px; font-weight: 800; color: #6366f1; line-height: 1.1; }
 .tutor-kpi span { font-size: 12px; color: var(--lf-text-muted, #7a8699); }
 
 .tutor-detalle-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -1101,20 +1101,22 @@ body.is-tutor .tutor-only { display: block; }
   gap: 18px;
   padding: 20px 24px;
   border-radius: var(--lf-radius-lg, 16px);
-  background: linear-gradient(135deg, #b45309 0%, #d97706 55%, #f59e0b 100%);
-  color: #fff;
-  box-shadow: 0 10px 30px rgba(180, 83, 9, 0.28);
+  background: var(--lf-surface-0);
+  border: 1px solid var(--lf-border-light);
+  border-left: 4px solid var(--lf-amber-500);
+  color: var(--lf-text-primary);
+  box-shadow: var(--lf-shadow-sm);
   position: relative;
   overflow: hidden;
 }
 .retos-banner::after {
   content: "";
   position: absolute;
-  right: -40px;
-  top: -60px;
-  width: 220px;
-  height: 220px;
-  background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
+  right: -60px;
+  top: -80px;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(217, 119, 6, 0.07), transparent 70%);
   pointer-events: none;
 }
 .retos-banner__icon {
@@ -1123,10 +1125,10 @@ body.is-tutor .tutor-only { display: block; }
   height: 58px;
   display: grid;
   place-items: center;
-  font-size: 30px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
+  font-size: 28px;
+  border-radius: 14px;
+  background: rgba(217, 119, 6, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.22);
 }
 .retos-banner__body { flex: 1 1 auto; min-width: 0; }
 .retos-banner__top {
@@ -1140,47 +1142,49 @@ body.is-tutor .tutor-only { display: block; }
   font-size: 20px;
   font-weight: 700;
   margin: 0;
-  color: #fff;
+  color: var(--lf-text-primary);
 }
 .retos-banner__badge {
   font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
   padding: 4px 12px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(217, 119, 6, 0.13);
+  color: var(--lf-amber-600);
 }
+[data-theme="dark"] .retos-banner__badge { color: #fbbf24; }
 .retos-banner__sub {
   margin: 6px 0 12px;
   font-size: 13.5px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--lf-text-secondary);
   max-width: 640px;
 }
 .retos-banner__bar {
   height: 8px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--lf-surface-200);
   overflow: hidden;
 }
 .retos-banner__fill {
   height: 100%;
   border-radius: 999px;
-  background: #fff;
+  background: linear-gradient(90deg, var(--lf-amber-600), var(--lf-amber-500));
   transition: width 0.4s ease;
 }
 .retos-banner__btn {
   flex: 0 0 auto;
-  background: #fff;
-  color: #92400e;
-  border-color: #fff;
+  background: var(--lf-amber-500);
+  color: #fff;
+  border-color: transparent;
   font-weight: 700;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.24);
 }
 .retos-banner__btn:hover {
-  background: #fff7ed;
-  border-color: #fff7ed;
-  color: #7c2d12;
+  background: var(--lf-amber-600);
+  border-color: transparent;
+  color: #fff;
   transform: translateY(-1px);
 }
 
@@ -1250,4 +1254,4 @@ body.is-tutor .tutor-only { display: block; }
 
 [data-theme="dark"] .lf-notif-bell,
 [data-theme="dark"] .notif-item { background: rgba(255,255,255,0.03); }
-[data-theme="dark"] .notif-item.no-leida { background: rgba(43,108,255,0.12); }
+[data-theme="dark"] .notif-item.no-leida { background: rgba(99,102,241,0.12); }

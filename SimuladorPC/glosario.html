@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Glosario de términos de hardware de LogicFlow. Aprende el vocabulario técnico.">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title>Glosario — LogicFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/estilos.css">
     <link rel="stylesheet" href="css/logicflow-premium.css">
     <link rel="stylesheet" href="css/tools-v2.css">
@@ -16,7 +19,7 @@
 
     <header class="lf-header tools-header">
         <a href="index.html" class="logo-area" style="text-decoration:none;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f76d8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#566ab3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
             <span class="logo-text">LogicFlow</span>
         </a>
         <div class="tools-header-actions">
@@ -34,7 +37,7 @@
         <section class="tools-hero">
             <span class="tools-eyebrow">Recurso educativo</span>
             <h1 class="tools-title">Glosario de <span class="lf-text-gradient">hardware</span></h1>
-            <p class="tools-desc">Términos esenciales que todo ensamblador de PCs debe conocer.</p>
+            <p class="tools-desc">Los términos esenciales del hardware, al grano.</p>
 
             <div class="tool-search">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -53,16 +56,12 @@
     </main>
 
     <footer class="footer-dashboard">
-        <p>Universidad Central del Ecuador · Pedagogía de las Ciencias Experimentales — Informática &copy; 2026</p>
+        <p>&copy; 2026 LogicFlow · Universidad Central del Ecuador</p>
     </footer>
 
     <script src="js/theme.js"></script>
     <script src="js/ui-effects.js"></script>
     <script type="module" src="js/glosario.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-        }
-</script>
+    <script src="js/sw-register.js"></script>
 </body>
 </html>

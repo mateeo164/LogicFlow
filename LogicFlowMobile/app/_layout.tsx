@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Stack, router } from 'expo-router'
+import { Stack, router, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { StyleSheet, View } from 'react-native'
@@ -24,6 +24,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {})
 
 export default function RootLayout() {
   const { session, loading } = useAuth()
+  const segments = useSegments()
 
   useEffect(() => {
     loadSoundPref()
@@ -43,9 +44,21 @@ export default function RootLayout() {
   useEffect(() => {
     if (!ready) return
     SplashScreen.hideAsync().catch(() => {})
-    if (!session) router.replace('/auth/login')
-    else router.replace('/(tabs)')
-  }, [ready, session])
+  }, [ready])
+
+  // Guarda de sesión: solo redirige cuando estás del lado equivocado de la
+  // frontera de auth. Nunca vuelve a hacer replace de la ruta en la que ya
+  // estás; hacerlo reiniciaba el Stack y remontaba la pantalla de login,
+  // cerrando el teclado apenas tocabas el campo de correo.
+  useEffect(() => {
+    if (!ready) return
+    const inAuthGroup = segments[0] === 'auth'
+    if (session && inAuthGroup) {
+      router.replace('/(tabs)')
+    } else if (!session && !inAuthGroup) {
+      router.replace('/auth/login')
+    }
+  }, [ready, session, segments])
 
   if (!ready) {
     return <View style={styles.boot} />

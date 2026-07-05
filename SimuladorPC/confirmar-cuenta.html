@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Confirmación de tu cuenta de LogicFlow.">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title>Cuenta confirmada - LogicFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/estilos.css">
     <link rel="stylesheet" href="css/logicflow-premium.css">
     <link rel="stylesheet" href="css/auth-v2.css">
@@ -44,31 +47,13 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
             <h2 class="auth-hero-title">¡Bienvenido a LogicFlow!</h2>
-            <p class="auth-hero-desc">Tu cuenta está lista. Comienza a construir, simular y aprender lógica computacional.</p>
-            <div class="auth-features">
-                <div class="auth-feature">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span>Simulador de ensamblaje de PC</span>
-                </div>
-                <div class="auth-feature">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span>Retos y logros para aprender jugando</span>
-                </div>
-                <div class="auth-feature">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span>Tu progreso respaldado en la nube</span>
-                </div>
-            </div>
+            <p class="auth-hero-desc">Tu cuenta está lista para entrar al laboratorio 3D.</p>
         </div>
     </div>
 
     <script src="js/theme.js"></script>
     <script src="js/ui-effects.js"></script>
     <script type="module" src="js/confirmar-cuenta.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-        }
-    </script>
+    <script src="js/sw-register.js"></script>
 </body>
 </html>

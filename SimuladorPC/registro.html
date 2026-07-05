@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Crea tu cuenta en LogicFlow y empieza a aprender ensamblaje de PCs.">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title>Crear Cuenta - LogicFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/estilos.css">
     <link rel="stylesheet" href="css/logicflow-premium.css">
     <link rel="stylesheet" href="css/auth-v2.css">
@@ -26,8 +29,8 @@
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="auth-icon-center"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
             </div>
 
-            <h1 class="auth-title">Crea tu cuenta de LogicFlow</h1>
-            <p class="auth-subtitulo">Regístrate como Estudiante o Tutor para iniciar tu ruta de aprendizaje en el simulador.</p>
+            <h1 class="auth-title">Crea tu cuenta</h1>
+            <p class="auth-subtitulo">Elige tu rol y empieza en minutos.</p>
 
             <div id="auth-mensaje" class="auth-message" hidden></div>
 
@@ -38,14 +41,14 @@
                         <input type="radio" id="rol-estudiante" name="rol" value="Estudiante" checked>
                         <label for="rol-estudiante">
                             <h3>🎓 Estudiante</h3>
-                            <p>Explora retos guiados y monitorea tu progreso de ensamblaje.</p>
+                            <p>Aprende y practica en el laboratorio 3D.</p>
                         </label>
                     </div>
                     <div>
                         <input type="radio" id="rol-tutor" name="rol" value="Tutor">
                         <label for="rol-tutor">
                             <h3>👨‍🏫 Tutor</h3>
-                            <p>Supervisa aprendizajes y apoya a estudiantes en su camino.</p>
+                            <p>Crea clases y sigue el progreso.</p>
                         </label>
                     </div>
                 </div>
@@ -84,14 +87,8 @@
                     <a href="login.html">¿Ya tienes una cuenta? Inicia sesión.</a>
                 </div>
 
-                <div class="auth-privacy">
-                    <p>
-                        Tu perfil se mantendrá cifrado. LogicFlow evaluará tu tiempo y precisión en el simulador para generar tu reporte de aprendizaje.
-                    </p>
-                </div>
-
                 <div class="auth-actions">
-                    <button type="submit" class="btn btn-primary auth-btn">Crear Cuenta y Continuar</button>
+                    <button type="submit" class="btn btn-primary auth-btn">Crear cuenta</button>
                 </div>
                 <div class="auth-btn-secondary-wrapper" style="margin-top: 15px;">
                     <button type="button" class="btn btn-secondary auth-btn auth-btn-outline" onclick="window.location.href='index.html'">Volver al inicio</button>
@@ -106,8 +103,8 @@
             <div class="auth-hero-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
-            <h2 class="auth-hero-title">Únete a la comunidad técnica</h2>
-            <p class="auth-hero-desc">Empieza tu camino como técnico de ensamblaje con simulaciones guiadas, evaluaciones y certificación.</p>
+            <h2 class="auth-hero-title">Únete a LogicFlow</h2>
+            <p class="auth-hero-desc">Simulación guiada, evaluación y certificación en un solo lugar.</p>
             <div class="auth-features">
                 <div class="auth-feature">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -128,10 +125,6 @@
     <script src="js/theme.js"></script>
     <script src="js/ui-effects.js"></script>
     <script type="module" src="js/registro.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-        }
-</script>
+    <script src="js/sw-register.js"></script>
 </body>
 </html>
