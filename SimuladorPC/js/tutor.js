@@ -1,11 +1,12 @@
 
 import {
-    crearClase, misClasesTutor, resumenClase,
+    crearClase, misClasesTutor, resumenClase, conceptosDificilesClase,
     unirseAClase, misClasesEstudiante,
     crearTarea, eliminarTarea, tareasDeClase, resumenTarea,
     calificarEntrega, entregarTarea, misTareas,
     renombrarClase, eliminarClase, quitarEstudiante,
-    misNotificaciones, marcarNotifsLeidas
+    misNotificaciones, marcarNotifsLeidas,
+    subirArchivoEntrega, urlArchivoEntrega
 } from './tutor-api.js'
 
 function formatTiempo(segundos) {
@@ -150,10 +151,13 @@ export async function initTutorPanel() {
 
 function exportarCSV() {
     if (!claseActual?.filas?.length) { toast('No hay estudiantes que exportar'); return }
-    const cols = ['Estudiante', 'Email', 'Nota ensamble', 'Aprobo web', 'Completo app', 'Mejor reto', 'Retos superados', 'Logros', 'Tiempo (s)']
+    const cols = ['Estudiante', 'Email', 'Nota ensamble', 'Comprension (%)', 'Ganancia aprendizaje', 'Aprobo web', 'Completo app', 'Mejor reto', 'Retos superados', 'Logros', 'Tiempo (s)']
     const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
     const filas = claseActual.filas.map(f => [
-        f.nombre, f.email, f.nota_web ?? '', f.web_aprobado ? 'Si' : 'No', f.movil_completado ? 'Si' : 'No',
+        f.nombre, f.email, f.nota_web ?? '',
+        f.comprension_pct != null ? Math.round(Number(f.comprension_pct)) : '',
+        f.ganancia != null ? Math.round(Number(f.ganancia) * 100) + '%' : '',
+        f.web_aprobado ? 'Si' : 'No', f.movil_completado ? 'Si' : 'No',
         f.mejor_nota_reto ?? '', f.retos_superados, f.logros_total, f.tiempo_total_segundos
     ].map(esc).join(','))
     const csv = [cols.map(esc).join(','), ...filas].join('\r\n')
@@ -229,6 +233,7 @@ async function cargarEntregas(tareaId, cont) {
             <div class="entrega-alumno">
                 <span class="entrega-estado ${f.entregada ? 'on' : ''}">${f.entregada ? '✓ Entregada' : 'Pendiente'}</span>
                 <strong>${f.nombre}</strong>
+                ${f.archivo_path ? `<a href="#" class="entrega-archivo" data-path="${f.archivo_path}">📎 ${f.archivo_nombre || 'archivo'}</a>` : ''}
             </div>
             <div class="entrega-calif">
                 <input type="number" class="entrega-nota" min="0" step="0.1" placeholder="Nota" value="${f.nota != null ? f.nota : ''}">
@@ -238,6 +243,21 @@ async function cargarEntregas(tareaId, cont) {
         </div>`).join('')
 
     cont.querySelectorAll('.entrega-row').forEach(row => {
+        row.querySelector('.entrega-archivo')?.addEventListener('click', async (e) => {
+            e.preventDefault()
+            const a = e.currentTarget
+            const prev = a.textContent
+            a.textContent = 'Abriendo…'
+            try {
+                const url = await urlArchivoEntrega(a.getAttribute('data-path'))
+                window.open(url, '_blank', 'noopener')
+            } catch (err) {
+                a.textContent = 'No se pudo abrir'
+            } finally {
+                setTimeout(() => { a.textContent = prev }, 1500)
+            }
+        })
+
         row.querySelector('.entrega-guardar')?.addEventListener('click', async (e) => {
             const btn = e.currentTarget
             const estId = row.getAttribute('data-est')
@@ -333,17 +353,24 @@ async function seleccionarClase(id, nombre, codigo) {
     claseActual.filas = filas
 
     if (!filas.length) {
-        if (body) body.innerHTML = `<tr><td colspan="8" class="tutor-tabla-empty">Sin estudiantes aún. Comparte el código <strong>${codigo}</strong> para que se unan.</td></tr>`
+        if (body) body.innerHTML = `<tr><td colspan="9" class="tutor-tabla-empty">Sin estudiantes aún. Comparte el código <strong>${codigo}</strong> para que se unan.</td></tr>`
         setKpiClase(null)
+        const conc = document.getElementById('tutor-conceptos')
+        if (conc) conc.hidden = true
         return
     }
 
     renderResumenClase(filas)
+    renderConceptosDificiles(id)
 
     if (body) body.innerHTML = filas.map(f => {
         const nota = f.nota_web != null ? Number(f.nota_web).toFixed(1) : '—'
         const notaCls = f.nota_web == null ? '' : (Number(f.nota_web) >= 7 ? 'ok' : 'bajo')
         const mejor = f.mejor_nota_reto != null ? Number(f.mejor_nota_reto).toFixed(1) : '—'
+        const compVal = f.comprension_pct != null ? Math.round(Number(f.comprension_pct)) : null
+        const compCls = compVal == null ? '' : (compVal >= 70 ? 'ok' : compVal >= 40 ? 'medio' : 'bajo')
+        const ganTxt = f.ganancia != null ? `<span class="tutor-gan" title="Ganancia de aprendizaje (pre→post)">${Number(f.ganancia) >= 0 ? '▲' : '▼'} ${Math.round(Number(f.ganancia) * 100)}%</span>` : ''
+        const compCell = compVal == null ? '—' : `<span class="tutor-nota ${compCls}">${compVal}%</span>${ganTxt}`
         const cert = `<span class="cert-mini ${f.web_aprobado ? 'on' : ''}">Web</span><span class="cert-mini ${f.movil_completado ? 'on' : ''}">App</span>`
         return `
         <tr data-est="${f.estudiante_id}" data-nombre="${encodeURIComponent(f.nombre)}">
@@ -357,6 +384,7 @@ async function seleccionarClase(id, nombre, codigo) {
                 </div>
             </td>
             <td><span class="tutor-nota ${notaCls}">${nota}${f.nota_web != null ? '/10' : ''}</span></td>
+            <td>${compCell}</td>
             <td>${mejor}${f.mejor_nota_reto != null ? '/10' : ''}</td>
             <td>${f.retos_superados}</td>
             <td>${f.logros_total}</td>
@@ -388,13 +416,53 @@ function renderResumenClase(filas) {
     const app = filas.filter(f => f.movil_completado).length
     const retos = filas.reduce((s, f) => s + (f.retos_superados || 0), 0)
     const tiempo = filas.reduce((s, f) => s + (f.tiempo_total_segundos || 0), 0)
+    const conComp = filas.filter(f => f.comprension_pct != null)
+    const compMedia = conComp.length
+        ? Math.round(conComp.reduce((s, f) => s + Number(f.comprension_pct), 0) / conComp.length)
+        : null
     const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v }
     set('res-aprobados', `${aprobados}/${filas.length}`)
+    set('res-comprension', compMedia == null ? '—' : `${compMedia}%`)
     set('res-app', `${app}/${filas.length}`)
     set('res-retos', retos)
     set('res-tiempo', formatTiempo(tiempo))
     resumen.hidden = false
     setKpiClase(filas)
+}
+
+// Etiquetas legibles de los componentes (coherentes con PASOS del laboratorio).
+const CONCEPTO_LABEL = {
+    case: 'Gabinete', mb: 'Placa base', cpu: 'Procesador (CPU)', cooler: 'Disipador',
+    ram: 'Memoria RAM', storage: 'Almacenamiento', gpu: 'Tarjeta gráfica', power: 'Fuente de poder'
+}
+
+// Widget "conceptos que más le cuestan a la clase": accionable para el docente.
+async function renderConceptosDificiles(claseId) {
+    const cont = document.getElementById('tutor-conceptos')
+    const list = document.getElementById('tutor-conceptos-list')
+    if (!cont || !list) return
+
+    let filas = []
+    try { filas = await conceptosDificilesClase(claseId) } catch (_) { filas = [] }
+
+    const conDatos = filas.filter(f => (f.total || 0) > 0)
+    if (!conDatos.length) { cont.hidden = true; return }
+
+    list.innerHTML = conDatos.slice(0, 8).map(f => {
+        const pct = f.pct_error != null ? Math.round(Number(f.pct_error)) : 0
+        const cls = pct >= 50 ? 'bajo' : pct >= 25 ? 'medio' : 'ok'
+        const label = CONCEPTO_LABEL[f.componente] || f.componente
+        return `
+        <div class="tutor-concepto">
+            <div class="tutor-concepto__head">
+                <span class="tutor-concepto__nombre">${label}</span>
+                <span class="tutor-concepto__pct ${cls}">${pct}% error</span>
+            </div>
+            <div class="tutor-concepto__bar"><span class="tutor-concepto__fill ${cls}" style="width:${pct}%"></span></div>
+            <span class="tutor-concepto__det">${f.errores} de ${f.total} respuestas incorrectas</span>
+        </div>`
+    }).join('')
+    cont.hidden = false
 }
 
 function setKpiClase(filas) {
@@ -509,12 +577,18 @@ async function cargarMisTareas() {
     }
     if (card) card.hidden = false
 
+    const ahora = Date.now()
     list.innerHTML = tareas.map(t => {
         const vence = fmtFecha(t.vence_at)
+        const vencida = t.vence_at && new Date(t.vence_at).getTime() < ahora
         let estado, cls
         if (t.calificada) { estado = `Calificada: ${Number(t.nota).toFixed(1)}/${Number(t.puntaje_max).toFixed(0)}`; cls = 'calificada' }
         else if (t.entregada) { estado = 'Entregada · por calificar'; cls = 'entregada' }
+        else if (vencida) { estado = `No entregada · 0/${Number(t.puntaje_max).toFixed(0)}`; cls = 'vencida' }
         else { estado = 'Pendiente'; cls = 'pendiente' }
+        const btnLabel = t.entregada ? 'Reemplazar archivo' : 'Entregar'
+        // Solo se puede (re)entregar si no está calificada y no venció.
+        const puedeEntregar = !t.calificada && !vencida
         return `
         <li class="mi-tarea-item" data-id="${t.tarea_id}">
             <div class="mi-tarea-head">
@@ -526,19 +600,67 @@ async function cargarMisTareas() {
             </div>
             ${t.descripcion ? `<p class="mi-tarea-desc">${t.descripcion}</p>` : ''}
             ${t.comentario ? `<p class="mi-tarea-coment">💬 ${t.comentario}</p>` : ''}
-            ${!t.entregada ? `<button type="button" class="btn btn-primary btn-sm mi-tarea-entregar">Marcar como entregada</button>` : ''}
+            ${t.archivo_path ? `<p class="mi-tarea-archivo">📎 <a href="#" class="mi-tarea-ver" data-path="${t.archivo_path}">${t.archivo_nombre || 'Ver archivo entregado'}</a></p>` : ''}
+            ${vencida && !t.entregada ? `<p class="mi-tarea-vencida-aviso">La fecha límite pasó. Ya no puedes entregar esta tarea.</p>` : ''}
+            ${puedeEntregar ? `
+            <div class="mi-tarea-entrega">
+                <label class="mi-tarea-file">
+                    <input type="file" class="mi-tarea-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,application/pdf" hidden>
+                    <span class="btn btn-secondary btn-sm mi-tarea-pick">Elegir archivo (obligatorio)</span>
+                    <span class="mi-tarea-fname">Ningún archivo seleccionado</span>
+                </label>
+                <button type="button" class="btn btn-primary btn-sm mi-tarea-entregar" disabled>${btnLabel}</button>
+                <span class="mi-tarea-msg" role="status"></span>
+            </div>` : ''}
         </li>`
     }).join('')
 
     list.querySelectorAll('.mi-tarea-item').forEach(li => {
-        li.querySelector('.mi-tarea-entregar')?.addEventListener('click', async (e) => {
-            const btn = e.currentTarget
-            btn.disabled = true; btn.textContent = 'Enviando…'
+        const tareaId = li.getAttribute('data-id')
+        const input = li.querySelector('.mi-tarea-input')
+        const fname = li.querySelector('.mi-tarea-fname')
+        const btn = li.querySelector('.mi-tarea-entregar')
+        const msg = li.querySelector('.mi-tarea-msg')
+
+        input?.addEventListener('change', () => {
+            const file = input.files?.[0]
+            fname.textContent = file?.name || 'Ningún archivo seleccionado'
+            if (btn) btn.disabled = !file   // archivo obligatorio
+            if (msg) msg.textContent = ''
+        })
+
+        // Ver / descargar el archivo ya entregado (URL firmada temporal).
+        li.querySelector('.mi-tarea-ver')?.addEventListener('click', async (e) => {
+            e.preventDefault()
+            const a = e.currentTarget
+            const prev = a.textContent
+            a.textContent = 'Abriendo…'
             try {
-                await entregarTarea(li.getAttribute('data-id'))
+                const url = await urlArchivoEntrega(a.getAttribute('data-path'))
+                window.open(url, '_blank', 'noopener')
+            } catch (err) {
+                a.textContent = 'No se pudo abrir'
+            } finally {
+                setTimeout(() => { a.textContent = prev }, 1500)
+            }
+        })
+
+        btn?.addEventListener('click', async () => {
+            const file = input?.files?.[0] || null
+            if (!file) {   // archivo obligatorio
+                if (msg) { msg.className = 'mi-tarea-msg error'; msg.textContent = 'Debes adjuntar un archivo para entregar.' }
+                return
+            }
+            btn.disabled = true; btn.textContent = 'Enviando…'
+            if (msg) { msg.className = 'mi-tarea-msg'; msg.textContent = '' }
+            try {
+                if (msg) msg.textContent = 'Subiendo archivo…'
+                const subido = await subirArchivoEntrega(tareaId, file)
+                await entregarTarea(tareaId, { archivoPath: subido.path, archivoNombre: subido.nombre })
                 await cargarMisTareas()
             } catch (err) {
-                btn.textContent = 'Error'; btn.disabled = false
+                btn.disabled = false; btn.textContent = 'Reintentar'
+                if (msg) { msg.className = 'mi-tarea-msg error'; msg.textContent = err.message || 'No se pudo entregar.' }
             }
         })
     })

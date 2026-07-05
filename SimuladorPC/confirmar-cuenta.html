@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Confirmación de tu cuenta de LogicFlow.">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>Cuenta confirmada - LogicFlow</title>
+    <link rel="stylesheet" href="css/estilos.css">
+    <link rel="stylesheet" href="css/logicflow-premium.css">
+    <link rel="stylesheet" href="css/auth-v2.css">
+</head>
+<body class="auth-body">
+
+    <div class="auth-panel">
+        <main class="auth-container" style="max-width: 520px;">
+
+            <button type="button" class="lf-theme-toggle" id="theme-toggle" aria-label="Cambiar tema" title="Cambiar tema">
+                <svg class="lf-theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <svg class="lf-theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            </button>
+
+            <div class="auth-logo-wrapper">
+                <svg id="confirmar-icono" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="auth-icon-center"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
+
+            <h1 class="auth-title" id="confirmar-titulo">Confirmando tu cuenta…</h1>
+            <p class="auth-subtitulo" id="confirmar-subtitulo">Estamos verificando tu enlace de confirmación.</p>
+
+            <div class="auth-actions" id="confirmar-acciones" style="margin-top: 20px;"></div>
+
+            <div class="auth-btn-secondary-wrapper" style="margin-top:15px;">
+                <button type="button" class="btn btn-secondary auth-btn auth-btn-outline" onclick="window.location.href='index.html'">Volver al inicio</button>
+            </div>
+
+        </main>
+    </div>
+
+    <div class="auth-hero-panel" aria-hidden="true">
+        <div class="auth-hero-content">
+            <div class="auth-hero-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h2 class="auth-hero-title">¡Bienvenido a LogicFlow!</h2>
+            <p class="auth-hero-desc">Tu cuenta está lista. Comienza a construir, simular y aprender lógica computacional.</p>
+            <div class="auth-features">
+                <div class="auth-feature">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Simulador de ensamblaje de PC</span>
+                </div>
+                <div class="auth-feature">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Retos y logros para aprender jugando</span>
+                </div>
+                <div class="auth-feature">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Tu progreso respaldado en la nube</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/theme.js"></script>
+    <script src="js/ui-effects.js"></script>
+    <script type="module" src="js/confirmar-cuenta.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>

@@ -56,14 +56,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="assembly"
-        options={{
-          title: 'Ensamble',
-          href: esTutor ? null : undefined,
-          tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'construct' : 'construct-outline'} color={color} focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
         name="learn"
         options={{
           title: 'Aprender',

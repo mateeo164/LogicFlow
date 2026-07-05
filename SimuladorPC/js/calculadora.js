@@ -1,4 +1,4 @@
-import { CPU_WATTAGE, GPU_WATTAGE, calculateWattage, getEfficiencyRating } from './learning-tools.js'
+import { CPU_WATTAGE, GPU_WATTAGE, calculateWattage, getEfficiencyRating, estimarCostoMensual } from './learning-tools.js'
 
 function populateSelect(selectId, optionsMap) {
   const select = document.getElementById(selectId)
@@ -27,10 +27,22 @@ function updateResult() {
   certEl.textContent = cert.label
   certEl.style.color = cert.color
 
-  document.getElementById('eff-bronze').textContent = `≈ ${result.efficiency.bronze} W desde la pared`
-  document.getElementById('eff-silver').textContent = `≈ ${result.efficiency.silver} W desde la pared`
-  document.getElementById('eff-gold').textContent = `≈ ${result.efficiency.gold} W desde la pared`
-  document.getElementById('eff-platinum').textContent = `≈ ${result.efficiency.platinum} W desde la pared`
+  const eff = (id, dato) => {
+    const el = document.getElementById(id)
+    if (el) el.textContent = `≈ ${dato.pared} W desde la pared · ${dato.perdida} W perdidos en calor`
+  }
+  eff('eff-bronze', result.efficiency.bronze)
+  eff('eff-silver', result.efficiency.silver)
+  eff('eff-gold', result.efficiency.gold)
+  eff('eff-platinum', result.efficiency.platinum)
+
+  // Costo eléctrico mensual estimado, tomando una fuente Gold como referencia.
+  const costoEl = document.getElementById('result-costo')
+  if (costoEl) {
+    const costo = estimarCostoMensual(result.efficiency.gold.pared)
+    costoEl.textContent = `≈ $${costo.costo.toFixed(2)}/mes`
+    costoEl.title = `${costo.kwhMes} kWh/mes · ${costo.horasDia} h/día de uso · ${costo.precioKwh.toFixed(2)} USD/kWh (referencia Ecuador)`
+  }
 }
 
 function init() {

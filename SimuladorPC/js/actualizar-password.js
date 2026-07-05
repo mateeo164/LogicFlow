@@ -1,4 +1,4 @@
-import { actualizarContrasena, establecerSesionDesdeHash } from './auth.js'
+import { actualizarContrasena, establecerSesionDesdeHash, obtenerTipoDesdeHash, RUTA_CONFIRMAR_CUENTA } from './auth.js'
 import { obtenerSesionGuardada, limpiarSesion } from './supabase-config.js'
 import { validarContrasena, validarConfirmacion } from './auth-validations.js'
 import {
@@ -15,6 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const mensajeGlobal = document.getElementById('auth-mensaje')
     const btnSubmit = form?.querySelector('button[type="submit"]')
     const TEXTO_BTN = 'Guardar nueva contraseña'
+
+    // Si el enlace es de confirmación de cuenta (type=signup) y no de recuperación,
+    // no corresponde mostrar el cambio de contraseña: redirigir a la página de éxito.
+    if (obtenerTipoDesdeHash() === 'signup') {
+        window.location.replace(RUTA_CONFIRMAR_CUENTA + window.location.hash)
+        return
+    }
 
     establecerSesionDesdeHash()
 

@@ -58,6 +58,13 @@ export async function resumenClase(claseId) {
     return Array.isArray(data) ? data : []
 }
 
+// Conceptos con más dificultad en la clase (agrega las respuestas conceptuales).
+// Devuelve [{ componente, aciertos, errores, total, pct_error }] ordenado por dificultad.
+export async function conceptosDificilesClase(claseId) {
+    const data = await rpc('lf_conceptos_dificiles_clase', { p_clase_id: claseId })
+    return Array.isArray(data) ? data : []
+}
+
 // Tutor: renombra una clase.
 export async function renombrarClase(claseId, nombre) {
     await dataRequest(`/lf_clases?id=eq.${claseId}`, {
@@ -130,8 +137,120 @@ export async function calificarEntrega({ tareaId, estudianteId, nota, comentario
     })
 }
 
-export async function entregarTarea(tareaId) {
-    return rpc('lf_entregar_tarea', { p_tarea_id: tareaId })
+export async function entregarTarea(tareaId, { archivoPath = null, archivoNombre = null } = {}) {
+    return rpc('lf_entregar_tarea', {
+        p_tarea_id: tareaId,
+        p_archivo_path: archivoPath,
+        p_archivo_nombre: archivoNombre
+    })
+}
+
+// --- Archivos de entrega (Supabase Storage · bucket privado "entregas") ---
+
+const ENTREGAS_BUCKET = 'entregas'
+const MAX_ARCHIVO_BYTES = 10 * 1024 * 1024 // 10 MB
+const TIPOS_PERMITIDOS = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/png',
+    'image/jpeg'
+]
+
+function nombreSeguro(nombre) {
+    const punto = nombre.lastIndexOf('.')
+    const base = (punto > 0 ? nombre.slice(0, punto) : nombre)
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')   // quita acentos
+        .replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'archivo'
+    const ext = (punto > 0 ? nombre.slice(punto).toLowerCase() : '')
+        .replace(/[^a-z0-9.]/g, '')
+    return `${base.slice(0, 60)}${ext}`
+}
+
+// Sube el archivo de la entrega y devuelve { path, nombre }.
+// Lanza Error con mensaje claro si el tipo/tamaño no es válido.
+export async function subirArchivoEntrega(tareaId, file) {
+    if (!file) throw new Error('No se seleccionó ningún archivo.')
+    if (file.size > MAX_ARCHIVO_BYTES) throw new Error('El archivo supera el límite de 10 MB.')
+    if (file.type && !TIPOS_PERMITIDOS.includes(file.type)) {
+        throw new Error('Formato no permitido. Sube un PDF, Word o imagen.')
+    }
+
+    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const userId = obtenerUserId()
+    if (!userId) throw new Error('Sesión no válida. Vuelve a iniciar sesión.')
+
+    const nombre = nombreSeguro(file.name || 'archivo.pdf')
+    const path = `${tareaId}/${userId}/${nombre}`
+
+    const ctrl = new AbortController()
+    const tid = setTimeout(() => ctrl.abort(), 60000) // subidas: hasta 60 s
+    try {
+        const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${ENTREGAS_BUCKET}/${encodeURI(path)}`, {
+            method: 'POST',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${token}`,
+                'Content-Type': file.type || 'application/octet-stream',
+                'x-upsert': 'true'
+            },
+            body: file,
+            signal: ctrl.signal
+        })
+        if (!res.ok) {
+            const payload = await res.json().catch(() => null)
+            throw new Error(payload?.message || payload?.error || `No se pudo subir el archivo (HTTP ${res.status}).`)
+        }
+        return { path, nombre: file.name || nombre }
+    } catch (err) {
+        if (err.name === 'AbortError') throw new Error('La subida tardó demasiado. Revisa tu conexión.')
+        throw err
+    } finally {
+        clearTimeout(tid)
+    }
+}
+
+// Genera una URL firmada temporal para descargar/ver un archivo de entrega.
+export async function urlArchivoEntrega(path, expiraSeg = 3600) {
+    const data = await storageRequest(`/object/sign/${ENTREGAS_BUCKET}/${encodeURI(path)}`, {
+        method: 'POST',
+        body: { expiresIn: expiraSeg }
+    })
+    if (!data?.signedURL) throw new Error('No se pudo generar el enlace de descarga.')
+    return `${SUPABASE_URL}/storage/v1${data.signedURL}`
+}
+
+function obtenerUserId() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.user)
+        return raw ? JSON.parse(raw)?.id || null : null
+    } catch { return null }
+}
+
+async function storageRequest(path, options = {}) {
+    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const ctrl = new AbortController()
+    const tid = setTimeout(() => ctrl.abort(), TIMEOUT)
+    try {
+        const res = await fetch(`${SUPABASE_URL}/storage/v1${path}`, {
+            method: options.method || 'GET',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+            signal: ctrl.signal
+        })
+        const payload = await res.json().catch(() => null)
+        if (!res.ok) throw new Error(payload?.message || payload?.error || `HTTP ${res.status}`)
+        return payload
+    } catch (err) {
+        if (err.name === 'AbortError') throw new Error('Tiempo de espera agotado.')
+        throw err
+    } finally {
+        clearTimeout(tid)
+    }
 }
 
 export async function misTareas() {

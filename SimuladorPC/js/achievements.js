@@ -113,7 +113,7 @@ export const BADGES = [
     condition: (p, s) => (p?.componentes_instalados || []).length >= 8
   },
   {
-    id: ' persistente',
+    id: 'persistente',
     title: 'Persistente',
     description: 'Completaste 5 simulaciones.',
     icon: '🔄',

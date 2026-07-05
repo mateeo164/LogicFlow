@@ -91,7 +91,11 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0;
 }
+
+.panel-column--main { grid-column: 1; }
+.panel-column--side { grid-column: 2; }
 
 .perfil-card {
   grid-column: 1 / -1;
@@ -644,6 +648,10 @@
   .panel-main {
     grid-template-columns: 1fr;
   }
+  .panel-column--main,
+  .panel-column--side {
+    grid-column: 1;
+  }
   .perfil-card {
     flex-direction: column;
     align-items: flex-start;
@@ -675,11 +683,17 @@
   .perfil-card__actions {
     flex-direction: column;
   }
+  .lf-header.dashboard-header {
+    padding: 0 14px;
+  }
   .dashboard-header-actions {
     gap: 8px;
   }
   .header-user-name {
     display: none;
+  }
+  .logo-text {
+    font-size: 18px;
   }
   .badges-grid,
   .tools-grid {
@@ -693,6 +707,20 @@
   }
   .perfil-info h1 {
     font-size: 22px;
+  }
+  .header-user-pill {
+    display: none;
+  }
+  .lf-header.dashboard-header {
+    padding: 0 10px;
+  }
+  .dashboard-header-actions {
+    gap: 6px;
+  }
+  #btn-cerrar-sesion {
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 13px;
   }
 }
 
@@ -892,7 +920,39 @@ body.is-tutor .tutor-only { display: block; }
 
 .tutor-nota { font-weight: 700; }
 .tutor-nota.ok { color: #16a34a; }
+.tutor-nota.medio { color: #d97706; }
 .tutor-nota.bajo { color: #dc2626; }
+
+.tutor-gan { margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--lf-text-muted, #7a8699); }
+
+/* Conceptos que más le cuestan a la clase (analítica accionable para el docente) */
+.tutor-conceptos {
+    margin-top: 18px;
+    padding: 18px 20px;
+    border: 1px solid var(--lf-border-light, #e2e8f0);
+    border-radius: var(--lf-radius-lg, 16px);
+    background: var(--lf-surface-0, #fff);
+}
+.tutor-conceptos__title { margin: 0 0 2px; font-size: 15px; font-weight: 700; color: var(--lf-text-primary, #1e293b); }
+.tutor-conceptos__hint { margin: 0 0 14px; font-size: 12.5px; color: var(--lf-text-muted, #7a8699); }
+.tutor-conceptos__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.tutor-concepto {
+    padding: 12px 14px;
+    border: 1px solid var(--lf-border-light, #e2e8f0);
+    border-radius: var(--lf-radius-md, 12px);
+    background: var(--lf-surface-100, #f8fafc);
+}
+.tutor-concepto__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.tutor-concepto__nombre { font-size: 13.5px; font-weight: 600; color: var(--lf-text-primary, #1e293b); }
+.tutor-concepto__pct { font-size: 12px; font-weight: 700; }
+.tutor-concepto__pct.ok { color: #16a34a; }
+.tutor-concepto__pct.medio { color: #d97706; }
+.tutor-concepto__pct.bajo { color: #dc2626; }
+.tutor-concepto__bar { height: 6px; border-radius: 999px; background: var(--lf-border-light, #e2e8f0); overflow: hidden; }
+.tutor-concepto__fill { display: block; height: 100%; border-radius: 999px; background: #16a34a; }
+.tutor-concepto__fill.medio { background: #d97706; }
+.tutor-concepto__fill.bajo { background: #dc2626; }
+.tutor-concepto__det { display: block; margin-top: 7px; font-size: 11.5px; color: var(--lf-text-muted, #7a8699); }
 
 .cert-mini-wrap { display: inline-flex; gap: 5px; }
 .cert-mini {
@@ -958,9 +1018,20 @@ body.is-tutor .tutor-only { display: block; }
 .mi-tarea-estado.pendiente { background: var(--lf-surface-1, #eef0f3); color: var(--lf-text-muted, #7a8699); }
 .mi-tarea-estado.entregada { background: rgba(43,108,255,0.12); color: #1d4ed8; }
 .mi-tarea-estado.calificada { background: rgba(22,163,74,0.14); color: #16a34a; }
+.mi-tarea-estado.vencida { background: rgba(220,38,38,0.12); color: #dc2626; }
+.mi-tarea-vencida-aviso { font-size: 12px; color: #dc2626; margin: 8px 0 0; }
 .mi-tarea-desc { font-size: 12.5px; color: var(--lf-text-muted, #7a8699); margin: 8px 0 0; }
 .mi-tarea-coment { font-size: 12.5px; color: var(--lf-text, #1a2233); margin: 6px 0 0; background: var(--lf-surface-1, #f6f7f9); padding: 8px 10px; border-radius: 8px; }
-.mi-tarea-entregar { margin-top: 10px; }
+.mi-tarea-archivo { font-size: 12.5px; margin: 8px 0 0; }
+.mi-tarea-archivo a, .entrega-archivo { color: var(--lf-primary, #2b6cff); text-decoration: none; font-weight: 600; }
+.mi-tarea-archivo a:hover, .entrega-archivo:hover { text-decoration: underline; }
+.entrega-archivo { font-size: 11.5px; }
+
+.mi-tarea-entrega { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.mi-tarea-file { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.mi-tarea-fname { font-size: 12px; color: var(--lf-text-muted, #7a8699); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mi-tarea-msg { font-size: 12px; color: var(--lf-text-muted, #7a8699); }
+.mi-tarea-msg.error { color: #dc2626; }
 
 [data-theme="dark"] .tutor-tarea-form input,
 [data-theme="dark"] .tutor-tarea-form textarea,
@@ -1021,6 +1092,107 @@ body.is-tutor .tutor-only { display: block; }
   font-size: 14px; cursor: pointer; padding: 4px 7px; border-radius: 7px;
 }
 .tutor-quitar:hover { background: rgba(220,38,38,0.1); color: #dc2626; }
+
+/* --- Banner destacado de Retos de reparación --- */
+.retos-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 24px;
+  border-radius: var(--lf-radius-lg, 16px);
+  background: linear-gradient(135deg, #b45309 0%, #d97706 55%, #f59e0b 100%);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(180, 83, 9, 0.28);
+  position: relative;
+  overflow: hidden;
+}
+.retos-banner::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  top: -60px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
+  pointer-events: none;
+}
+.retos-banner__icon {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
+}
+.retos-banner__body { flex: 1 1 auto; min-width: 0; }
+.retos-banner__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.retos-banner__title {
+  font-family: var(--lf-font-serif, Georgia, serif);
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  color: #fff;
+}
+.retos-banner__badge {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.retos-banner__sub {
+  margin: 6px 0 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 640px;
+}
+.retos-banner__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+.retos-banner__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #fff;
+  transition: width 0.4s ease;
+}
+.retos-banner__btn {
+  flex: 0 0 auto;
+  background: #fff;
+  color: #92400e;
+  border-color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+.retos-banner__btn:hover {
+  background: #fff7ed;
+  border-color: #fff7ed;
+  color: #7c2d12;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .retos-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px;
+  }
+  .retos-banner__btn { width: 100%; }
+}
 
 @media (max-width: 720px) {
   .tutor-kpis { grid-template-columns: repeat(2, 1fr); }

@@ -132,6 +132,14 @@
   color: var(--lf-border-medium);
 }
 
+/* En tema oscuro, los azules oscuros de marca no contrastan sobre la
+   tarjeta oscura: se aclaran a un azul legible. */
+[data-theme="dark"] .auth-links a,
+[data-theme="dark"] .input-group input:focus + label,
+[data-theme="dark"] .input-group input:not(:placeholder-shown) + label {
+  color: var(--lf-primary-300);
+}
+
 .auth-privacy {
   background: var(--lf-paper-2);
   border: 1px solid var(--lf-border-light);
@@ -302,9 +310,13 @@
 
 .auth-message {
   position: fixed;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: 24px;
-  transform: translateX(-50%);
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+  max-width: min(380px, calc(100% - 32px));
   border-radius: var(--lf-radius-md);
   box-shadow: var(--lf-shadow-xl);
   font-size: 14px;

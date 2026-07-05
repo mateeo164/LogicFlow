@@ -66,6 +66,9 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     Ir al laboratorio 3D
                 </a>
+                <a href="retos.html" class="btn btn-accent student-only">
+                    🔧 Retos de reparación
+                </a>
             </div>
         </section>
 
@@ -118,6 +121,7 @@
                     <div id="tutor-view-estudiantes">
                         <div class="tutor-resumen" id="tutor-resumen" hidden>
                             <div class="tutor-resumen__item"><strong id="res-aprobados">—</strong><span>Aprobaron ensamble</span></div>
+                            <div class="tutor-resumen__item"><strong id="res-comprension">—</strong><span>Comprensión media</span></div>
                             <div class="tutor-resumen__item"><strong id="res-app">—</strong><span>Completaron app</span></div>
                             <div class="tutor-resumen__item"><strong id="res-retos">—</strong><span>Retos superados</span></div>
                             <div class="tutor-resumen__item"><strong id="res-tiempo">—</strong><span>Tiempo total clase</span></div>
@@ -128,6 +132,7 @@
                                     <tr>
                                         <th>Estudiante</th>
                                         <th>Ensamble</th>
+                                        <th>Comprensión</th>
                                         <th>Mejor reto</th>
                                         <th>Retos</th>
                                         <th>Logros</th>
@@ -137,9 +142,15 @@
                                     </tr>
                                 </thead>
                                 <tbody id="tutor-tabla-body">
-                                    <tr><td colspan="8" class="tutor-tabla-empty">Elige una clase de la izquierda para ver a sus estudiantes.</td></tr>
+                                    <tr><td colspan="9" class="tutor-tabla-empty">Elige una clase de la izquierda para ver a sus estudiantes.</td></tr>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <div class="tutor-conceptos" id="tutor-conceptos" hidden>
+                            <h4 class="tutor-conceptos__title">Conceptos que más le cuestan a la clase</h4>
+                            <p class="tutor-conceptos__hint">Basado en las micro-preguntas del laboratorio. Útil para decidir qué reforzar en clase.</p>
+                            <div class="tutor-conceptos__list" id="tutor-conceptos-list"></div>
                         </div>
                     </div>
 
@@ -179,7 +190,20 @@
             </div>
         </div>
 
-        <div class="panel-column student-only" style="grid-column: 1;">
+        <section class="retos-banner student-only" aria-label="Retos de reparación">
+            <div class="retos-banner__icon" aria-hidden="true">🔧</div>
+            <div class="retos-banner__body">
+                <div class="retos-banner__top">
+                    <h2 class="retos-banner__title">Retos de reparación</h2>
+                    <span class="retos-banner__badge" id="retos-banner-count">0 / 4</span>
+                </div>
+                <p class="retos-banner__sub" id="retos-banner-sub">Diagnostica y repara PCs con fallas reales. Superarlos es parte del 100% del simulador.</p>
+                <div class="retos-banner__bar"><div class="retos-banner__fill" id="retos-banner-fill" style="width:0%"></div></div>
+            </div>
+            <a href="retos.html" class="btn retos-banner__btn" id="retos-banner-btn">🔧 Empezar retos</a>
+        </section>
+
+        <div class="panel-column student-only panel-column--main">
 
             <section class="progreso-card" id="notificaciones-card" hidden>
                 <div class="progreso-card__header" style="margin-bottom: 14px;">
@@ -222,7 +246,7 @@
                     </div>
                 </div>
 
-                <div class="stats-strip" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+                <div class="stats-strip" style="margin-bottom: 24px;">
                     <div class="stats-strip__item">
                         <strong id="stat-aciertos">—</strong>
                         <span>Ensamblajes correctos</span>
@@ -265,6 +289,11 @@
                         <span class="nota-box__detalle" id="nota-ensamble-detalle">Sin registrar aún</span>
                     </div>
                     <div class="nota-box">
+                        <span class="nota-box__valor" id="nota-comprension">—</span>
+                        <span class="nota-box__label">Comprensión</span>
+                        <span class="nota-box__detalle" id="nota-comprension-detalle">Sin registrar aún</span>
+                    </div>
+                    <div class="nota-box">
                         <span class="nota-box__valor" id="nota-retos-mejor">—</span>
                         <span class="nota-box__label">Mejor reto</span>
                         <span class="nota-box__detalle" id="nota-retos-superados">0 retos superados</span>
@@ -303,7 +332,7 @@
             </section>
         </div>
 
-        <div class="panel-column student-only" style="grid-column: 2;">
+        <div class="panel-column student-only panel-column--side">
 
             <section class="level-widget">
                 <div class="level-widget__header">

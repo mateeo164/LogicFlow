@@ -452,6 +452,10 @@
   margin-bottom: 20px;
 }
 
+[data-theme="dark"] .academic-tool-icon {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .academic-tool-card h3 {
   font-family: var(--lf-font-serif);
   font-size: 22px;

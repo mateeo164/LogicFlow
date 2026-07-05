@@ -527,6 +527,62 @@
   background: radial-gradient(circle at center, var(--lf-surface-100), var(--lf-surface-0));
 }
 
+/* ------------------------------------------------------------------ *
+ * Legibilidad sobre superficies SIEMPRE oscuras (overlays y player).
+ * Estas zonas usan fondo oscuro fijo en ambos temas, así que su
+ * contenido necesita texto claro sin depender del tema. Antes heredaban
+ * colores de texto oscuros pensados para fondo claro (ilegibles).
+ * ------------------------------------------------------------------ */
+
+/* Botones secundarios dentro de los overlays oscuros */
+.lab-overlay .btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+}
+.lab-overlay .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #fff;
+}
+
+/* Píldoras de pasos en la bienvenida */
+.lab-overlay .bv-step-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.75);
+}
+.lab-overlay .bv-step-pill.current {
+  background: rgba(180, 83, 9, 0.20);
+  border-color: rgba(180, 83, 9, 0.4);
+  color: var(--lf-accent-400);
+}
+.lab-overlay .bv-step-pill.done {
+  background: rgba(4, 120, 87, 0.20);
+  border-color: rgba(4, 120, 87, 0.4);
+  color: #6ee7b7;
+}
+
+/* Tarjeta de material educativo (fallback sin video) sobre player negro */
+.vf-player-area .vf-info-card__header h3 { color: #fff; }
+.vf-player-area .vf-info-card__header p { color: rgba(255, 255, 255, 0.7); }
+.vf-player-area .vf-spec-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.vf-player-area .vf-spec-key { color: rgba(255, 255, 255, 0.55); }
+.vf-player-area .vf-spec-val { color: #fff; }
+.vf-player-area .vf-video-placeholder {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.vf-player-area .vf-video-placeholder p { color: rgba(255, 255, 255, 0.7); }
+.vf-player-area .vf-config-hint {
+  background: rgba(58, 139, 255, 0.14);
+  border-color: rgba(58, 139, 255, 0.3);
+  color: #9ec5ff;
+}
+
 @media (max-width: 1024px) {
   .video-layout {
     display: flex;
@@ -618,4 +674,127 @@
   .sim-sidebar-right {
     padding: 12px;
   }
+}
+
+/* ── Evaluación formativa (quiz de comprensión) ───────────────── */
+.quiz-layout {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.quiz-card {
+  width: 100%;
+  max-width: 620px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--lf-radius-lg);
+  padding: 32px;
+  box-shadow: var(--lf-shadow-lg);
+}
+
+.quiz-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.quiz-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--lf-accent-400);
+}
+
+.quiz-pregunta {
+  font-family: var(--lf-font-serif);
+  font-size: clamp(20px, 3vw, 26px);
+  line-height: 1.3;
+  color: #fff;
+  margin: 0 0 22px;
+}
+
+.quiz-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quiz-opcion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 15px 18px;
+  border-radius: var(--lf-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+  font-family: var(--lf-font-sans);
+  cursor: pointer;
+  transition: background var(--lf-transition-fast), border-color var(--lf-transition-fast), transform var(--lf-transition-fast);
+}
+
+.quiz-opcion:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--lf-accent-400);
+  transform: translateY(-1px);
+}
+
+.quiz-opcion:disabled { cursor: default; }
+
+.quiz-opcion .quiz-letra {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lf-radius-full);
+  background: rgba(255, 255, 255, 0.1);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.quiz-opcion.is-correcta {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: #22c55e;
+  color: #eafff2;
+}
+.quiz-opcion.is-correcta .quiz-letra { background: #22c55e; color: #06331b; }
+
+.quiz-opcion.is-incorrecta {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: #ef4444;
+  color: #ffecec;
+}
+.quiz-opcion.is-incorrecta .quiz-letra { background: #ef4444; color: #3a0b0b; }
+
+.quiz-feedback {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border-radius: var(--lf-radius-md);
+  font-size: 14.5px;
+  line-height: 1.6;
+  border-left: 3px solid var(--lf-accent-400);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+.quiz-feedback strong { color: #fff; }
+.quiz-feedback.ok    { border-left-color: #22c55e; }
+.quiz-feedback.fail  { border-left-color: #ef4444; }
+
+.quiz-actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
 }

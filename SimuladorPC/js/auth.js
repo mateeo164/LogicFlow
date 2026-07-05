@@ -17,6 +17,7 @@ import {
 const RUTA_USUARIO = 'menu.html'
 const RUTA_LOGIN = 'login.html'
 const RUTA_ACTUALIZAR_PASSWORD = 'actualizar-password.html'
+const RUTA_CONFIRMAR_CUENTA = 'confirmar-cuenta.html'
 
 function traducirErrorSupabase(mensaje) {
     const errores = {
@@ -58,8 +59,10 @@ export async function registrarUsuario(datos) {
 
     const { correo, password, nombres, institucion, rol } = validacion.datos
 
+    const redirectConfirmacion = new URL(RUTA_CONFIRMAR_CUENTA, window.location.href).href
+
     try {
-        const response = await supabaseAuthRequest('/signup', {
+        const response = await supabaseAuthRequest(`/signup?redirect_to=${encodeURIComponent(redirectConfirmacion)}`, {
             method: 'POST',
             body: {
                 email: correo,
@@ -123,11 +126,10 @@ export async function recuperarContrasena(correo) {
     const redirectTo = new URL(RUTA_ACTUALIZAR_PASSWORD, window.location.href).href
 
     try {
-        await supabaseAuthRequest('/recover', {
+        await supabaseAuthRequest(`/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
             method: 'POST',
             body: {
-                email: validacion.valor,
-                redirect_to: redirectTo
+                email: validacion.valor
             }
         })
 
@@ -163,6 +165,14 @@ export async function actualizarContrasena(nuevaPassword) {
     } catch (error) {
         return manejarErrorAutenticacion(error)
     }
+}
+
+export function obtenerTipoDesdeHash() {
+    const hash = window.location.hash?.startsWith('#') ? window.location.hash.slice(1) : ''
+    if (!hash) return null
+
+    const params = new URLSearchParams(hash)
+    return params.get('type')
 }
 
 export function establecerSesionDesdeHash() {
@@ -222,4 +232,4 @@ export function redirigirSiAutenticado() {
     }
 }
 
-export { RUTA_USUARIO, RUTA_LOGIN }
+export { RUTA_USUARIO, RUTA_LOGIN, RUTA_CONFIRMAR_CUENTA }

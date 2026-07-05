@@ -30,8 +30,7 @@ const DAILY_TIPS = [
 ]
 
 const ACTIONS: { id: string; label: string; sub: string; icon: IconName; route: string; tone: string }[] = [
-  { id: 'scanner', label: 'Escáner AR', sub: 'Identifica piezas', icon: 'scan-outline', route: '/(tabs)/scanner', tone: Colors.primary },
-  { id: 'assembly', label: 'Ensamble', sub: 'Guía paso a paso', icon: 'construct-outline', route: '/(tabs)/assembly', tone: Colors.accent },
+  { id: 'scanner', label: 'Escáner AR', sub: 'Escanea y ensambla', icon: 'scan-outline', route: '/(tabs)/scanner', tone: Colors.primary },
   { id: 'learn', label: 'Aprender', sub: 'Tarjetas y quizzes', icon: 'book-outline', route: '/(tabs)/learn', tone: Colors.success },
   { id: 'badges', label: 'Logros', sub: 'Tus insignias', icon: 'trophy-outline', route: '/(tabs)/badges', tone: Colors.secondary },
 ]
@@ -161,7 +160,7 @@ export function HomeScreen() {
 
         {/* Hero — continue building */}
         <Pressable
-          onPress={() => router.push('/(tabs)/assembly')}
+          onPress={() => router.push('/(tabs)/scanner')}
           style={({ pressed }) => [styles.hero, Shadow.lg, pressed && { transform: [{ scale: 0.99 }] }]}
         >
           <View style={styles.heroTopRow}>

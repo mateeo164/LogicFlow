@@ -93,7 +93,7 @@ function renderPerfil(user) {
     document.getElementById('edit-institucion').value = institucion
 }
 
-function renderProgreso(progreso) {
+function renderProgreso(progreso, retosSuperados = 0) {
     const instalados = progreso?.componentes_instalados || []
     const total = COMPONENTS.length
     const completados = instalados.length
@@ -102,12 +102,20 @@ function renderProgreso(progreso) {
     const tiempoSeg = progreso?.tiempo_total_segundos || 0
     const ultimaAct = progreso?.updated_at || null
 
+    // El progreso general del simulador web = ensamble de componentes + retos superados.
+    // Para llegar al 100% hay que instalar todos los componentes Y aprobar todos los retos.
+    const totalRetos = RETOS.length
+    const retosOk = Math.min(retosSuperados, totalRetos)
+    const unidadesTotales = total + totalRetos
+    const unidadesHechas = completados + retosOk
+    const pctGeneral = unidadesTotales ? Math.round((unidadesHechas / unidadesTotales) * 100) : 0
+
     const setEl = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt }
 
     setEl('stat-componentes', `${completados} / ${total}`)
     setEl('stat-simulaciones', simulaciones)
     setEl('stat-tiempo', formatTiempo(tiempoSeg))
-    setEl('stat-porcentaje', `${pct}%`)
+    setEl('stat-porcentaje', `${pctGeneral}%`)
     setEl('pct-badge', `${pct}%`)
     setEl('ultima-actividad', formatFecha(ultimaAct))
 
@@ -117,7 +125,7 @@ function renderProgreso(progreso) {
     const subtituloEl = document.getElementById('progreso-subtitulo')
     if (subtituloEl) {
         if (pct === 0) subtituloEl.textContent = 'Aún no has comenzado el laboratorio. ¡Arranca ahora!'
-        else if (pct === 100) subtituloEl.textContent = '¡Simulación completa! Todos los componentes instalados.'
+        else if (pct === 100) subtituloEl.textContent = '¡Ensamble completo! Todos los componentes instalados.'
         else subtituloEl.textContent = `${completados} de ${total} componentes instalados.`
     }
 
@@ -146,8 +154,28 @@ function renderProgreso(progreso) {
     }).join('')
 }
 
-function renderProgresoVacio() {
-    renderProgreso(null)
+function renderRetosBanner(retosSuperados = 0) {
+    const total = RETOS.length
+    const superados = Math.min(retosSuperados, total)
+    const completo = superados >= total
+
+    const setEl = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt }
+    setEl('retos-banner-count', `${superados} / ${total}`)
+
+    const fill = document.getElementById('retos-banner-fill')
+    if (fill) fill.style.width = `${total ? Math.round((superados / total) * 100) : 0}%`
+
+    const sub = document.getElementById('retos-banner-sub')
+    if (sub) {
+        sub.textContent = completo
+            ? '¡Reparaste todas las PCs! Estos retos ya cuentan para tu 100% del simulador.'
+            : superados === 0
+                ? 'Diagnostica y repara PCs con fallas reales. Superarlos es parte del 100% del simulador.'
+                : `Vas por buen camino: te faltan ${total - superados} reto${total - superados === 1 ? '' : 's'} para completar el simulador.`
+    }
+
+    const btn = document.getElementById('retos-banner-btn')
+    if (btn) btn.textContent = superados === 0 ? '🔧 Empezar retos' : completo ? '🔁 Repasar retos' : '🔧 Continuar retos'
 }
 
 function formatHora(iso) {
@@ -272,6 +300,14 @@ function renderNotasCertificado(progreso, logros = [], resultados = []) {
     setEl('nota-ensamble', notaWeb != null ? `${Number(notaWeb).toFixed(1)}/10` : '—')
     setEl('nota-ensamble-detalle', progreso?.web_aprobado_at ? '✓ Aprobado' : 'Sin aprobar aún')
 
+    const comp = progreso?.comprension_pct
+    setEl('nota-comprension', comp != null ? `${Math.round(Number(comp))}%` : '—')
+    const gan = progreso?.ganancia
+    setEl('nota-comprension-detalle',
+        comp == null ? 'Sin registrar aún'
+        : gan != null ? `Ganancia de aprendizaje ${Math.round(Number(gan) * 100)}%`
+        : 'Preguntas conceptuales acertadas')
+
     const resumen = resumirResultados(resultados)
     const superados = RETOS.filter(r => resumen[r.id]?.exito).length
     const mejor = resultados.length ? Math.max(...resultados.map(r => Number(r.nota) || 0)) : null
@@ -343,20 +379,20 @@ async function init() {
 
         initTutorPanel()
     } else {
-        const progreso = await obtenerProgreso()
-        if (progreso) {
-            renderProgreso(progreso)
-        } else {
-            renderProgresoVacio()
-        }
-
-        const estadisticas = await obtenerEstadisticas()
-        renderEstadisticas(estadisticas)
-
-        const [logros, resultadosRetos] = await Promise.all([
+        const [progreso, logros, resultadosRetos] = await Promise.all([
+            obtenerProgreso(),
             obtenerLogrosUsuario(),
             obtenerResultadosRetos()
         ])
+
+        const resumenRetos = resumirResultados(resultadosRetos)
+        const retosSuperados = RETOS.filter(r => resumenRetos[r.id]?.exito).length
+
+        renderProgreso(progreso, retosSuperados)
+        renderRetosBanner(retosSuperados)
+
+        const estadisticas = await obtenerEstadisticas()
+        renderEstadisticas(estadisticas)
 
         renderAchievements(progreso, estadisticas, logros)
         renderNotasCertificado(progreso, logros, resultadosRetos)

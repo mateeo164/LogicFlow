@@ -151,11 +151,11 @@ export function CertificateScreen() {
             <Requisito ok={webOk} titulo="Ensamble 3D aprobado (web)"
               detalle={webOk ? '✓ Aprobado en el simulador' : 'Aprueba el ensamble en el simulador web (≥ 7/10).'} />
             <Requisito ok={appOk} titulo="Instalación real (app móvil)"
-              detalle={appOk ? '✓ Completada' : 'Completa el ensamble guiado o el escáner AR de los 8 componentes.'} />
+              detalle={appOk ? '✓ Completada' : 'Escanea los 8 componentes con el escáner AR para completar el ensamble.'} />
           </GradientCard>
 
           {!appOk && (
-            <PrimaryButton label="Ir al ensamble" icon="🛠️" onPress={() => router.push('/(tabs)/assembly')} style={{ width: '100%', marginTop: Spacing.lg }} />
+            <PrimaryButton label="Ir al escáner" icon="📷" onPress={() => router.push('/(tabs)/scanner')} style={{ width: '100%', marginTop: Spacing.lg }} />
           )}
         </ScrollView>
       </SafeAreaView>

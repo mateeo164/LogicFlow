@@ -1,5 +1,5 @@
 import { protegerRuta } from './auth.js'
-import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, marcarAprobacionWeb, subirFotoSimulador } from './progreso.js'
+import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, marcarAprobacionWeb, subirFotoSimulador, guardarComprension } from './progreso.js'
 import { PROC_LOGRO, notaConBono } from './achievements.js'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
@@ -10,183 +10,10 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { obtenerReto, calcularNotaReto, LOGROS_RETO, NOTA_MINIMA_RETO } from './retos-data.js'
 import { guardarResultadoReto, obtenerResultadosRetos, otorgarLogros, obtenerLogrosUsuario } from './retos-api.js'
 import * as LFSound from './audio.js'
+import { PREGUNTAS_COMPONENTE, EVALUACION, notaConceptual, combinarNota, gananciaAprendizaje } from './quiz-data.js'
 
-const PASOS = [
-    {
-        id: 'case', brand: 'NZXT', nombre: 'Gabinete',
-        modelo: 'H510 Mid Tower', subtitulo: 'La estructura que protege y organiza',
-        color: 0x60a5fa,
-        ruta: 'assets/3d_models/computer_case_based_off_of_nzxt_510b/scene.gltf',
-        size: 1.7, pos: new THREE.Vector3(0, 0.85, 0), rot: { x: 0, y: 0, z: 0 },
-        specs: { 'Formato': 'Mid Tower ATX', 'Material': 'Acero + Vidrio templado', 'Bahías': '2.5" / 3.5"', 'Ventiladores': 'Hasta 7', 'Gestión de cables': 'Trasera' },
-        hechos: [
-            'El gabinete protege los componentes del polvo y los golpes',
-            'Su diseño de flujo de aire mantiene fría toda la configuración',
-            'Compatible con placas ATX, micro-ATX y mini-ITX',
-            'Panel lateral de vidrio templado para mostrar el interior',
-            'Gestión de cables trasera para un montaje limpio y ordenado'
-        ],
-        videoId: null,
-        drone: {
-            video:       'El gabinete es el esqueleto de tu PC: aloja y protege todos los componentes. Fíjate en sus bahías, soportes y zonas de ventilación.',
-            instalacion: 'Coloca el gabinete en tu mesa de trabajo. Haz clic en el disco luminoso para posicionarlo y empezar el montaje.',
-            exito:       '¡Listo! El gabinete está en su lugar. Ahora montaremos la placa base dentro de él.'
-        }
-    },
-    {
-        id: 'mb', brand: 'ASUS ROG', nombre: 'Placa Base',
-        modelo: 'Strix X570-E Gaming', subtitulo: 'El núcleo que conecta todo',
-        color: 0x22c55e,
-        ruta: 'assets/3d_models/rog_strix_x370-f_motherboard/scene.gltf',
-        size: 1.3, pos: new THREE.Vector3(-0.30, 1.03, -0.22), rot: { x: 0, y: 0, z: 0 },
-
-        shelfRotX: -Math.PI / 18,
-        shelfRotY: -Math.PI / 12,
-        shelfScale: 1.12,
-        shelfOffsetY: 0.018,
-        specs: { 'Socket': 'AM4', 'Formato': 'ATX', 'Chipset': 'AMD X570', 'Memoria': '4× DDR4 (Máx 128 GB)', 'PCIe': 'PCIe 4.0 ×16' },
-        hechos: [
-            'La placa base conecta y comunica todos los componentes entre sí',
-            'El socket AM4 es compatible con procesadores Ryzen 3000–5000',
-            '4 ranuras DDR4 admiten hasta 128 GB de memoria RAM',
-            'Incluye slots M.2 para almacenamiento NVMe ultrarrápido',
-            'Distribuye la energía de la fuente a cada componente'
-        ],
-        videoId: null,
-        drone: {
-            video:       'La placa base es el componente central: todo se conecta a ella. Observa el socket del CPU, las ranuras de RAM y los slots PCIe.',
-            instalacion: 'Selecciona la placa base en la vitrina y haz clic en el disco luminoso dentro del gabinete para atornillarla a la bandeja.',
-            exito:       '¡Excelente! La placa base está fijada. Es la columna vertebral de todo el sistema.'
-        }
-    },
-    {
-        id: 'cpu', brand: 'AMD', nombre: 'Procesador (CPU)',
-        modelo: 'Ryzen 9 5900X', subtitulo: 'El cerebro del computador',
-        color: 0x00e5ff,
-        ruta: 'assets/3d_models/amd_ryzen/scene.gltf',
-        size: 0.20, pos: new THREE.Vector3(-0.24, 1.26, -0.27), rot: { x: Math.PI / 2, y: 0, z: 0 },
-        specs: { 'Núcleos/Hilos': '12C / 24T', 'Frecuencia Base': '3.7 GHz', 'Boost': '4.8 GHz', 'Caché L3': '64 MB', 'TDP': '105 W' },
-        hechos: [
-            'El procesador ejecuta las instrucciones de todos los programas',
-            '12 núcleos físicos procesan hasta 24 hilos en simultáneo',
-            'Frecuencia boost de 4.8 GHz para tareas exigentes',
-            'El triángulo dorado indica la orientación correcta en el socket',
-            'Es uno de los componentes más delicados: nunca toques sus pines'
-        ],
-        videoId: null,
-        drone: {
-            video:       'El procesador es el cerebro del PC. Atiende cómo alinear el triángulo dorado del chip con la marca del socket antes de instalarlo.',
-            instalacion: 'Selecciona el CPU y colócalo en el socket AM4 de la placa. Respeta la orientación del triángulo dorado.',
-            exito:       '¡Perfecto! El Ryzen 9 está asentado en el socket. Ahora debemos refrigerarlo.'
-        }
-    },
-    {
-        id: 'cooler', brand: 'AMD', nombre: 'Disipador (Cooler)',
-        modelo: 'Wraith Stealth', subtitulo: 'Mantiene el CPU a temperatura segura',
-        color: 0xf59e0b,
-        ruta: 'assets/3d_models/amd_wraith_stealth_cpu_cooler/scene.gltf',
-        size: 0.7, pos: new THREE.Vector3(-0.1, 1.28, -0.15), rot: { x: Math.PI / 2, y: 0, z: 0 },
-        specs: { 'Tipo': 'Aire (torre baja)', 'Socket': 'AM4', 'Ventilador': '92 mm PWM', 'Disipación': 'Hasta 95 W TDP', 'Pasta térmica': 'Pre-aplicada' },
-        hechos: [
-            'El disipador extrae el calor que genera el procesador',
-            'Sin refrigeración, el CPU se apagaría para protegerse en segundos',
-            'La pasta térmica mejora la transferencia de calor al disipador',
-            'El ventilador PWM ajusta su velocidad según la temperatura',
-            'Se fija con clips o tornillos justo encima del procesador'
-        ],
-        videoId: null,
-        drone: {
-            video:       'El disipador evita que el procesador se sobrecaliente. La pasta térmica rellena los microporos para conducir mejor el calor.',
-            instalacion: 'Selecciona el disipador y colócalo justo encima del procesador. El ventilador queda mirando hacia arriba.',
-            exito:       '¡Muy bien! El CPU ya está refrigerado y protegido. Continuemos con la memoria.'
-        }
-    },
-    {
-        id: 'ram', brand: 'G.Skill', nombre: 'Memoria RAM',
-        modelo: 'Trident Z Neo 32 GB', subtitulo: 'El espacio de trabajo del CPU',
-        color: 0x7c4dff,
-        ruta: 'assets/3d_models/ram_ddr4_g.skill_trident_z_neo/scene.gltf',
-        size: 0.60, pos: new THREE.Vector3(0.0, 1.27, -0.20), rot: { x: 0, y: 1.8, z: 1.5708 },
-
-        specs: { 'Capacidad': '32 GB (2×16 GB)', 'Tipo': 'DDR4', 'Velocidad': '3600 MHz', 'Latencia': 'CL16', 'Voltaje': '1.35 V' },
-        hechos: [
-            'La RAM es la memoria de trabajo temporal del procesador',
-            'A más RAM, más programas abiertos sin perder fluidez',
-            'Se instala en pares para activar el modo Dual Channel',
-            'Dual Channel duplica el ancho de banda entre CPU y RAM',
-            'Los módulos encajan con un clic en las ranuras de la placa'
-        ],
-        videoId: null,
-        drone: {
-            video:       'La RAM guarda los datos que el procesador usa en el momento. Se instala en pares y en las ranuras del mismo color para Dual Channel.',
-            instalacion: 'Selecciona la RAM y colócala en las ranuras DDR4 de la placa. Presiona hasta escuchar el clic de los seguros.',
-            exito:       '¡Bien hecho! 32 GB de DDR4 instalados. El sistema podrá ejecutar varias tareas pesadas a la vez.'
-        }
-    },
-    {
-        id: 'storage', brand: 'Samsung', nombre: 'Almacenamiento NVMe',
-        modelo: '990 PRO 1 TB', subtitulo: 'Velocidad de transferencia extrema',
-        color: 0x26a69a,
-        ruta: 'assets/3d_models/m.2_nvme_ssd_samsung_990_pro_1tb_3d_model/scene.gltf',
-        size: 0.3, pos: new THREE.Vector3(-0.05, 0.55, -0.28), rot: { x: 1.5708, y: 0, z: 0 },
-        specs: { 'Capacidad': '1 TB', 'Factor Forma': 'M.2 2280', 'Interfaz': 'PCIe Gen 4.0 ×4', 'Lectura': '7450 MB/s', 'Escritura': '6900 MB/s' },
-        hechos: [
-            'El SSD NVMe almacena el sistema operativo y tus archivos',
-            'Es hasta 47 veces más rápido que un disco duro mecánico',
-            'Se conecta directo a la placa base, sin cables (slot M.2)',
-            'Sin partes móviles: más silencioso y resistente que un HDD',
-            'Con 7450 MB/s, el sistema arranca en pocos segundos'
-        ],
-        videoId: null,
-        drone: {
-            video:       'El SSD M.2 NVMe es el almacenamiento más rápido. Se inserta en ángulo en el slot M.2 y se asegura con un tornillo, ¡sin cables!',
-            instalacion: 'Selecciona el SSD y colócalo en el slot M.2 de la placa base. Se inserta en ángulo y luego se baja para fijarlo.',
-            exito:       '¡Increíble! Almacenamiento ultrarrápido instalado. Ahora la parte visual: la tarjeta gráfica.'
-        }
-    },
-    {
-        id: 'gpu', brand: 'NVIDIA', nombre: 'Tarjeta Gráfica (GPU)',
-        modelo: 'GeForce RTX 3090', subtitulo: 'Motor de procesamiento visual',
-        color: 0x10b981,
-        ruta: 'assets/3d_models/nvidia_geforce_rtx_3090/scene.gltf',
-        size: 1.0, pos: new THREE.Vector3(-0.36, 0.86, -0.06), rot: { x: -1.5708, y: 0, z: 0 },
-        specs: { 'Arquitectura': 'Ampere', 'VRAM': '24 GB GDDR6X', 'CUDA Cores': '10496', 'Bus': '384-bit', 'Consumo': '350 W' },
-        hechos: [
-            'La GPU procesa todo lo que ves: escritorio, juegos y video',
-            '10496 núcleos CUDA trabajan en paralelo para los gráficos',
-            '24 GB de VRAM para texturas y modelos 3D de alta resolución',
-            'Ray Tracing: simula la iluminación real en tiempo real',
-            'Por su consumo, exige una fuente de poder potente y estable'
-        ],
-        videoId: null,
-        drone: {
-            video:       'La GPU es responsable de todos los gráficos. Se inserta en el slot PCIe ×16 y se alimenta con cables dedicados de la fuente.',
-            instalacion: 'Selecciona la GPU y colócala en el slot PCIe ×16 principal. Escucharás el clic del seguro al encajar.',
-            exito:       '¡Espectacular! La tarjeta gráfica está montada. Solo falta darle energía a todo el sistema.'
-        }
-    },
-    {
-        id: 'power', brand: 'EVGA', nombre: 'Fuente de Poder (PSU)',
-        modelo: 'SuperNOVA 850 G6', subtitulo: 'El corazón eléctrico del sistema',
-        color: 0xff5f7e,
-        ruta: 'assets/3d_models/psu_power_supply_unit/scene.gltf',
-        size: 0.8, pos: new THREE.Vector3(-0.48, 0.36, 0), rot: { x: 0, y: 1.5708, z: 0 },
-        specs: { 'Potencia': '850 W', 'Certificación': '80 Plus Gold', 'Cableado': '100% Modular', 'Ventilador': '135 mm FDB', 'Protecciones': 'OCP / OVP / SCP' },
-        hechos: [
-            'La fuente convierte la corriente del enchufe en energía para el PC',
-            '850 W alimentan con holgura una RTX 3090 y un Ryzen 9',
-            'Certificación 80 Plus Gold: alta eficiencia, menos calor',
-            'Cableado modular: solo conectas los cables que necesitas',
-            'Sus protecciones evitan daños por picos o cortocircuitos'
-        ],
-        videoId: null,
-        drone: {
-            video:       'La fuente de poder suministra energía limpia y estable a todos los componentes. Va en el compartimento inferior del gabinete.',
-            instalacion: 'Selecciona la fuente y colócala en el compartimento inferior del gabinete para conectar la energía a todo.',
-            exito:       '¡ENSAMBLAJE COMPLETO! 🎉 Has construido una PC de alto rendimiento de principio a fin. ¡Excelente trabajo!'
-        }
-    }
-]
+import { PASOS } from './pasos-data.js'
+import { crearTexturaRadial, crearTexturaMadera, crearTexturaMaderaClara, crearTexturaLetreroComponentes, crearTexturaPisoModerno, crearTexturaPegboard, crearTexturaMat, crearTexturaEtiqueta, crearTexturaPared, crearTexturaCielo, crearTexturaCartel, crearTexturaBlueprint } from './texturas.js'
 
 const TOTAL = PASOS.length
 
@@ -213,6 +40,11 @@ let sessionStartTime = Date.now()
 let labStartTime = Date.now()
 let erroresSesion = 0
 let demorasSesion = 0
+let aciertosConceptuales = 0   // preguntas de comprensión acertadas al primer intento
+let preguntasRespondidas = 0   // total de preguntas de comprensión mostradas
+let preTestAciertos = null     // aciertos en el test diagnóstico (null = no realizado)
+let postTestAciertos = null    // aciertos en el test final
+let preTestHecho = false       // evita repetir el diagnóstico al reentrar
 
 let scene, camera, renderer, controls, raycaster, mouse
 let slotDiscs = []
@@ -402,12 +234,157 @@ function droneHabla(msg) {
     if (el) el.textContent = msg
 }
 
+// Evaluación formativa: micro-pregunta conceptual tras instalar un componente.
+// Da retroalimentación del PORQUÉ y suma a la nota de comprensión.
+// Llama onDone() cuando el estudiante pulsa "Continuar".
+function mostrarQuizComponente(paso, onDone) {
+    const q = PREGUNTAS_COMPONENTE[paso.id]
+    if (!q) { onDone(); return }
+
+    fase = 'quiz'
+    mostrarOverlay('overlay-quiz')
+    montarDrone('drone-quiz')
+
+    const badge = document.getElementById('quiz-badge')
+    if (badge) badge.textContent = `Comprensión · ${paso.nombre}`
+    const pregEl = document.getElementById('quiz-pregunta')
+    if (pregEl) pregEl.textContent = q.pregunta
+
+    const fb = document.getElementById('quiz-feedback')
+    if (fb) { fb.hidden = true; fb.className = 'quiz-feedback' }
+
+    const cont = document.getElementById('btn-quiz-continuar')
+    if (cont) { cont.hidden = true; cont.onclick = () => onDone() }
+
+    const opcEl = document.getElementById('quiz-opciones')
+    if (!opcEl) { onDone(); return }
+
+    const letras = ['A', 'B', 'C', 'D', 'E']
+    opcEl.innerHTML = q.opciones.map((op, i) =>
+        `<button type="button" class="quiz-opcion" data-idx="${i}">
+            <span class="quiz-letra">${letras[i] || i + 1}</span>
+            <span class="quiz-texto">${op}</span>
+        </button>`).join('')
+
+    preguntasRespondidas++
+    let respondida = false
+
+    opcEl.querySelectorAll('.quiz-opcion').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (respondida) return
+            respondida = true
+            const idx = Number(btn.getAttribute('data-idx'))
+            const acierto = idx === q.correcta
+
+            opcEl.querySelectorAll('.quiz-opcion').forEach((b, i) => {
+                b.disabled = true
+                if (i === q.correcta) b.classList.add('is-correcta')
+                else if (i === idx) b.classList.add('is-incorrecta')
+            })
+
+            if (acierto) {
+                aciertosConceptuales++
+                LFSound.success()
+                appendLog(`Pregunta de ${paso.nombre}: correcta. Suma a tu nota de comprensión.`, 'success')
+            } else {
+                LFSound.error()
+                appendLog(`Pregunta de ${paso.nombre}: incorrecta. Revisa la explicación.`, 'warn')
+            }
+            // Registra la respuesta conceptual: alimenta la analítica del docente
+            // ("¿qué concepto le cuesta a la clase?").
+            registrarEvento({ tipo: acierto ? 'quiz_acierto' : 'quiz_error', componenteId: paso.id })
+
+            if (fb) {
+                fb.hidden = false
+                fb.className = `quiz-feedback ${acierto ? 'ok' : 'fail'}`
+                fb.innerHTML = `<strong>${acierto ? '¡Correcto!' : `Respuesta correcta: ${letras[q.correcta]}.`}</strong> ${q.explica}`
+            }
+            droneHabla(acierto
+                ? '¡Muy bien! Entendiste el concepto.'
+                : 'No pasa nada: lee la explicación y lo recordarás la próxima vez.')
+            if (cont) cont.hidden = false
+        })
+    })
+
+    droneHabla(`Antes de seguir, comprobemos que entendiste el ${paso.nombre}.`)
+}
+
+// Test diagnóstico (pre) o final (post): recorre el banco EVALUACION una pregunta a
+// la vez, sin retroalimentación (es una medición, no una lección), y guarda el puntaje.
+// Comparar pre vs post da la "ganancia de aprendizaje" que se muestra al final.
+// onDone(aciertos) se llama al terminar (o al saltar el diagnóstico).
+function mostrarEvaluacion(tipo, onDone) {
+    const preguntas = EVALUACION
+    if (!preguntas.length) { onDone(null); return }
+
+    fase = 'evaluacion'
+    mostrarOverlay('overlay-quiz')
+    montarDrone('drone-quiz')
+
+    const badge = document.getElementById('quiz-badge')
+    const pregEl = document.getElementById('quiz-pregunta')
+    const opcEl = document.getElementById('quiz-opciones')
+    const fb = document.getElementById('quiz-feedback')
+    const cont = document.getElementById('btn-quiz-continuar')
+    const letras = ['A', 'B', 'C', 'D', 'E']
+    let idx = 0, aciertos = 0
+
+    const terminar = (valor) => {
+        if (tipo === 'pre') { preTestAciertos = valor; preTestHecho = true }
+        else postTestAciertos = valor
+        onDone(valor)
+    }
+
+    const render = () => {
+        if (idx >= preguntas.length) { terminar(aciertos); return }
+        const q = preguntas[idx]
+
+        if (fb) { fb.hidden = true; fb.className = 'quiz-feedback' }
+        if (cont) cont.hidden = true
+        if (badge) badge.textContent = tipo === 'pre'
+            ? `Test diagnóstico · ${idx + 1}/${preguntas.length}`
+            : `Test final · ${idx + 1}/${preguntas.length}`
+        if (pregEl) pregEl.textContent = q.pregunta
+
+        if (!opcEl) { terminar(aciertos); return }
+        let extra = ''
+        if (tipo === 'pre' && idx === 0) {
+            extra = `<button type="button" class="quiz-opcion" data-skip="1" style="justify-content:center;opacity:.75">Saltar el diagnóstico</button>`
+        }
+        opcEl.innerHTML = q.opciones.map((op, i) =>
+            `<button type="button" class="quiz-opcion" data-idx="${i}">
+                <span class="quiz-letra">${letras[i] || i + 1}</span>
+                <span class="quiz-texto">${op}</span>
+            </button>`).join('') + extra
+
+        opcEl.querySelectorAll('.quiz-opcion').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.getAttribute('data-skip')) { LFSound.click(); terminar(null); return }
+                const elegido = Number(btn.getAttribute('data-idx'))
+                if (elegido === q.correcta) { aciertos++; LFSound.success() } else LFSound.error()
+                idx++
+                render()
+            }, { once: true })
+        })
+    }
+
+    droneHabla(tipo === 'pre'
+        ? 'Antes de empezar: un test corto para ver qué sabes ya. Responde con lo que creas, no se penaliza.'
+        : '¡Última parte! El mismo test de antes, para medir cuánto aprendiste.')
+    render()
+}
+
 const NOTA_MINIMA = 7
 let notaFinalSesion = 0
 
 function calcularNota() {
-    let nota = 10 - erroresSesion * 1.0 - demorasSesion * 0.5
-    return Math.max(0, Math.min(10, nota))
+    const notaDestreza = Math.max(0, Math.min(10, 10 - erroresSesion * 1.0 - demorasSesion * 0.5))
+    // La nota final mezcla la destreza en el ensamble con la comprensión demostrada
+    // en las preguntas conceptuales. Así aprobar exige entender, no solo hacer clic.
+    if (preguntasRespondidas > 0) {
+        return combinarNota(notaDestreza, notaConceptual(aciertosConceptuales, preguntasRespondidas))
+    }
+    return notaDestreza
 }
 
 function obtenerNombreUsuario() {
@@ -444,6 +421,7 @@ function mostrarFinal() {
             <div class="final-stat"><strong>${TOTAL}</strong><span>Componentes<br>instalados</span></div>
             <div class="final-stat"><strong>${formatTiempo(t)}</strong><span>Tiempo de<br>ensamblaje</span></div>
             <div class="final-stat"><strong>${erroresSesion}</strong><span>Errores<br>cometidos</span></div>
+            <div class="final-stat"><strong>${aciertosConceptuales}/${preguntasRespondidas}</strong><span>Preguntas<br>acertadas</span></div>
             <div class="final-stat"><strong id="final-nota" style="color:${aprobado ? '#22c55e' : '#ef4444'}">${notaBase.toFixed(1)}/10</strong><span id="final-nota-lbl">Nota<br>${aprobado ? 'APROBADO' : 'NO APROBADO'}</span></div>`
     }
 
@@ -467,8 +445,43 @@ function mostrarFinal() {
         document.getElementById('btn-app-movil')?.addEventListener('click', irAppMovil)
     }
 
+    // Ganancia de aprendizaje: compara el test diagnóstico con el final.
+    const statsEl = document.getElementById('final-stats')
+    if (statsEl && preTestAciertos != null && postTestAciertos != null) {
+        const total = EVALUACION.length
+        const pct = Math.round(gananciaAprendizaje(preTestAciertos, postTestAciertos, total) * 100)
+        const mejora = postTestAciertos - preTestAciertos
+        let msg
+        if (mejora > 0) msg = `📈 Pasaste de <strong>${preTestAciertos}/${total}</strong> a <strong>${postTestAciertos}/${total}</strong> en el test conceptual — ganancia de aprendizaje <strong>${pct}%</strong>. ¡Bien!`
+        else if (mejora === 0) msg = `Mantuviste <strong>${postTestAciertos}/${total}</strong> entre el test inicial y el final.`
+        else msg = `Test inicial <strong>${preTestAciertos}/${total}</strong>, final <strong>${postTestAciertos}/${total}</strong>. Repasa los conceptos y vuelve a intentarlo.`
+        let box = document.getElementById('final-ganancia')
+        if (!box) {
+            box = document.createElement('p')
+            box.id = 'final-ganancia'
+            box.style.cssText = 'margin:14px auto 0;max-width:560px;font-size:14.5px;line-height:1.6;color:rgba(255,255,255,.82);background:rgba(255,255,255,.06);border-left:3px solid var(--lf-accent-400,#c98a3a);border-radius:10px;padding:12px 16px'
+            statsEl.insertAdjacentElement('afterend', box)
+        }
+        box.innerHTML = msg
+    }
+
     const aviso = document.getElementById('final-aviso')
     if (aviso) aviso.style.display = 'none'
+
+    // Persiste la dimensión conceptual para que el docente pueda evaluarla.
+    const comprensionPct = preguntasRespondidas > 0
+        ? Math.round((aciertosConceptuales / preguntasRespondidas) * 100)
+        : null
+    const gan = (preTestAciertos != null && postTestAciertos != null)
+        ? gananciaAprendizaje(preTestAciertos, postTestAciertos, EVALUACION.length)
+        : null
+    guardarComprension({
+        comprensionPct,
+        preTest: preTestAciertos,
+        postTest: postTestAciertos,
+        evalTotal: (preTestAciertos != null || postTestAciertos != null) ? EVALUACION.length : null,
+        ganancia: gan
+    }).catch(() => {})
 
     procesarCierreSesion(notaBase, aprobado)
 }
@@ -849,16 +862,23 @@ function aplicarHoverSlot(pasoId, activo) {
 
 function entrarCaminar() {
     if (!walkControls || walkMode || fase !== '3d') return
+    if (modoReto && camera) {
+        const eyeY = SALA.y0 + ALTURA_OJOS
+        camera.position.set(0, eyeY, 3.0)
+    }
     walkControls.lock()
 }
 
 function onWalkLock() {
     walkMode = true
+    if (modoReto && controls) controls.enabled = false
     const card = document.getElementById('walk-start')
     if (card) card.style.display = 'none'
     const ch = document.getElementById('crosshair')
     if (ch) ch.style.display = 'block'
-    appendLog('Caminando. E = agarrar/instalar · Q = soltar · Esc = menús.', 'info')
+    appendLog(modoReto
+        ? 'Caminando por el taller. E = inspeccionar/tomar/instalar · Esc = diagnosticar en el panel.'
+        : 'Caminando. E = agarrar/instalar · Q = soltar · Esc = menús.', 'info')
 }
 
 function onWalkUnlock() {
@@ -869,6 +889,7 @@ function onWalkUnlock() {
 
     if (iniciandoProc) { iniciandoProc = false; return }
 
+    if (modoReto && controls) controls.enabled = true
     if (heldComponent) soltarComponente()
     actualizarOverlayWalk()
 }
@@ -884,7 +905,8 @@ function armarCaminar() {
 function actualizarOverlayWalk() {
     const card = document.getElementById('walk-start')
     if (!card) return
-    const mostrar = fase === '3d' && !walkMode && !selectedComponent && !heldComponent && !modoReto
+    const retoExplorable = !modoReto || (modoReto.fase === 'inspeccion' || modoReto.fase === 'reparacion')
+    const mostrar = fase === '3d' && !walkMode && !selectedComponent && !heldComponent && retoExplorable
     card.style.display = mostrar ? 'flex' : 'none'
 }
 
@@ -956,8 +978,11 @@ async function finalizarPaso(paso) {
     updateMissionProgress()
 
     setTimeout(() => {
-        if (indiceActual < TOTAL) mostrarVideo(indiceActual)
-        else mostrarFinal()
+        const continuar = () => {
+            if (indiceActual < TOTAL) mostrarVideo(indiceActual)
+            else mostrarEvaluacion('post', () => mostrarFinal())  // test final antes del cierre
+        }
+        mostrarQuizComponente(paso, continuar)
     }, 2400)
 }
 
@@ -1122,287 +1147,13 @@ function initMotor3D() {
     }
 }
 
-function crearTexturaRadial(stops, size = 512) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
-    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-    for (const [off, color] of stops) g.addColorStop(off, color)
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, size, size)
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.anisotropy = 4
-    return tex
-}
 
-function crearTexturaMadera(size = 1024) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
 
-    ctx.fillStyle = '#8a5a33'
-    ctx.fillRect(0, 0, size, size)
 
-    const tablones = 8
-    const alto = size / tablones
-    const tonos = ['#7a4d2b', '#8a5a33', '#946134', '#7f5230', '#8e5e38']
-    for (let i = 0; i < tablones; i++) {
-        ctx.fillStyle = tonos[i % tonos.length]
-        ctx.fillRect(0, i * alto, size, alto)
 
-        const vetas = 26
-        for (let v = 0; v < vetas; v++) {
-            const y = i * alto + Math.random() * alto
-            ctx.strokeStyle = `rgba(60,38,20,${0.04 + Math.random() * 0.10})`
-            ctx.lineWidth = 0.5 + Math.random() * 1.2
-            ctx.beginPath()
-            ctx.moveTo(0, y)
-            for (let x = 0; x <= size; x += 32) {
-                ctx.lineTo(x, y + Math.sin(x * 0.012 + v) * 2.2 + (Math.random() - 0.5) * 1.5)
-            }
-            ctx.stroke()
-        }
 
-        ctx.strokeStyle = 'rgba(40,24,12,0.55)'
-        ctx.lineWidth = 2
-        ctx.beginPath(); ctx.moveTo(0, i * alto); ctx.lineTo(size, i * alto); ctx.stroke()
-    }
 
-    const vg = ctx.createRadialGradient(size / 2, size / 2, size * 0.1, size / 2, size / 2, size * 0.72)
-    vg.addColorStop(0, 'rgba(255,235,200,0.18)')
-    vg.addColorStop(0.6, 'rgba(0,0,0,0)')
-    vg.addColorStop(1, 'rgba(30,16,6,0.45)')
-    ctx.fillStyle = vg
-    ctx.fillRect(0, 0, size, size)
 
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.anisotropy = 8
-    return tex
-}
-
-function crearTexturaMaderaClara(size = 1024) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = '#d9bd91'
-    ctx.fillRect(0, 0, size, size)
-
-    const tablones = 6
-    const alto = size / tablones
-    const tonos = ['#dcc096', '#d3b485', '#e1c8a0', '#d7b98c', '#cdae80']
-    for (let i = 0; i < tablones; i++) {
-        ctx.fillStyle = tonos[i % tonos.length]
-        ctx.fillRect(0, i * alto, size, alto)
-
-        for (let v = 0; v < 22; v++) {
-            const y = i * alto + Math.random() * alto
-            ctx.strokeStyle = `rgba(150,110,65,${0.03 + Math.random() * 0.07})`
-            ctx.lineWidth = 0.5 + Math.random() * 1.1
-            ctx.beginPath(); ctx.moveTo(0, y)
-            for (let x = 0; x <= size; x += 32) {
-                ctx.lineTo(x, y + Math.sin(x * 0.012 + v) * 1.8 + (Math.random() - 0.5) * 1.2)
-            }
-            ctx.stroke()
-        }
-
-        ctx.strokeStyle = 'rgba(120,85,45,0.40)'
-        ctx.lineWidth = 1.5
-        ctx.beginPath(); ctx.moveTo(0, i * alto); ctx.lineTo(size, i * alto); ctx.stroke()
-    }
-
-    const vg = ctx.createRadialGradient(size / 2, size / 2, size * 0.1, size / 2, size / 2, size * 0.75)
-    vg.addColorStop(0, 'rgba(255,245,225,0.15)')
-    vg.addColorStop(1, 'rgba(120,85,45,0.10)')
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, size, size)
-
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-    tex.anisotropy = 8
-    return tex
-}
-
-function crearTexturaLetreroComponentes() {
-    const c = document.createElement('canvas')
-    c.width = 2048; c.height = 200
-    const ctx = c.getContext('2d')
-
-    const g = ctx.createLinearGradient(0, 0, 0, c.height)
-    g.addColorStop(0, '#cdab77'); g.addColorStop(0.5, '#dabb89'); g.addColorStop(1, '#c09a64')
-    ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, c.height)
-
-    for (let i = 0; i < 90; i++) {
-        ctx.strokeStyle = `rgba(130,95,55,${0.04 + Math.random() * 0.06})`
-        ctx.lineWidth = 1
-        const y = Math.random() * c.height
-        ctx.beginPath(); ctx.moveTo(0, y)
-        for (let x = 0; x <= c.width; x += 48) ctx.lineTo(x, y + Math.sin(x * 0.01) * 2)
-        ctx.stroke()
-    }
-
-    ctx.strokeStyle = 'rgba(95,65,35,0.55)'; ctx.lineWidth = 7
-    ctx.strokeRect(16, 16, c.width - 32, c.height - 32)
-    ctx.strokeStyle = 'rgba(255,246,228,0.35)'; ctx.lineWidth = 2
-    ctx.strokeRect(22, 22, c.width - 44, c.height - 44)
-
-    ;[[44, 44], [c.width - 44, 44], [44, c.height - 44], [c.width - 44, c.height - 44]].forEach(([x, y]) => {
-        ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2)
-        ctx.fillStyle = '#7a5a32'; ctx.fill()
-        ctx.strokeStyle = 'rgba(40,26,12,0.6)'; ctx.lineWidth = 2
-        ctx.beginPath(); ctx.moveTo(x - 7, y); ctx.lineTo(x + 7, y); ctx.stroke()
-    })
-
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '40px'
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.font = `800 116px 'Segoe UI', Arial, sans-serif`
-
-    ctx.fillStyle = 'rgba(255,248,230,0.5)'
-    ctx.fillText('COMPONENTES', c.width / 2 + 3, c.height / 2 + 4)
-    ctx.fillStyle = '#46301a'
-    ctx.fillText('COMPONENTES', c.width / 2, c.height / 2)
-
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.anisotropy = 8
-    return tex
-}
-
-function crearTexturaPisoModerno(size = 1024) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
-    const half = size / 2
-
-    const baseTones = ['#3b414a', '#363b44', '#3f4651', '#383e47']
-    const drawTile = (tx, ty, tone) => {
-
-        const g = ctx.createLinearGradient(tx, ty, tx + half, ty + half)
-        g.addColorStop(0, tone)
-        g.addColorStop(1, '#2e333b')
-        ctx.fillStyle = g
-        ctx.fillRect(tx, ty, half, half)
-
-        for (let v = 0; v < 7; v++) {
-            ctx.strokeStyle = `rgba(155,170,195,${0.04 + Math.random() * 0.06})`
-            ctx.lineWidth = 0.6 + Math.random() * 1.6
-            ctx.beginPath()
-            let x = tx + Math.random() * half, y = ty + Math.random() * half
-            ctx.moveTo(x, y)
-            for (let s = 0; s < 6; s++) {
-                x += (Math.random() - 0.5) * half * 0.5
-                y += (Math.random() - 0.4) * half * 0.4
-                ctx.lineTo(x, y)
-            }
-            ctx.stroke()
-        }
-
-        const sg = ctx.createRadialGradient(tx + half * 0.35, ty + half * 0.30, 0, tx + half * 0.35, ty + half * 0.30, half * 0.85)
-        sg.addColorStop(0, 'rgba(225,235,250,0.06)')
-        sg.addColorStop(1, 'rgba(225,235,250,0)')
-        ctx.fillStyle = sg
-        ctx.fillRect(tx, ty, half, half)
-    }
-
-    drawTile(0, 0, baseTones[0]);    drawTile(half, 0, baseTones[1])
-    drawTile(0, half, baseTones[2]); drawTile(half, half, baseTones[3])
-
-    ctx.strokeStyle = 'rgba(8,10,13,0.9)'
-    ctx.lineWidth = size * 0.011
-    ;[0, half].forEach(p => {
-        ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(size, p); ctx.stroke()
-    })
-
-    ctx.strokeStyle = 'rgba(130,145,170,0.22)'
-    ctx.lineWidth = 1.5
-    ;[3, half + 3].forEach(p => {
-        ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(size, p); ctx.stroke()
-    })
-
-    for (let i = 0; i < 1800; i++) {
-        ctx.fillStyle = `rgba(${Math.random() > 0.5 ? '215,225,240' : '12,15,20'},${Math.random() * 0.05})`
-        ctx.fillRect(Math.random() * size, Math.random() * size, 1, 1)
-    }
-
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-    tex.anisotropy = 8
-    return tex
-}
-
-function crearTexturaPegboard(size = 512) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
-
-    ctx.fillStyle = '#d9cbb2'
-    ctx.fillRect(0, 0, size, size)
-
-    for (let i = 0; i < 60; i++) {
-        ctx.strokeStyle = `rgba(150,120,80,${0.02 + Math.random() * 0.04})`
-        ctx.lineWidth = 1
-        const y = Math.random() * size
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke()
-    }
-
-    const paso = size / 16
-    for (let x = paso / 2; x < size; x += paso) {
-        for (let y = paso / 2; y < size; y += paso) {
-            ctx.beginPath()
-            ctx.arc(x, y, paso * 0.16, 0, Math.PI * 2)
-            ctx.fillStyle = '#3a3128'
-            ctx.fill()
-
-            ctx.beginPath()
-            ctx.arc(x + 0.6, y - 0.6, paso * 0.16, 0, Math.PI * 2)
-            ctx.strokeStyle = 'rgba(255,255,255,0.25)'
-            ctx.lineWidth = 1
-            ctx.stroke()
-        }
-    }
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-    tex.repeat.set(4, 1.6)
-    return tex
-}
-
-function crearTexturaMat(size = 512) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = '#10333d'
-    ctx.fillRect(0, 0, size, size)
-    const paso = size / 12
-    ctx.strokeStyle = 'rgba(120,200,210,0.16)'
-    ctx.lineWidth = 1
-    for (let i = 0; i <= 12; i++) {
-        ctx.beginPath(); ctx.moveTo(i * paso, 0); ctx.lineTo(i * paso, size); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(0, i * paso); ctx.lineTo(size, i * paso); ctx.stroke()
-    }
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    return tex
-}
-
-function crearTexturaEtiqueta(nombre) {
-    const c = document.createElement('canvas')
-    c.width = 256; c.height = 42
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = 'rgba(10,16,28,0.78)'
-    ctx.fillRect(0, 0, 256, 42)
-    ctx.fillStyle = '#eaf2ff'
-    ctx.font = 'bold 15px sans-serif'
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(nombre, 128, 21)
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    return tex
-}
 
 function crearVitrinaComponentes(grupo) {
     const { cols, slotW, depth, backZ, frontZ, w, baseH, rowH } = VITRINA
@@ -1761,12 +1512,13 @@ function intentarInstalar() {
 }
 
 function interactuarE() {
-    if (modoReto) return
     if (!walkControls?.isLocked) return
 
     const eRay = new THREE.Raycaster()
     eRay.setFromCamera({ x: 0, y: 0 }, camera)
     eRay.far = 3.2
+
+    if (modoReto) { interactuarEReto(eRay); return }
 
     if (!heldComponent) {
 
@@ -1805,6 +1557,54 @@ function interactuarE() {
             }
         }
     }
+}
+
+function interactuarEReto(eRay) {
+    const M = modoReto
+    if (!M || (M.fase !== 'inspeccion' && M.fase !== 'reparacion')) return
+
+    if (M.fase === 'inspeccion') {
+        const dHits = eRay.intersectObjects(slotDiscs)
+        if (dHits.length) { inspeccionarReto(dHits[0].object.userData.id); return }
+
+        const pHits = eRay.intersectObjects(propsInteractivos, true)
+        if (pHits.length) {
+            let obj = pHits[0].object
+            while (obj && !obj.userData.fact) obj = obj.parent
+            if (obj?.userData.fact) { droneHabla(obj.userData.fact); return }
+        }
+        droneHabla('Apunta al disco luminoso de un componente y pulsa E para inspeccionarlo. Cuando sepas cuál falla, pulsa Esc y márcalo en el panel de diagnóstico.')
+        return
+    }
+
+    // Fase reparación: tomar el repuesto de la vitrina e instalarlo
+    const fallaId = M.reto.componenteFalla
+    const sHits = eRay.intersectObjects(shelfMeshes)
+    if (sHits.length) {
+        const pasoId = sHits[0].object.userData.pasoId
+        const paso = PASOS.find(p => p.id === pasoId)
+        if (pasoId === fallaId) {
+            M.piezaLista = true
+            droneHabla(`Perfecto: ${paso.nombre} nuevo en mano. Ahora apunta al disco luminoso de la PC y pulsa E para instalarlo.`)
+            setHint(`<strong>En mano: ${paso.nombre} (repuesto).</strong> Apunta al disco luminoso y pulsa E para instalarlo.`)
+            appendLog(`Repuesto tomado: ${paso.nombre}`, 'info')
+            renderPanelReto()
+        } else {
+            droneHabla(`Ese es ${paso.nombre}, pero la pieza dañada es ${PASOS.find(p => p.id === fallaId).nombre}.`)
+        }
+        return
+    }
+
+    const dHits = eRay.intersectObjects(slotDiscs)
+    if (dHits.find(h => h.object.userData.id === fallaId)) {
+        if (!M.piezaLista) {
+            droneHabla('Primero toma el repuesto de la vitrina: apúntale y pulsa E.')
+            return
+        }
+        instalarReemplazoReto()
+        return
+    }
+    droneHabla('Apunta al repuesto en la vitrina o al disco luminoso de la PC y pulsa E.')
 }
 
 const PROCEDIMIENTOS = { cpu: construirProcedimientoCPU, mb: construirProcedimientoMB, cooler: construirProcedimientoCooler, ram: construirProcedimientoRAM, gpu: construirProcedimientoGPU, power: construirProcedimientoPSU }
@@ -1975,6 +1775,7 @@ function mostrarPanelProc() {
         ;(document.getElementById('canvas-container') || document.body).appendChild(el)
     }
     el.style.display = 'block'
+    document.getElementById('hint-box')?.classList.add('con-panel-proc')
     actualizarPanelProc()
 }
 
@@ -2003,6 +1804,7 @@ function actualizarPanelProc() {
 function ocultarPanelProc() {
     const el = document.getElementById('proc-panel')
     if (el) el.style.display = 'none'
+    document.getElementById('hint-box')?.classList.remove('con-panel-proc')
 }
 
 function crearHotspot(color = 0x3a8bff, r = 0.028) {
@@ -2660,7 +2462,7 @@ function construirProcedimientoPSU(P) {
     const mbPos = (PASOS.find(p => p.id === 'mb')?.pos || P.paso.pos).clone()
     G.position.copy(mbPos)
     P.focusTarget = mbPos.clone()
-    P.focusOffset = new THREE.Vector3(0.22, 0.06, 0.56)
+    P.focusOffset = new THREE.Vector3(0.24, 0.12, 0.94)
 
     const negro    = new THREE.MeshStandardMaterial({ color: 0x1a1c21, metalness: 0.35, roughness: 0.75 })
     const dorado   = new THREE.MeshStandardMaterial({ color: 0xd4aa50, metalness: 0.90, roughness: 0.20 })
@@ -2739,7 +2541,7 @@ function construirProcedimientoPSU(P) {
             instruccion: 'El ATX 24-pin es el conector principal: suministra energía a toda la placa base. Encájalo en el socket del borde derecho.',
             activar(P) {
                 zoomSock(
-                    new THREE.Vector3(0.22, 0.06, 0.54),
+                    new THREE.Vector3(0.22, 0.08, 0.90),
                     new THREE.Vector3(0.18, 0.01, 0)
                 )
                 plugAtx.visible = true
@@ -2759,7 +2561,7 @@ function construirProcedimientoPSU(P) {
             instruccion: 'Este cable alimenta los VRM del procesador. ¡Ojo! El EPS 8-pin y el PCIe 8-pin son físicamente idénticos. ¿Cuál va al CPU?',
             activar(P) {
                 zoomSock(
-                    new THREE.Vector3(-0.06, 0.20, 0.54),
+                    new THREE.Vector3(-0.04, 0.22, 0.90),
                     new THREE.Vector3(-0.14, 0.13, 0)
                 )
                 epsGrupos.forEach(e => { e.group.visible = true })
@@ -2788,7 +2590,7 @@ function construirProcedimientoPSU(P) {
             instruccion: 'La RTX 3090 necesita alimentación directa de la fuente. Conecta el cable PCIe 8-pin al puerto de la tarjeta gráfica.',
             activar(P) {
                 zoomSock(
-                    new THREE.Vector3(0.14, -0.04, 0.54),
+                    new THREE.Vector3(0.14, 0.00, 0.90),
                     new THREE.Vector3(0.05, -0.09, 0)
                 )
                 plugPcie.visible = true
@@ -2902,39 +2704,6 @@ function crearPared(grupo, w, h, pos, rotY) {
     grupo.add(pared)
 }
 
-function crearTexturaPared(size = 512) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
-
-    ctx.fillStyle = '#cabfa4'
-    ctx.fillRect(0, 0, size, size)
-
-    const wy = size * 0.66
-    ctx.fillStyle = '#2f5d63'
-    ctx.fillRect(0, wy, size, size - wy)
-
-    ctx.fillStyle = '#5a4632'
-    ctx.fillRect(0, wy - size * 0.02, size, size * 0.02)
-
-    ctx.fillStyle = '#3a2f24'
-    ctx.fillRect(0, size - size * 0.035, size, size * 0.035)
-
-    ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 2
-    for (let x = 0; x <= size; x += size / 4) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, wy); ctx.stroke()
-    }
-
-    for (let i = 0; i < 1500; i++) {
-        ctx.fillStyle = `rgba(${Math.random() > 0.5 ? '255,255,255' : '0,0,0'},${Math.random() * 0.04})`
-        ctx.fillRect(Math.random() * size, Math.random() * size, 1, 1)
-    }
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = THREE.RepeatWrapping
-    tex.wrapT = THREE.ClampToEdgeWrapping
-    return tex
-}
 
 function crearLucesTecho(grupo) {
 
@@ -3067,33 +2836,6 @@ function crearVentana(grupo) {
     propsInteractivos.push(g)
 }
 
-function crearTexturaCielo() {
-    const c = document.createElement('canvas')
-    c.width = 512; c.height = 288
-    const ctx = c.getContext('2d')
-    const g = ctx.createLinearGradient(0, 0, 0, c.height)
-    g.addColorStop(0, '#7db8e8'); g.addColorStop(0.62, '#bcd9ef'); g.addColorStop(1, '#e8ecd9')
-    ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, c.height)
-
-    const sol = ctx.createRadialGradient(400, 66, 4, 400, 66, 70)
-    sol.addColorStop(0, 'rgba(255,250,225,0.98)'); sol.addColorStop(0.25, 'rgba(255,244,200,0.75)')
-    sol.addColorStop(1, 'rgba(255,244,200,0)')
-    ctx.fillStyle = sol; ctx.fillRect(300, 0, 212, 170)
-
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'
-    ;[[90, 80, 46], [150, 96, 34], [260, 60, 40], [210, 74, 28]].forEach(([x, y, r]) => {
-        ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.45, 0, 0, Math.PI * 2); ctx.fill()
-    })
-
-    ctx.fillStyle = '#6c8f5f'
-    ctx.beginPath(); ctx.moveTo(0, 288)
-    for (let x = 0; x <= 512; x += 32) ctx.lineTo(x, 246 + Math.sin(x * 0.02) * 12)
-    ctx.lineTo(512, 288); ctx.closePath(); ctx.fill()
-
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    return tex
-}
 
 let pantallaTallerCanvas = null
 let pantallaTallerTex = null
@@ -3219,46 +2961,7 @@ function crearPlantas(grupo) {
     mkPlanta(SALA.xMax - 0.65, SALA.zMin + 0.7, 1.2)
 }
 
-function crearTexturaCartel(size = 512) {
-    const c = document.createElement('canvas')
-    c.width = size; c.height = Math.round(size * 0.21)
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = '#0f1b2e'; ctx.fillRect(0, 0, c.width, c.height)
-    ctx.strokeStyle = '#2c79c7'; ctx.lineWidth = 6
-    ctx.strokeRect(6, 6, c.width - 12, c.height - 12)
-    ctx.fillStyle = '#eaf2ff'
-    ctx.font = `bold ${c.height * 0.5}px 'Segoe UI', sans-serif`
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('LOGICFLOW · TALLER', c.width / 2, c.height / 2)
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    return tex
-}
 
-function crearTexturaBlueprint(size = 512) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = '#1f4e8a'; ctx.fillRect(0, 0, size, size)
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1
-    for (let i = 0; i <= size; i += size / 24) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, size); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(size, i); ctx.stroke()
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2
-    ctx.strokeRect(size * 0.16, size * 0.22, size * 0.52, size * 0.44)
-    ctx.strokeRect(size * 0.22, size * 0.28, size * 0.12, size * 0.12)
-    ;[0.46, 0.5, 0.54, 0.58].forEach(x => ctx.strokeRect(size * x, size * 0.28, size * 0.025, size * 0.3))
-    ctx.beginPath(); ctx.arc(size * 0.3, size * 0.56, size * 0.04, 0, Math.PI * 2); ctx.stroke()
-    ctx.strokeRect(size * 0.62, size * 0.78, size * 0.3, size * 0.14)
-    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = `bold ${size * 0.035}px monospace`
-    ctx.fillText('ATX MAINBOARD', size * 0.16, size * 0.17)
-    ctx.font = `${size * 0.026}px monospace`
-    ctx.fillText('REV 1.0 — LOGICFLOW', size * 0.635, size * 0.865)
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    return tex
-}
 
 function crearPanelPegboard(grupo) {
     const g = new THREE.Group()
@@ -3982,6 +3685,7 @@ function comenzarInspeccionReto() {
 
     const title = document.getElementById('mission-title')
     if (title) title.textContent = `RETO: ${M.reto.titulo}`
+    actualizarOverlayWalk()
 }
 
 function setupSidebarReto() {
@@ -4187,6 +3891,8 @@ function instalarReemplazoReto() {
     const M = modoReto
     const paso = PASOS.find(p => p.id === M.reto.componenteFalla)
     M.fase = 'final'
+    if (walkControls?.isLocked) walkControls.unlock()
+    actualizarOverlayWalk()
     ocultarMarcador(paso.id)
     colocarModelo(paso, true)
     appendLog(`${paso.nombre} reemplazado. Encendiendo la PC…`, 'success')
@@ -4333,7 +4039,11 @@ async function initGame() {
     }
 }
 
-document.getElementById('btn-empezar')?.addEventListener('click', () => { LFSound.unlock(); mostrarVideo(indiceActual) })
+document.getElementById('btn-empezar')?.addEventListener('click', () => {
+    LFSound.unlock()
+    if (!preTestHecho && indiceActual === 0) mostrarEvaluacion('pre', () => mostrarVideo(0))
+    else mostrarVideo(indiceActual)
+})
 document.getElementById('btn-ir-3d')?.addEventListener('click', () => { LFSound.unlock(); mostrarFase3D(indiceActual) })
 document.getElementById('btn-skip-video')?.addEventListener('click', () => mostrarFase3D(indiceActual))
 

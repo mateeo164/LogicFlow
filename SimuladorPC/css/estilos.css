@@ -1072,6 +1072,25 @@ body.sim-dashboard-layout {
     text-overflow: ellipsis;
 }
 
+/* Durante una instalación guiada, el panel "Instalación guiada" ocupa la
+   esquina superior derecha (≈286px + 16px). El banner de pista se reencuadra
+   al espacio libre de la izquierda y permite envolver texto, para que nunca
+   quede tapado por el panel ni pise la interacción. */
+.floating-hint-banner.con-panel-proc {
+    left: 16px;
+    right: 320px;
+    transform: none;
+    white-space: normal;
+    max-width: none;
+    text-align: center;
+    text-overflow: clip;
+}
+
+@media (max-width: 640px) {
+    /* No hay ancho libre junto al panel; el panel ya muestra la instrucción. */
+    .floating-hint-banner.con-panel-proc { display: none; }
+}
+
 .btn-floating-dock {
     position: absolute;
     bottom: 24px;

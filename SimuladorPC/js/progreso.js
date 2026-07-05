@@ -208,6 +208,33 @@ export async function marcarAprobacionWeb({ nota, fotoPath = null }) {
     }
 }
 
+// Guarda el resumen de comprensión conceptual del estudiante (dimensión pedagógica
+// que el docente necesita para evaluar si ENTENDIÓ, no solo si ensambló).
+// Se guarda siempre al terminar el laboratorio, apruebe o no.
+export async function guardarComprension({ comprensionPct = null, preTest = null, postTest = null, evalTotal = null, ganancia = null }) {
+    const userId = getUserId()
+    if (!userId) return false
+
+    try {
+        const campos = { updated_at: new Date().toISOString() }
+        if (comprensionPct != null) campos.comprension_pct = Math.max(0, Math.min(100, Number(comprensionPct)))
+        if (preTest != null)  campos.pre_test  = Math.max(0, Math.round(preTest))
+        if (postTest != null) campos.post_test = Math.max(0, Math.round(postTest))
+        if (evalTotal != null) campos.eval_total = Math.max(0, Math.round(evalTotal))
+        if (ganancia != null) campos.ganancia = Math.max(-1, Math.min(1, Number(ganancia)))
+
+        await dataRequest(`/progreso_usuario?user_id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: campos
+        })
+        return true
+    } catch (err) {
+        console.warn('[LogicFlow] No se pudo guardar la comprensión:', err.message)
+        return false
+    }
+}
+
 export async function subirFotoSimulador(blob) {
     const userId = getUserId()
     const token = localStorage.getItem(STORAGE_KEYS.accessToken)

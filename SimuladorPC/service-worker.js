@@ -1,13 +1,17 @@
 
 
-const CACHE_NAME = 'logicflow-v12';
+const CACHE_NAME = 'logicflow-v20';
 const STATIC_ASSETS = [
   '/',
+  '/manifest.json',
+  '/favicon.svg',
+  '/assets/icon.svg',
   '/index.html',
   '/login.html',
   '/registro.html',
   '/recuperar-password.html',
   '/actualizar-password.html',
+  '/confirmar-cuenta.html',
   '/menu.html',
   '/juego.html',
   '/retos.html',

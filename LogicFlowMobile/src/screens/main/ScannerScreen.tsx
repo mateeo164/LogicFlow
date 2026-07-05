@@ -14,7 +14,7 @@ import * as Speech from 'expo-speech'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { PC_COMPONENTS, PCComponent } from '../../constants/components'
-import { guardarProgreso, registrarEvento } from '../../services/progress'
+import { guardarProgreso, registrarEvento, obtenerProgreso, reiniciarProgreso } from '../../services/progress'
 import { otorgarLogros } from '../../services/logros'
 import { detectarComponente, preguntarSobreComponente, RateLimitedError } from '../../services/ai'
 import { sfx } from '../../services/sound'
@@ -47,6 +47,7 @@ export function ScannerScreen() {
   const [scanState, setScanState] = useState<ScanState>('idle')
   const [detected, setDetected] = useState<PCComponent | null>(null)
   const [instalados, setInstalados] = useState<string[]>([])
+  const [showComplete, setShowComplete] = useState(false)
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null)
   const [quizFeedback, setQuizFeedback] = useState<'correct' | 'wrong' | null>(null)
   const [saving, setSaving] = useState(false)
@@ -67,6 +68,14 @@ export function ScannerScreen() {
 
   useEffect(() => () => {
     if (cooldownTimer.current) clearTimeout(cooldownTimer.current)
+  }, [])
+
+  // Carga las piezas ya escaneadas para que el contador N/8 sea persistente
+  // entre sesiones y el ensamble se complete al escanear todas las piezas.
+  useEffect(() => {
+    obtenerProgreso().then(p => {
+      if (p?.componentes_instalados?.length) setInstalados(p.componentes_instalados)
+    })
   }, [])
 
   const startScanAnimation = useCallback(() => {
@@ -169,8 +178,15 @@ export function ScannerScreen() {
     const start = Date.now()
     await guardarProgreso({ componenteId: detected.id, segundos: 0 })
     await registrarEvento({ tipo: 'acierto', componenteId: detected.id, segundos: Math.round((Date.now() - start) / 1000) })
-    setInstalados(prev => [...prev, detected.id])
+    const nuevos = instalados.includes(detected.id) ? instalados : [...instalados, detected.id]
+    setInstalados(nuevos)
     setSaving(false)
+    // Al escanear las 8 piezas se completa el ensamble móvil (condición del
+    // certificado) y se otorga el logro correspondiente.
+    if (nuevos.length >= PC_COMPONENTS.length) {
+      otorgarLogros(['instalacion_real'], 'scanner')
+      sfx.complete()
+    }
     setScanState('quiz')
     setQuizAnswer(null)
     setQuizFeedback(null)
@@ -200,6 +216,27 @@ export function ScannerScreen() {
     setQuizFeedback(null)
     setConversacion([])
     lastPhotoBase64.current = null
+    // Si ya se escanearon las 8 piezas, muestra la celebración de ensamble.
+    if (instalados.length >= PC_COMPONENTS.length) setShowComplete(true)
+  }
+
+  async function handleReset() {
+    Alert.alert(
+      'Reiniciar ensamblaje',
+      '¿Seguro que quieres empezar desde cero? Tus estadísticas acumuladas se conservan.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Reiniciar',
+          style: 'destructive',
+          onPress: async () => {
+            await reiniciarProgreso()
+            setInstalados([])
+            setShowComplete(false)
+          },
+        },
+      ]
+    )
   }
 
   if (!permission) {
@@ -421,6 +458,25 @@ export function ScannerScreen() {
             {quizAnswer !== null && (
               <PrimaryButton label="Continuar escaneando" onPress={handleClose} style={{ marginTop: Spacing.md }} />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Completion sheet — se muestra al escanear las 8 piezas */}
+      <Modal visible={showComplete} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.quizSheet}>
+            <View style={{ alignItems: 'center', gap: Spacing.xs }}>
+              <Text style={{ fontSize: 56 }}>🎉</Text>
+              <Text style={styles.quizTitle}>¡PC ensamblada!</Text>
+              <Text style={styles.quizQuestion}>
+                Escaneaste e instalaste los 8 componentes. Tu PC virtual está lista y el ensamble móvil quedó completado.
+              </Text>
+            </View>
+            <PrimaryButton label="Seguir explorando" onPress={() => setShowComplete(false)} style={{ marginTop: Spacing.sm }} />
+            <TouchableOpacity style={styles.skipBtn} onPress={handleReset}>
+              <Text style={[styles.skipText, { color: Colors.error }]}>Reiniciar ensamblaje</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

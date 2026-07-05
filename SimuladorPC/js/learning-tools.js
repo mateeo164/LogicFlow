@@ -41,17 +41,39 @@ export function calculateWattage({ cpuId, gpuId, ramSticks = 2, ssds = 1, hdds =
   total += rgb ? BASE_WATTAGE.rgb : 0
 
   const recommended = Math.ceil(total * 1.2 / 50) * 50
+  const totalR = Math.round(total)
+
+  // Eficiencia 80 Plus: fracción del consumo (DC) que la fuente entrega respecto
+  // a la energía (AC) que toma de la pared. Una fuente MENOS eficiente toma MÁS
+  // energía de la pared para entregar el mismo consumo; el resto se pierde en calor.
+  const EFF = { bronze: 0.82, silver: 0.85, gold: 0.90, platinum: 0.92 }
+  const desdePared = (pct) => {
+    const pared = Math.round(totalR / pct)
+    return { pared, perdida: pared - totalR }
+  }
 
   return {
-    total: Math.round(total),
+    total: totalR,
     recommended,
-    headroom: recommended - total,
+    headroom: recommended - totalR,
     efficiency: {
-      bronze: Math.round(recommended * 0.82),
-      silver: Math.round(recommended * 0.87),
-      gold: Math.round(recommended * 0.90),
-      platinum: Math.round(recommended * 0.92)
+      bronze: desdePared(EFF.bronze),
+      silver: desdePared(EFF.silver),
+      gold: desdePared(EFF.gold),
+      platinum: desdePared(EFF.platinum)
     }
+  }
+}
+
+// Estima el costo eléctrico mensual a partir de la potencia real tomada de la pared.
+// Precio referencial residencial en Ecuador ≈ 0,10 USD/kWh.
+export function estimarCostoMensual(wattsDesdePared, horasDia = 4, precioKwh = 0.10) {
+  const kwhMes = (wattsDesdePared / 1000) * horasDia * 30
+  return {
+    kwhMes: Math.round(kwhMes * 10) / 10,
+    costo: Math.round(kwhMes * precioKwh * 100) / 100,
+    horasDia,
+    precioKwh
   }
 }
 
@@ -151,6 +173,48 @@ export const GLOSARIO = [
     title: 'Flujo de aire',
     description: 'Movimiento del aire dentro del gabinete. Un buen airflow reduce temperaturas y mejora la estabilidad.',
     tags: ['Refrigeración', 'Gabinete']
+  },
+  {
+    term: 'POST',
+    title: 'Autoprueba de encendido',
+    description: 'Chequeo que la placa base ejecuta al encender para verificar CPU, RAM y video antes de cargar el sistema. Si algo falla, lo avisa con pitidos o LEDs de diagnóstico.',
+    tags: ['Placa', 'Diagnóstico']
+  },
+  {
+    term: 'BIOS / UEFI',
+    title: 'Firmware de arranque',
+    description: 'Programa grabado en la placa base que inicializa el hardware y arranca el sistema operativo. UEFI es la versión moderna del clásico BIOS, con interfaz gráfica.',
+    tags: ['Placa', 'Arranque']
+  },
+  {
+    term: 'NVMe',
+    title: 'Memoria no volátil exprés',
+    description: 'Protocolo que permite a los SSD M.2 comunicarse directamente por PCIe, alcanzando velocidades muy superiores a las de un disco SATA.',
+    tags: ['Almacenamiento', 'Conectividad']
+  },
+  {
+    term: 'M.2',
+    title: 'Ranura M.2',
+    description: 'Conector compacto de la placa base para SSD NVMe o SATA. Se instala en ángulo y se fija con un tornillo, sin cables de datos ni de poder.',
+    tags: ['Almacenamiento', 'Placa']
+  },
+  {
+    term: 'Dual Channel',
+    title: 'Doble canal de memoria',
+    description: 'Modo que se activa al instalar la RAM en pares y en las ranuras correctas. Duplica el ancho de banda entre la CPU y la memoria, mejorando el rendimiento.',
+    tags: ['Memoria', 'Rendimiento']
+  },
+  {
+    term: 'Throttling',
+    title: 'Estrangulamiento térmico',
+    description: 'Reducción automática de la frecuencia de un componente cuando alcanza una temperatura peligrosa. Protege el hardware, pero baja el rendimiento; si el calor sigue subiendo, el equipo se apaga.',
+    tags: ['Refrigeración', 'Rendimiento']
+  },
+  {
+    term: 'ATX',
+    title: 'Estándar ATX',
+    description: 'Norma que define el tamaño de placas, gabinetes y conectores de energía (como el ATX de 24 pines de la fuente). Garantiza que los componentes sean compatibles entre sí.',
+    tags: ['Placa', 'Energía']
   }
 ]
 
