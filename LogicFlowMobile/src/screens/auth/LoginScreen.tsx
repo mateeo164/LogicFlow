@@ -61,7 +61,7 @@ export function LoginScreen() {
             <View style={{ gap: Spacing.md, marginTop: Spacing.sm }}>
               <InputField
                 label="Correo electrónico" value={email} onChangeText={setEmail}
-                keyboardType="email-address" autoComplete="email" icon="mail-outline"
+                keyboardType="email-address" icon="mail-outline"
                 placeholder="tu@correo.com" error={errors.email}
               />
               <InputField

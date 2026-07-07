@@ -1,7 +1,7 @@
 
 import {
     crearClase, misClasesTutor, resumenClase, conceptosDificilesClase,
-    unirseAClase, misClasesEstudiante,
+    unirseAClase, misClasesEstudiante, rankingClase,
     crearTarea, eliminarTarea, tareasDeClase, resumenTarea,
     calificarEntrega, entregarTarea, misTareas,
     renombrarClase, eliminarClase, quitarEstudiante,
@@ -436,8 +436,9 @@ function renderResumenClase(filas) {
 
 // Etiquetas legibles de los componentes (coherentes con PASOS del laboratorio).
 const CONCEPTO_LABEL = {
-    case: 'Gabinete', mb: 'Placa base', cpu: 'Procesador (CPU)', cooler: 'Disipador',
-    ram: 'Memoria RAM', storage: 'Almacenamiento', gpu: 'Tarjeta gráfica', power: 'Fuente de poder'
+    case: 'Gabinete', fans: 'Ventiladores', mb: 'Placa base', cpu: 'Procesador (CPU)', cooler: 'Disipador',
+    ram: 'Memoria RAM', storage: 'Almacenamiento', hdd: 'Disco duro (HDD)', sata: 'Cable SATA',
+    gpu: 'Tarjeta gráfica', power: 'Fuente de poder'
 }
 
 // Widget "conceptos que más le cuestan a la clase": accionable para el docente.
@@ -685,5 +686,66 @@ async function cargarMisClases() {
             <span class="mis-clase-dot"></span>
             <strong>${c.nombre}</strong>
             <span class="tutor-codigo-chip tutor-codigo-chip--sm">${c.codigo}</span>
-        </li>`).join('')
+            <button type="button" class="ranking-toggle" data-id="${c.id}" aria-expanded="false" aria-controls="ranking-${c.id}">🏆 Ranking</button>
+        </li>
+        <li class="ranking-panel" id="ranking-${c.id}" hidden></li>`).join('')
+
+    list.querySelectorAll('.ranking-toggle').forEach(btn => {
+        btn.addEventListener('click', () => toggleRanking(btn.getAttribute('data-id'), btn))
+    })
+}
+
+function medallaPos(pos) {
+    if (pos === 1) return '🥇'
+    if (pos === 2) return '🥈'
+    if (pos === 3) return '🥉'
+    return `${pos}º`
+}
+
+function renderRankingHTML(filas) {
+    if (!filas.length) return '<p class="ranking-vacio">Aún no hay estudiantes en esta clase.</p>'
+    const rows = filas.map(f => {
+        const clases = ['ranking-row']
+        if (f.es_tu) clases.push('ranking-row--tu')
+        if (f.posicion <= 3) clases.push('ranking-row--podio')
+        return `
+        <li class="${clases.join(' ')}">
+            <span class="ranking-pos">${medallaPos(f.posicion)}</span>
+            <span class="ranking-nombre">${f.nombre}${f.es_tu ? ' <span class="ranking-tu-badge">tú</span>' : ''}</span>
+            <span class="ranking-detalle" title="Retos superados · Logros">${f.retos_superados}🔧 · ${f.logros_total}🏅</span>
+            <span class="ranking-pts">${f.puntos}<small>pts</small></span>
+        </li>`
+    }).join('')
+    return `
+        <div class="ranking-box">
+            <div class="ranking-head">
+                <span>🏆 Ranking de la clase</span>
+                <span class="ranking-formula" title="puntos = retos superados ×100 + logros ×25 + mejor nota de reto ×10 + componentes ×10">¿cómo se calcula?</span>
+            </div>
+            <ul class="ranking-list">${rows}</ul>
+        </div>`
+}
+
+async function toggleRanking(claseId, btn) {
+    const panel = document.getElementById(`ranking-${claseId}`)
+    if (!panel) return
+
+    if (!panel.hidden) {
+        panel.hidden = true
+        btn.setAttribute('aria-expanded', 'false')
+        return
+    }
+
+    panel.hidden = false
+    btn.setAttribute('aria-expanded', 'true')
+
+    if (panel.dataset.loaded) return
+    panel.innerHTML = '<p class="ranking-vacio">Cargando ranking…</p>'
+    try {
+        const filas = await rankingClase(claseId)
+        panel.innerHTML = renderRankingHTML(filas)
+        panel.dataset.loaded = '1'
+    } catch (err) {
+        panel.innerHTML = `<p class="ranking-vacio">No se pudo cargar el ranking: ${err.message}</p>`
+    }
 }

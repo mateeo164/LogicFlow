@@ -224,11 +224,11 @@
     </div>
 </header>
 
-<div id="drone-float" class="drone-float" hidden>
+<!-- Dron asistente flotante desactivado en el 3D: no debe tapar la interacción.
+     display:none inline gana al .drone-float{display:flex} que anula [hidden]. -->
+<div id="drone-float" class="drone-float" hidden style="display:none;">
     <div class="drone-wrapper drone-wrapper--md" id="drone-float-svg"></div>
-    <div class="drone-float-bubble" id="drone-float-msg">
-        Selecciona un componente de la vitrina.
-    </div>
+    <div class="drone-float-bubble" id="drone-float-msg"></div>
 </div>
 
 <div class="sim-main-container" id="sim-main" hidden>
@@ -275,9 +275,8 @@
             </button>
         </div>
 
-        <div id="hint-box" class="floating-hint-banner">
-            Sistema inicializado. Esperando acción.
-        </div>
+        <!-- Banner de pista flotante desactivado: no debe tapar la interacción 3D. -->
+        <div id="hint-box" class="floating-hint-banner" hidden style="display:none;"></div>
 
     </main>
 
@@ -289,11 +288,6 @@
             <div id="specs-content" class="specs-content-list">
                 <p class="empty-spec-text">Selecciona una pieza para ver su hoja técnica.</p>
             </div>
-        </div>
-
-        <div class="terminal-card">
-            <h3>Consola del sistema</h3>
-            <div id="terminal-log" class="terminal-log-flow"></div>
         </div>
 
         <div class="specs-card" id="walk-controls">

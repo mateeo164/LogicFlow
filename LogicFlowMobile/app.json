@@ -24,6 +24,7 @@
         "backgroundColor": "#fbf9f4"
       },
       "package": "com.logicflow.mobile",
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",

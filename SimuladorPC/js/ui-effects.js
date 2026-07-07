@@ -173,12 +173,33 @@
     });
   }
 
+  // Reemplaza una foto de equipo rota (aún sin subir) por sus iniciales.
+  // Va aquí y no en un onerror inline porque la CSP bloquea los handlers inline.
+  function replaceWithInitials(img) {
+    const span = document.createElement('span');
+    span.className = 'academic-footer-team-photo academic-footer-team-photo--fallback';
+    span.textContent = img.dataset.initials || '';
+    img.replaceWith(span);
+  }
+
+  function initTeamPhotoFallback(selector = '.academic-footer-team-photo[data-initials]') {
+    document.querySelectorAll(selector).forEach(img => {
+      if (img.tagName !== 'IMG') return;
+      if (img.complete && img.naturalWidth === 0) {
+        replaceWithInitials(img); // ya falló antes de que corriera este script
+      } else {
+        img.addEventListener('error', () => replaceWithInitials(img), { once: true });
+      }
+    });
+  }
+
   function init() {
     initScrollReveal();
     initCounters();
     initNavbarScroll();
     initTiltCards();
     initSmoothAnchorScroll();
+    initTeamPhotoFallback();
   }
 
   if (document.readyState === 'loading') {

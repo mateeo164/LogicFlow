@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, TextInput, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, TextInput, ActivityIndicator, Image } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../hooks/useAuth'
@@ -13,6 +13,13 @@ import { InputField } from '../../components/InputField'
 import { router } from 'expo-router'
 import { supabase } from '../../services/supabase'
 import { loadSoundPref, setSoundPref, sfx } from '../../services/sound'
+
+const TEAM = [
+  { name: 'Mateo Almeida', role: 'Lead Full-Stack Developer', photo: require('../../../assets/equipo/mateo-almeida.png') },
+  { name: 'Jonathan Cunguan', role: 'Database Administrator (DBA)', photo: require('../../../assets/equipo/jonathan-cunguan.png') },
+  { name: 'Kevin Guamán', role: 'EdTech Specialist', photo: require('../../../assets/equipo/kevin-guaman.png') },
+  { name: 'Washington Pizarra', role: '3D Modeler', photo: require('../../../assets/equipo/washington-pizarra.png') },
+]
 
 async function actualizarPerfilSupabase(params: { full_name?: string; institucion?: string }) {
   const { error } = await supabase.auth.updateUser({ data: params })
@@ -196,6 +203,18 @@ export function ProfileScreen() {
             <Text style={styles.aboutDot}>·</Text>
             <Text style={styles.aboutMetaItem}>React Native + Expo</Text>
           </View>
+
+          <View style={styles.teamDivider} />
+          <Text style={styles.teamLabel}>Equipo de desarrollo</Text>
+          {TEAM.map(m => (
+            <View key={m.name} style={styles.teamRow}>
+              <Image source={m.photo} style={styles.teamPhoto} />
+              <View style={styles.teamInfo}>
+                <Text style={styles.teamName}>{m.name}</Text>
+                <Text style={styles.teamRole}>{m.role}</Text>
+              </View>
+            </View>
+          ))}
         </GradientCard>
 
         <PrimaryButton label="Cerrar sesión" icon="⏻" onPress={handleSignOut} variant="danger" />
@@ -283,4 +302,12 @@ const styles = StyleSheet.create({
   aboutMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: Spacing.md },
   aboutMetaItem: { fontFamily: Fonts.sansSemi, fontSize: 12, color: Colors.primaryMid },
   aboutDot: { color: Colors.primaryMid },
+
+  teamDivider: { height: 1, backgroundColor: Colors.primaryMid + '30', marginTop: Spacing.md, marginBottom: Spacing.sm },
+  teamLabel: { fontFamily: Fonts.sansBold, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: Colors.primaryMid, marginBottom: Spacing.sm },
+  teamRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 5 },
+  teamPhoto: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primaryMid + '22' },
+  teamInfo: { flex: 1 },
+  teamName: { fontFamily: Fonts.sansSemi, fontSize: 13, color: Colors.primaryDeep },
+  teamRole: { fontFamily: Fonts.sans, fontSize: 11.5, color: Colors.primaryMid },
 })

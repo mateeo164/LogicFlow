@@ -178,7 +178,7 @@ export function HomeScreen() {
           </Text>
           <Text style={styles.heroSub}>
             {instalados.length >= PC_COMPONENTS.length
-              ? 'Has instalado los 8 componentes. ¡Excelente trabajo!'
+              ? `Has instalado los ${PC_COMPONENTS.length} componentes. ¡Excelente trabajo!`
               : `${instalados.length} de ${PC_COMPONENTS.length} componentes instalados`}
           </Text>
           <View style={styles.heroTrack}>
@@ -199,7 +199,7 @@ export function HomeScreen() {
 
         {/* Stats */}
         <View style={styles.statsRow}>
-          <StatCard icon="🧩" label="Componentes" value={`${instalados.length}/8`} color={Colors.primary} />
+          <StatCard icon="🧩" label="Componentes" value={`${instalados.length}/${PC_COMPONENTS.length}`} color={Colors.primary} />
           <StatCard icon="🎯" label="Precisión" value={precision !== null ? `${precision}%` : '—'} color={Colors.success} />
           <StatCard icon="🏆" label="Builds" value={progreso?.simulaciones_completadas || 0} color={Colors.accent} />
         </View>
@@ -274,7 +274,7 @@ export function HomeScreen() {
                   <Text style={{ fontSize: 30 }}>{nextComponent.icon}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.nextStep}>PASO {nextComponent.assemblyStep} DE 8</Text>
+                  <Text style={styles.nextStep}>PASO {nextComponent.assemblyStep} DE {PC_COMPONENTS.length}</Text>
                   <Text style={styles.nextName}>{nextComponent.label}</Text>
                   <Text style={styles.nextDesc} numberOfLines={2}>{nextComponent.shortDesc}</Text>
                 </View>

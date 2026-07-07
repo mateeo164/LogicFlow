@@ -38,7 +38,7 @@ function ComponentDetail({ component, onNext }: { component: PCComponent; onNext
           </View>
           <Text style={detail.name}>{component.label}</Text>
           <View style={detail.heroMeta}>
-            <Pill label={`Paso ${component.assemblyStep} de 8`} tone="navy" />
+            <Pill label={`Paso ${component.assemblyStep} de ${PC_COMPONENTS.length}`} tone="navy" />
             <Pill label={`+${component.xpValue} XP`} tone="accent" />
           </View>
         </View>
@@ -192,7 +192,7 @@ export function LearnScreen() {
           <View style={styles.listHeader}>
             <Text style={Typography.overline}>BIBLIOTECA</Text>
             <Text style={Typography.h1}>Aprende</Text>
-            <Text style={styles.listSub}>8 componentes esenciales, explicados paso a paso.</Text>
+            <Text style={styles.listSub}>{PC_COMPONENTS.length} componentes esenciales, explicados paso a paso.</Text>
           </View>
         }
         renderItem={({ item, index }) => (

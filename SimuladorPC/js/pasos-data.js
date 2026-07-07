@@ -23,7 +23,29 @@ export const PASOS = [
         drone: {
             video:       'El gabinete es el esqueleto de tu PC: aloja y protege todos los componentes. Fíjate en sus bahías, soportes y zonas de ventilación.',
             instalacion: 'Coloca el gabinete en tu mesa de trabajo. Haz clic en el disco luminoso para posicionarlo y empezar el montaje.',
-            exito:       '¡Listo! El gabinete está en su lugar. Ahora montaremos la placa base dentro de él.'
+            exito:       '¡Listo! El gabinete está en su lugar. Empecemos por los ventiladores para el flujo de aire.'
+        }
+    },
+    {
+        // NOTA: pos/rot son aproximados; calibrar en el gabinete con __lab.set('fans', {x,y,z,rx,ry,rz}).
+        id: 'fans', brand: 'Lian Li', nombre: 'Ventiladores de Gabinete',
+        modelo: 'UNI FAN 120 ARGB', subtitulo: 'Mantienen el aire fresco circulando',
+        color: 0x38bdf8,
+        ruta: 'assets/3d_models/rgb_pc_fan.opt.glb',
+        size: 0.32, pos: new THREE.Vector3(0.18, 1.05, 0.20), rot: { x: 0, y: 0, z: 0 },
+        specs: { 'Tamaño': '120 mm', 'Flujo de aire': '58 CFM', 'Velocidad': '1900 RPM', 'Conector': 'PWM 4-pin', 'Iluminación': 'ARGB' },
+        hechos: [
+            'Los ventiladores crean un flujo de aire que expulsa el calor del gabinete',
+            'Entra aire frío por el frente y sale el caliente por atrás y arriba',
+            'Una presión de aire positiva reduce la acumulación de polvo',
+            'El conector PWM regula su velocidad según la temperatura',
+            'La iluminación ARGB se sincroniza con el resto del sistema'
+        ],
+        videoId: null,
+        drone: {
+            video:       'Los ventiladores mantienen todo el sistema fresco. Fíjate en la dirección de las aspas: marcan por dónde entra y sale el aire.',
+            instalacion: 'Selecciona los ventiladores y colócalos en el frente del gabinete para crear el flujo de aire de entrada.',
+            exito:       '¡Genial! Con la ventilación lista, el aire circulará y todo se mantendrá fresco. Sigamos con la placa base.'
         }
     },
     {
@@ -134,7 +156,51 @@ export const PASOS = [
         drone: {
             video:       'El SSD M.2 NVMe es el almacenamiento más rápido. Se inserta en ángulo en el slot M.2 y se asegura con un tornillo, ¡sin cables!',
             instalacion: 'Selecciona el SSD y colócalo en el slot M.2 de la placa base. Se inserta en ángulo y luego se baja para fijarlo.',
-            exito:       '¡Increíble! Almacenamiento ultrarrápido instalado. Ahora la parte visual: la tarjeta gráfica.'
+            exito:       '¡Increíble! Almacenamiento ultrarrápido instalado. Ahora sumemos un disco duro para el almacenamiento masivo.'
+        }
+    },
+    {
+        // NOTA: pos/rot aproximados; calibrar con __lab.set('hdd', {x,y,z,rx,ry,rz}).
+        id: 'hdd', brand: 'Western Digital', nombre: 'Disco Duro (HDD)',
+        modelo: 'WD Green 1 TB', subtitulo: 'Almacenamiento masivo y económico',
+        color: 0x84cc16,
+        ruta: 'assets/3d_models/wd_green_1tb_hard_disk_hdd.opt.glb',
+        size: 0.42, pos: new THREE.Vector3(0.20, 0.50, 0.08), rot: { x: 0, y: 0, z: 0 },
+        specs: { 'Capacidad': '1 TB', 'Formato': '3.5"', 'Interfaz': 'SATA III', 'Velocidad': '5400 RPM', 'Caché': '64 MB' },
+        hechos: [
+            'El disco duro guarda grandes cantidades de datos a bajo costo',
+            'Usa platos magnéticos que giran y un cabezal que lee y escribe',
+            'Es más lento que un SSD, pero ofrece mucha más capacidad por el precio',
+            'Ideal para archivos, fotos, videos y copias de seguridad',
+            'Se conecta a la placa base con un cable de datos SATA'
+        ],
+        videoId: null,
+        drone: {
+            video:       'El disco duro mecánico ofrece mucho espacio barato. Necesita DOS cables: uno de datos (SATA) y uno de energía de la fuente.',
+            instalacion: 'Selecciona el disco duro y colócalo en la bahía de 3.5" del gabinete, en la zona inferior.',
+            exito:       '¡Bien! Ya tienes almacenamiento masivo. Ahora conectémoslo con su cable de datos SATA.'
+        }
+    },
+    {
+        // NOTA: pos/rot aproximados; calibrar con __lab.set('sata', {x,y,z,rx,ry,rz}).
+        id: 'sata', brand: 'SATA', nombre: 'Cable de Datos SATA',
+        modelo: 'SATA III 6 Gb/s', subtitulo: 'Comunica el disco con la placa base',
+        color: 0xef4444,
+        ruta: 'assets/3d_models/sata_cable.opt.glb',
+        size: 0.30, pos: new THREE.Vector3(0.05, 0.62, -0.02), rot: { x: 0, y: 0, z: 0 },
+        specs: { 'Estándar': 'SATA III', 'Ancho de banda': '6 Gb/s', 'Conector': '7 pines', 'Longitud': '50 cm', 'Traba': 'Clip de seguridad' },
+        hechos: [
+            'El cable SATA transporta los datos entre el disco y la placa base',
+            'Tiene un conector en "L" que solo entra en la orientación correcta',
+            'SATA III alcanza hasta 6 Gb/s, suficiente para discos mecánicos',
+            'El clip metálico evita que se desconecte por la vibración',
+            'Es distinto del cable de energía SATA, que viene de la fuente'
+        ],
+        videoId: null,
+        drone: {
+            video:       'El cable SATA es la vía de datos del disco. Su forma en "L" impide conectarlo al revés: fíjate en la muesca.',
+            instalacion: 'Selecciona el cable SATA y conéctalo entre el disco duro y el puerto SATA de la placa base.',
+            exito:       '¡Conectado! El disco ya puede comunicarse con el sistema. Ahora la parte visual: la tarjeta gráfica.'
         }
     },
     {

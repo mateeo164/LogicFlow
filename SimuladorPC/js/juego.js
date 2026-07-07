@@ -75,6 +75,12 @@ const mixers = []
 const propsTaller = {}
 const _texLoader = new THREE.TextureLoader()
 
+// SSD desarmable (teardown de la Fase 2A). El clip original targetea huesos
+// "Bone.001_SSD" que GLTFLoader renombra sin punto → no bindea. Como las 4 capas
+// son mallas normales accesibles por nombre, animamos su despiece a mano:
+// ssdPartes = [{ nodo, rest, dir }]; ssdProg va de 0 (armado) a 1 (desarmado).
+let ssdPartes = null, ssdProg = 0, ssdTarget = 0
+
 const ES_TACTIL = window.matchMedia('(pointer: coarse)').matches || !window.matchMedia('(pointer: fine)').matches
 
 let walkControls = null
@@ -100,6 +106,7 @@ let camTween     = null
 let iniciandoProc = false
 
 let modoReto = null
+let retoMedicion = false   // Fase 2C: modo multímetro activo durante la inspección de un reto
 
 function pedirActualizarSombras() {
     if (renderer) renderer.shadowMap.needsUpdate = true
@@ -159,7 +166,6 @@ function mostrarOverlay(id) {
     if (id === '3d') {
         document.getElementById('sim-main').hidden          = false
         document.getElementById('sim-header').style.display = ''
-        document.getElementById('drone-float').hidden       = false
         setTimeout(resizeRenderer, 60)
     } else {
         document.getElementById('sim-header').style.display = 'none'
@@ -252,10 +258,9 @@ function mostrarFase3D(idx) {
     setHint(`<strong>Instala: ${paso.nombre}</strong> — haz clic en la pieza dentro de la vitrina y luego en el disco luminoso.`)
 }
 
-function droneHabla(msg) {
-    const el = document.getElementById('drone-float-msg')
-    if (el) el.textContent = msg
-}
+// Asistente/dron flotante desactivado en el simulador 3D: no muestra burbujas
+// de mensaje que tapen la interacción.
+function droneHabla(msg) {}
 
 // Evaluación formativa: micro-pregunta conceptual tras instalar un componente.
 // Da retroalimentación del PORQUÉ y suma a la nota de comprensión.
@@ -736,23 +741,16 @@ function updateMissionProgress() {
     dibujarPantallaTaller()
 }
 
+// La consola/registro en pantalla se eliminó: no se muestra ningún log al
+// usuario. Se conserva solo la retroalimentación sonora (no tapa la interacción).
 function appendLog(msg, type = 'system') {
-    const log = document.getElementById('terminal-log')
-    if (log) {
-        const line = document.createElement('div')
-        line.className = `log-line ${type}`
-        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
-        log.appendChild(line)
-        log.scrollTop = log.scrollHeight
-    }
     if (type === 'success') LFSound.success()
     else if (type === 'warn' || type === 'warning') LFSound.error()
 }
 
-function setHint(msg) {
-    const el = document.getElementById('hint-box')
-    if (el) el.innerHTML = msg
-}
+// Banner de pista flotante desactivado: no se muestra nada sobre el 3D.
+// La guía del paso vive en el panel lateral (#instruction-p) y el encabezado.
+function setHint(msg) {}
 
 function handleSelection(componentId) {
     const idx  = PASOS.findIndex(p => p.id === componentId)
@@ -809,9 +807,9 @@ function onCanvasClick(e) {
         const { pasoId, idx } = sHits[0].object.userData
         const paso = PASOS[idx]
         if (idx < indiceActual) {
-            droneHabla(`"${paso.nombre}" ya está instalado en el PC.`)
+            mostrarErrorVisual(`"${paso.nombre}" ya está instalado.`)
         } else if (idx > indiceActual) {
-            droneHabla(`Todavía no toca "${paso.nombre}". Ahora corresponde instalar "${PASOS[indiceActual]?.nombre}".`)
+            mostrarErrorVisual(`Aún no toca: instala "${PASOS[indiceActual]?.nombre}".`)
         } else {
             handleSelection(pasoId)
         }
@@ -822,7 +820,8 @@ function onCanvasClick(e) {
         const pHits = raycaster.intersectObjects(propsInteractivos, true)
         if (pHits.length) {
             let obj = pHits[0].object
-            while (obj && !obj.userData.fact) obj = obj.parent
+            while (obj && !obj.userData.fact && !obj.userData.onClic) obj = obj.parent
+            if (obj?.userData.onClic) { obj.userData.onClic(); return }
             if (obj?.userData.fact) { droneHabla(obj.userData.fact); return }
         }
     }
@@ -1087,6 +1086,16 @@ function initMotor3D() {
             pedirActualizarSombras()
             const r = n => Math.round(n * 1000) / 1000
             return { pos: g.position.toArray().map(r), ry: r(g.rotation.y) }
+        },
+        ssdSet(p = 1) {   // debug: evalúa el despiece del SSD en [0..1] y renderiza
+            if (ssdPartes) { ssdProg = ssdTarget = p; aplicarTeardownSSD(p); renderer.render(scene, camera) }
+            return p
+        },
+        medirReto(id) {   // debug: activa el multímetro y mide un componente en un reto
+            if (!modoReto || modoReto.fase !== 'inspeccion') return 'no hay reto en inspección'
+            retoMedicion = true
+            medirComponenteReto(id)
+            return medicionReto(id)
         },
         medir() {
             const r = n => Math.round(n * 1000) / 1000
@@ -1541,9 +1550,7 @@ function intentarInstalar() {
             componenteEsperado: needed.id,
             segundos: elapsed
         })
-        droneHabla(`¡Incorrecto! Necesitas "${needed.nombre}", no "${heldComponent.nombre}".`)
-        appendLog(`Componente incorrecto: tienes "${heldComponent.nombre}", se necesita "${needed.nombre}".`, 'warn')
-        setHint(`<strong>Incorrecto.</strong> Llevas "<em>${heldComponent.nombre}</em>" pero se necesita "<strong>${needed.nombre}</strong>".`)
+        mostrarErrorVisual(`Incorrecto: se necesita "${needed.nombre}", no "${heldComponent.nombre}".`)
 
         if (heldMesh) {
             let cnt = 0
@@ -1581,7 +1588,8 @@ function interactuarE() {
             const pHits = eRay.intersectObjects(propsInteractivos, true)
             if (pHits.length) {
                 let obj = pHits[0].object
-                while (obj && !obj.userData.fact) obj = obj.parent
+                while (obj && !obj.userData.fact && !obj.userData.onClic) obj = obj.parent
+                if (obj?.userData.onClic) { obj.userData.onClic(); return }
                 if (obj?.userData.fact) { droneHabla(obj.userData.fact); return }
             }
             droneHabla('Acércate a la estantería (detrás de ti) y apunta a un componente para agarrarlo.')
@@ -1610,12 +1618,17 @@ function interactuarEReto(eRay) {
 
     if (M.fase === 'inspeccion') {
         const dHits = eRay.intersectObjects(slotDiscs)
-        if (dHits.length) { inspeccionarReto(dHits[0].object.userData.id); return }
+        if (dHits.length) {
+            const id = dHits[0].object.userData.id
+            if (retoMedicion) medirComponenteReto(id); else inspeccionarReto(id)
+            return
+        }
 
         const pHits = eRay.intersectObjects(propsInteractivos, true)
         if (pHits.length) {
             let obj = pHits[0].object
-            while (obj && !obj.userData.fact) obj = obj.parent
+            while (obj && !obj.userData.fact && !obj.userData.onClic) obj = obj.parent
+            if (obj?.userData.onClic) { obj.userData.onClic(); return }
             if (obj?.userData.fact) { droneHabla(obj.userData.fact); return }
         }
         droneHabla('Apunta al disco luminoso de un componente y pulsa E para inspeccionarlo. Cuando sepas cuál falla, pulsa Esc y márcalo en el panel de diagnóstico.')
@@ -1654,7 +1667,9 @@ function interactuarEReto(eRay) {
 
 const PROCEDIMIENTOS = { cpu: construirProcedimientoCPU, mb: construirProcedimientoMB, cooler: construirProcedimientoCooler, ram: construirProcedimientoRAM, gpu: construirProcedimientoGPU, power: construirProcedimientoPSU }
 
-function tieneProcedimiento(id) { return !!PROCEDIMIENTOS[id] }
+// Procedimiento de instalación guiada desactivado por completo: al instalar una
+// pieza se coloca directamente (finalizarPaso), sin pasos, hotspots ni panel.
+function tieneProcedimiento(id) { return false }
 
 function iniciarProcedimiento(paso) {
     if (procActivo) return
@@ -2734,7 +2749,7 @@ const RUTA_PROP = 'assets/3d_models/'
 function cargarProp(archivo, opts = {}) {
     const {
         size = 1, x = 0, z = 0, y = SALA.y0, rotY = 0, rotX = 0,
-        fact = null, id = null, anim = true, centroY = null, onReady = null
+        fact = null, id = null, anim = true, centroY = null, onReady = null, onClic = null
     } = opts
     crearGLTFLoader().load(RUTA_PROP + archivo, (gltf) => {
         const inner = gltf.scene
@@ -2758,7 +2773,8 @@ function cargarProp(archivo, opts = {}) {
             gltf.animations.forEach(cl => mixer.clipAction(cl).play())
             mixers.push(mixer)
         }
-        if (fact) { g.userData.fact = fact; propsInteractivos.push(g) }
+        if (onClic) g.userData.onClic = onClic
+        if (fact || onClic) { if (fact) g.userData.fact = fact; propsInteractivos.push(g) }
         if (id) propsTaller[id] = g
         pedirActualizarSombras()
         if (onReady) onReady(g, half)
@@ -2800,6 +2816,97 @@ function cargarPropsTaller() {
         fact: 'Ventilador RGB de repuesto: sus aspas mueven el aire para refrigerar el gabinete.'
     })
     cargarProp('rgb_fan.opt.glb', { id: 'fan2', size: 0.26, x: 0.95, z: -0.78, y: 0 })
+
+    // Fase 2A: SSD desarmable + herramientas interactivas.
+    cargarSSDTeardown()
+    cargarHerramientas()
+}
+
+// SSD de 2.5" desarmable: al hacer clic (o E al caminar) reproduce su despiece
+// —carcasa, PCB con controlador, chips NAND y tornillos— y al volver a pulsar se
+// rearma. Es un "mira por dentro" educativo. No se auto-reproduce: el clip se
+// controla por tiempo desde animar() según ssdProg→ssdTarget.
+function cargarSSDTeardown() {
+    crearGLTFLoader().load(RUTA_PROP + 'ssd_solid-state_drive.opt.glb', (gltf) => {
+        const inner = gltf.scene
+        let box = new THREE.Box3().setFromObject(inner)
+        const dim = box.getSize(new THREE.Vector3())
+        inner.scale.setScalar(0.42 / (Math.max(dim.x, dim.y, dim.z) || 1))
+        box = new THREE.Box3().setFromObject(inner)
+        inner.position.sub(box.getCenter(new THREE.Vector3()))
+        const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5)
+        optimizarMateriales(inner)
+
+        const g = new THREE.Group()
+        g.add(inner)
+        g.rotation.y = 0.4
+        g.position.set(1.05, half.y, 0.55)          // apoyado en la mesa (y=0)
+        g.userData.onClic = toggleSSDTeardown
+        g.userData.fact = 'SSD de 2.5": haz clic para desarmarlo y ver sus capas por dentro.'
+        scene.add(g)
+        propsInteractivos.push(g)
+        propsTaller.ssd = g
+
+        // Recolectamos las 4 capas (carcasa sup., PCB, tornillos, carcasa inf.) y
+        // guardamos su posición de reposo. El despiece las separa hacia arriba en
+        // el eje local Y, escalonadas, según ssdProg.
+        const orden = ['SSD_Case_1', 'SSD_Board', 'SSD_Screws', 'SSD_Case_2']
+        const nodos = {}
+        inner.traverse(o => { if (orden.includes(o.name)) nodos[o.name] = o })
+        ssdPartes = orden.filter(n => nodos[n]).map((n, i) => ({
+            nodo: nodos[n], rest: nodos[n].position.clone(), sep: i * 2.6
+        }))
+        aplicarTeardownSSD(0)
+
+        pedirActualizarSombras()
+        appendLog('SSD de inspección listo: haz clic para desarmarlo.', 'success')
+    }, undefined, () => appendLog('SSD de inspección no disponible.', 'system'))
+}
+
+// Coloca cada capa del SSD en rest + separación·prog a lo largo del eje local Y.
+function aplicarTeardownSSD(prog) {
+    if (!ssdPartes) return
+    for (const p of ssdPartes) p.nodo.position.set(p.rest.x, p.rest.y + p.sep * prog, p.rest.z)
+}
+
+function toggleSSDTeardown() {
+    if (!ssdPartes) return
+    ssdTarget = ssdTarget > 0.5 ? 0 : 1
+    const abriendo = ssdTarget > 0.5
+    LFSound.click()
+    droneHabla(abriendo
+        ? 'Mira un SSD por dentro: la carcasa, la placa PCB con el controlador y los chips de memoria NAND, y los tornillos que lo cierran. ¡Sin partes móviles!'
+        : 'Lo armamos de nuevo. Al no tener partes móviles, un SSD es silencioso y resiste golpes mucho mejor que un disco duro.')
+    setHint(abriendo
+        ? '<strong>SSD desarmado</strong> — carcasa · PCB + controlador · chips NAND · tornillos. Clic para armarlo de nuevo.'
+        : '<strong>SSD armado.</strong> Clic para desarmarlo otra vez.')
+    appendLog(abriendo ? 'SSD desarmado para inspección.' : 'SSD rearmado.', 'info')
+}
+
+// Herramientas reales del taller como props interactivos (clic → el dron explica
+// su uso). Colocadas alrededor de la mesa y el banco.
+function cargarHerramientas() {
+    cargarProp('phillips_screwdriver..opt.glb', {
+        id: 'screwdriver', size: 0.36, x: -0.7, z: 0.7, y: 0, rotY: 0.5,
+        fact: 'Destornillador Phillips #2: la herramienta esencial para armar un PC. Si es imantado, sujeta los tornillos y evita que caigan dentro del gabinete.'
+    })
+    cargarProp('syringe.opt.glb', {
+        id: 'paste', size: 0.3, x: -0.35, z: 0.85, y: 0, rotY: -0.4,
+        fact: 'Pasta térmica: se aplica una gota del tamaño de un guisante sobre el CPU. Rellena los microporos y conduce el calor al disipador.'
+    })
+    cargarProp('cc0_-_wooden_spatula.opt.glb', {
+        id: 'spatula', size: 0.16, x: -0.15, z: 0.9, y: 0, rotY: 0.8,
+        fact: 'Espátula: sirve para esparcir la pasta térmica de forma uniforme, aunque muchos prefieren dejar que la presión del disipador la reparta.'
+    })
+    cargarProp('clean_paint_brush.opt.glb', {
+        id: 'brush', size: 0.34, x: 0.25, z: 0.85, y: 0, rotY: -0.7,
+        fact: 'Brocha antiestática: para limpiar el polvo de ventiladores y disipadores. El polvo es el enemigo nº1 de la temperatura.'
+    })
+    cargarProp('fluck__probs.opt.glb', {
+        id: 'multimeter', size: 0.5, x: 4.0, z: 2.55, y: -0.3, rotY: -Math.PI / 2,
+        fact: 'Multímetro: mide voltajes para diagnosticar la fuente y detectar componentes dañados. Clave en la estación de diagnóstico.',
+        onClic: clicMultimetro
+    })
 }
 
 // Banco de pruebas con periféricos encima. Se calcula la altura real de la
@@ -3546,8 +3653,39 @@ function optimizarMateriales(obj) {
         if (!n.isMesh) return
         n.castShadow = true
         n.receiveShadow = true
+        // Si la malla no tiene un 2º set de UV (uv1), forzamos los mapas al canal 0:
+        // algunos GLB del taller traen texCoord=1 en normal/AO sin TEXCOORD_1, lo que
+        // rompe la compilación del shader ("uv1 undeclared identifier").
+        const sinUv1 = !n.geometry?.attributes?.uv1
         const mats = Array.isArray(n.material) ? n.material : [n.material]
-        mats.forEach(m => { if (m) claves.forEach(k => optimizarTextura(m[k])) })
+        mats.forEach(m => {
+            if (!m) return
+            claves.forEach(k => {
+                const tex = m[k]
+                if (!tex) return
+                optimizarTextura(tex)
+                if (sinUv1 && tex.channel === 1) { tex.channel = 0; m.needsUpdate = true }
+            })
+        })
+    })
+}
+
+// Barrido de escena: en mallas sin 2º set de UV (uv1), fuerza al canal 0 cualquier
+// mapa que apunte al canal 1. Cubre los meshes FUSIONADOS de la vitrina
+// (fusionarMallasEstante), que se crean después de optimizarMateriales y pueden
+// perder el uv1 dejando el normalMap en canal 1 → "uv1 undeclared" al compilar.
+function sanearCanalesUv(root = scene) {
+    if (!root) return
+    const claves = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']
+    root.traverse(n => {
+        if (!n.isMesh || n.geometry?.attributes?.uv1) return
+        const mats = Array.isArray(n.material) ? n.material : [n.material]
+        mats.forEach(m => {
+            if (!m) return
+            claves.forEach(k => {
+                if (m[k] && m[k].channel === 1) { m[k].channel = 0; m.needsUpdate = true }
+            })
+        })
     })
 }
 
@@ -3565,6 +3703,7 @@ function precargarModelos() {
     const marcarCargado = () => {
         cargados++
         setLoadingProgress(cargados, total)
+        sanearCanalesUv()   // corrige el normalMap del mesh fusionado de la vitrina
         pedirActualizarSombras()
         if (cargados >= total) { clearTimeout(safety); ocultarLoading() }
     }
@@ -3666,6 +3805,16 @@ function animar() {
 
     if (mixers.length) for (const m of mixers) m.update(delta)
 
+    // Teardown del SSD: avanza suavemente ssdProg hacia ssdTarget (~1.1 s) y
+    // reubica las capas.
+    if (ssdPartes && ssdProg !== ssdTarget) {
+        const d = Math.min(Math.abs(ssdTarget - ssdProg), delta / 1.1)
+        ssdProg += Math.sign(ssdTarget - ssdProg) * d
+        if (Math.abs(ssdTarget - ssdProg) < 0.001) ssdProg = ssdTarget
+        aplicarTeardownSSD(ssdProg)
+        pedirActualizarSombras()
+    }
+
     PASOS.forEach(p => {
         if (p.marker && p.marker.visible) {
             if (camera) p.marker.quaternion.copy(camera.quaternion)
@@ -3743,31 +3892,58 @@ function resizeRenderer() {
     renderer.setSize(w, h, false)
 }
 
-let _logroToastCSS = false
-function notificarLogro(texto, icono = '🏅') {
-    if (!_logroToastCSS) {
+// Toast de logro en pantalla desactivado: los logros se siguen otorgando y
+// guardando, pero no se muestra ninguna notificación que tape la interacción.
+function notificarLogro(texto, icono = '🏅') {}
+
+// Señal de error MUY notoria y transitoria para cualquier movimiento erróneo:
+// encierra el visor 3D en un marco rojo, muestra una ✕ grande al centro, suena el
+// tono de error y vibra en móvil. No bloquea la interacción (pointer-events:none)
+// y se autodestruye (~1s). Es el reemplazo visible de los avisos que se quitaron.
+let _errFxCSS = false
+function mostrarErrorVisual(mensaje = '') {
+    LFSound.error()
+    if (navigator.vibrate) { try { navigator.vibrate([90, 40, 90]) } catch (_) {} }
+
+    const host = document.querySelector('.sim-stage-viewport')
+        || document.getElementById('canvas-container') || document.body
+
+    if (!_errFxCSS) {
         const st = document.createElement('style')
         st.textContent =
-            '@keyframes lfLogroIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}' +
-            '@keyframes lfLogroOut{to{opacity:0;transform:translateY(-10px)}}' +
-            '.lf-logro-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9999;' +
-            'display:flex;align-items:center;gap:12px;max-width:420px;padding:13px 18px;border-radius:14px;' +
-            'background:linear-gradient(135deg,#11213a,#0e1726);border:1px solid #2b6cff55;color:#eaf2ff;' +
-            'box-shadow:0 14px 40px rgba(0,0,0,.45);font-family:"Segoe UI",Arial,sans-serif;animation:lfLogroIn .35s ease}' +
-            '.lf-logro-toast .ic{font-size:26px;filter:drop-shadow(0 2px 6px #2b6cff88)}' +
-            '.lf-logro-toast b{display:block;font-size:12px;letter-spacing:.6px;color:#7fb0ff;text-transform:uppercase}' +
-            '.lf-logro-toast span{font-size:14px;color:#dbe7f5}'
+            '@keyframes lfErrFrame{0%{opacity:0}10%{opacity:1}70%{opacity:1}100%{opacity:0}}' +
+            '@keyframes lfErrX{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-15deg)}' +
+            '40%{opacity:1;transform:translate(-50%,-50%) scale(1.12) rotate(0)}' +
+            '60%{transform:translate(-50%,-50%) scale(.94)}' +
+            '100%{opacity:0;transform:translate(-50%,-50%) scale(1.2)}}' +
+            '@keyframes lfErrMsg{0%{opacity:0;transform:translate(-50%,10px)}' +
+            '15%{opacity:1;transform:translate(-50%,0)}80%{opacity:1}100%{opacity:0}}' +
+            '.lf-err-frame{position:absolute;inset:0;z-index:70;pointer-events:none;' +
+            'box-shadow:inset 0 0 0 7px #ff2323, inset 0 0 120px 24px rgba(255,25,25,.55);' +
+            'background:rgba(255,20,20,.12);animation:lfErrFrame .9s ease forwards}' +
+            '.lf-err-x{position:absolute;left:50%;top:50%;z-index:71;pointer-events:none;' +
+            'font-family:system-ui,Arial,sans-serif;font-weight:900;color:#ff2323;' +
+            'font-size:min(38vh,260px);line-height:1;' +
+            'text-shadow:0 8px 30px rgba(0,0,0,.6),0 0 40px rgba(255,40,40,.9);' +
+            'animation:lfErrX .9s cubic-bezier(.2,.9,.3,1) forwards}' +
+            '.lf-err-msg{position:absolute;left:50%;bottom:9%;z-index:72;pointer-events:none;' +
+            'background:#d31f1f;color:#fff;font-weight:800;font-size:15px;letter-spacing:.3px;' +
+            'padding:10px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.45);' +
+            'max-width:82%;text-align:center;animation:lfErrMsg 1.6s ease forwards}'
         document.head.appendChild(st)
-        _logroToastCSS = true
+        _errFxCSS = true
     }
-    const el = document.createElement('div')
-    el.className = 'lf-logro-toast'
-    el.innerHTML = `<div class="ic">${icono}</div><div><b>¡Logro desbloqueado!</b><span>${texto}</span></div>`
-    document.body.appendChild(el)
-    setTimeout(() => {
-        el.style.animation = 'lfLogroOut .4s ease forwards'
-        setTimeout(() => el.remove(), 400)
-    }, 3200)
+
+    const frame = document.createElement('div'); frame.className = 'lf-err-frame'
+    const x = document.createElement('div'); x.className = 'lf-err-x'; x.textContent = '✕'
+    host.appendChild(frame); host.appendChild(x)
+    setTimeout(() => { frame.remove(); x.remove() }, 950)
+
+    if (mensaje) {
+        const m = document.createElement('div'); m.className = 'lf-err-msg'; m.textContent = mensaje
+        host.appendChild(m)
+        setTimeout(() => m.remove(), 1650)
+    }
 }
 
 const LS_KEY = 'lf_instalados'
@@ -3879,8 +4055,8 @@ function comenzarInspeccionReto() {
     renderPanelReto()
     dibujarPantallaTaller()
     actualizarNotaReto()
-    droneHabla(`El cliente dice: “${M.reto.cliente}”. Haz clic en los discos de la PC para inspeccionar cada componente.`)
-    setHint(`<strong>${M.reto.icono} ${M.reto.titulo}</strong> — inspecciona los componentes (clic en los discos) y diagnostica la falla en el panel derecho.`)
+    droneHabla(`El cliente dice: “${M.reto.cliente}”. Haz clic en los discos para inspeccionar cada componente. Y si quieres medir voltajes, activa el multímetro en el panel de diagnóstico.`)
+    setHint(`<strong>${M.reto.icono} ${M.reto.titulo}</strong> — inspecciona los componentes (clic en los discos), mide voltajes con el 🔌 multímetro y diagnostica la falla en el panel derecho.`)
     appendLog(`Reto iniciado: ${M.reto.titulo}`, 'info')
 
     const title = document.getElementById('mission-title')
@@ -3964,6 +4140,10 @@ function renderPanelReto() {
             Inspecciona con clic en los discos (${M.inspeccionados.size}/${PASOS.length} revisados) y marca la pieza dañada.
         </div>
         <ul style="list-style:none;padding:0;margin:0 0 12px;">${filas}</ul>
+        <button id="btn-multimetro-reto"
+            style="width:100%;padding:8px;border-radius:8px;margin-bottom:8px;border:1px solid rgba(57,255,120,.4);background:${retoMedicion ? 'rgba(57,255,120,.20)' : 'rgba(57,255,120,.06)'};color:#7dffa8;font-size:.8rem;cursor:pointer;">
+            🔌 Multímetro: ${retoMedicion ? 'ON · clic en un componente para medir' : 'OFF · activar (gratis)'}
+        </button>
         <button id="btn-pista-reto" ${quedanPistas <= 0 ? 'disabled' : ''}
             style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,213,74,.4);background:rgba(255,213,74,.08);color:#ffd54a;font-size:.8rem;cursor:${quedanPistas > 0 ? 'pointer' : 'default'};opacity:${quedanPistas > 0 ? 1 : 0.45};">
             💡 Pedir pista a TechBot (−1 punto) · quedan ${quedanPistas}
@@ -3971,6 +4151,7 @@ function renderPanelReto() {
 
     el.querySelectorAll('[data-diag]').forEach(btn =>
         btn.addEventListener('click', () => diagnosticarReto(btn.getAttribute('data-diag'))))
+    el.querySelector('#btn-multimetro-reto')?.addEventListener('click', toggleMultimetroReto)
     el.querySelector('#btn-pista-reto')?.addEventListener('click', pedirPistaReto)
 }
 
@@ -4012,6 +4193,8 @@ function diagnosticarReto(id) {
 
     if (id === M.reto.componenteFalla) {
         M.fase = 'reparacion'
+        retoMedicion = false
+        ocultarMultimetroReadout()
         const m = modelos3D[id]
         if (m) { m.visible = false; pedirActualizarSombras() }
         PASOS.forEach(p => { if (p.marker) p.marker.visible = false })
@@ -4024,12 +4207,116 @@ function diagnosticarReto(id) {
         renderPanelReto()
     } else {
         M.erroresDiag++
-        const info = M.reto.inspecciones[id]
-        appendLog(`✗ Diagnóstico incorrecto: ${paso.nombre} (−2 puntos).`, 'warn')
-        droneHabla(`No es ${paso.nombre}. ${info ? info.texto : 'Ese componente funciona correctamente.'} Sigue investigando.`)
-        setHint(`<strong>✗ Incorrecto (−2 puntos).</strong> ${paso.nombre} no es la causa. Revisa las inspecciones con ⚠.`)
+        appendLog(`✗ Diagnóstico incorrecto: ${paso.nombre} (−2 puntos).`, 'system')
+        mostrarErrorVisual(`Incorrecto (−2 puntos): ${paso.nombre} no es la falla.`)
         actualizarNotaReto()
     }
+}
+
+// ── Fase 2C: multímetro de diagnóstico ──────────────────────────────────────
+// Riel/voltaje nominal esperado por componente (con un decimal realista para que
+// parezca una lectura de instrumento). Los cables/switch se miden por continuidad.
+const RIELES = {
+    power:   { et: 'Riel principal (+12 V)',     v: 12.09, u: 'V' },
+    mb:      { et: 'Standby +5 V (5VSB)',        v: 5.04,  u: 'V' },
+    cpu:     { et: 'Vcore del CPU',              v: 1.28,  u: 'V' },
+    cooler:  { et: 'Conector CPU_FAN (+12 V)',   v: 11.98, u: 'V' },
+    fans:    { et: 'Ventiladores (+12 V)',       v: 12.05, u: 'V' },
+    ram:     { et: 'VDIMM de la RAM',            v: 1.35,  u: 'V' },
+    storage: { et: 'Slot M.2 (+3.3 V)',          v: 3.31,  u: 'V' },
+    hdd:     { et: 'Disco SATA (+12 V)',         v: 12.02, u: 'V' },
+    gpu:     { et: 'PCIe (+12 V) de la GPU',     v: 12.07, u: 'V' },
+    sata:    { et: 'Continuidad de datos',       cont: true },
+    case:    { et: 'Botón de encendido',         cont: true }
+}
+
+// Falla eléctrica = la fuente no entrega energía → TODO el sistema mide 0 V. Es el
+// caso donde el multímetro es decisivo; en fallas térmicas/lógicas/de VRAM los
+// voltajes salen normales (y eso también es un dato: la avería no es eléctrica).
+function esFallaElectricaReto(M) { return !!M && M.reto.componenteFalla === 'power' }
+
+function medicionReto(id) {
+    const M = modoReto
+    const base = RIELES[id] || { et: 'Voltaje', v: 5.0, u: 'V' }
+    if (base.cont) {
+        const ok = id !== M.reto.componenteFalla
+        return { etiqueta: base.et, valorStr: ok ? 'OK · cerrado' : 'ABIERTO', ok, esVoltaje: false }
+    }
+    if (esFallaElectricaReto(M)) return { etiqueta: base.et, valorStr: `0.00 ${base.u}`, ok: false, esVoltaje: true }
+    return { etiqueta: base.et, valorStr: `${base.v.toFixed(2)} ${base.u}`, ok: true, esVoltaje: true }
+}
+
+function comentarioMedicion(m, id) {
+    if (!m.esVoltaje) return m.ok ? 'El cable tiene continuidad: los datos pueden pasar.' : 'Cable cortado: no hay continuidad.'
+    if (!m.ok) {
+        if (id === 'power') return 'La fuente NO entrega voltaje en sus rieles: está muerta. Aquí está el origen del problema.'
+        return 'Marca 0 V: este componente no recibe energía. En esta PC nada tiene voltaje → rastrea el camino de la corriente hasta la fuente.'
+    }
+    return 'Voltaje dentro de rango. Recuerda: el multímetro delata fallas de ALIMENTACIÓN; si todo mide bien, la avería es de otro tipo (temperatura, RAM o video).'
+}
+
+function medirComponenteReto(id) {
+    const M = modoReto
+    const paso = PASOS.find(p => p.id === id)
+    if (!paso) return
+    M.inspeccionados.add(id)
+    const m = medicionReto(id)
+    const coment = comentarioMedicion(m, id)
+    mostrarMultimetroReadout(paso, m)
+    const specs = document.getElementById('specs-content')
+    if (specs) specs.innerHTML = `
+        <div style="font-weight:700;margin-bottom:6px;">🔌 Medición · ${paso.nombre}</div>
+        <p style="font-size:.95rem;margin:0;font-weight:700;color:${m.ok ? '#22c55e' : '#ef4444'};">${m.etiqueta}: ${m.valorStr}</p>
+        <p style="font-size:.82rem;line-height:1.5;margin:6px 0 0;color:var(--text-700,#3a4a5e);">${coment}</p>`
+    appendLog(`Multímetro · ${paso.nombre}: ${m.etiqueta} = ${m.valorStr}`, m.ok ? 'info' : 'warn')
+    droneHabla(coment)
+    setHint(`<strong>🔌 ${paso.nombre}:</strong> ${m.etiqueta} = <strong>${m.valorStr}</strong>. ${m.ok ? 'Valor normal.' : 'Fuera de rango.'}`)
+    renderPanelReto()
+}
+
+function mostrarMultimetroReadout(paso, m) {
+    let el = document.getElementById('multimeter-readout')
+    if (!el) {
+        el = document.createElement('div')
+        el.id = 'multimeter-readout'
+        el.style.cssText = 'position:absolute;left:16px;bottom:16px;z-index:41;width:236px;background:#0a1512;border:2px solid #1c3a2e;border-radius:12px;padding:12px 14px;font-family:"JetBrains Mono",ui-monospace,monospace;box-shadow:0 8px 26px rgba(0,0,0,.5);'
+        ;(document.getElementById('canvas-container') || document.body).appendChild(el)
+    }
+    el.style.display = 'block'
+    const col = m.ok ? '#39ff14' : '#ff4d4d'
+    el.innerHTML = `
+        <div style="font-size:.6rem;letter-spacing:2px;color:#5a7a68;">MULTÍMETRO · DC</div>
+        <div style="font-size:1.55rem;font-weight:700;color:${col};text-shadow:0 0 8px ${col}66;margin:2px 0;">${m.valorStr}</div>
+        <div style="font-size:.68rem;color:#8fb3a2;">${m.etiqueta}</div>
+        <div style="font-size:.66rem;color:#6b8a7a;margin-top:5px;">● medido en ${paso.nombre}</div>`
+}
+
+function ocultarMultimetroReadout() {
+    const el = document.getElementById('multimeter-readout')
+    if (el) el.style.display = 'none'
+}
+
+function toggleMultimetroReto() {
+    const M = modoReto
+    if (!M || M.fase !== 'inspeccion') return
+    retoMedicion = !retoMedicion
+    if (retoMedicion) {
+        LFSound.click()
+        droneHabla('Multímetro en mano. Haz clic (o pulsa E) en el disco de un componente para medir su voltaje. Un riel a 0 V significa que no le llega energía.')
+        setHint('<strong>🔌 Modo multímetro: ON</strong> — clic en un componente para medir. Vuelve a pulsar el botón (o el multímetro) para guardarlo.')
+    } else {
+        ocultarMultimetroReadout()
+        droneHabla('Guardaste el multímetro. Vuelve a la inspección visual haciendo clic en los discos.')
+        setHint('Modo multímetro: OFF. Clic en los discos para inspeccionar visualmente.')
+    }
+    renderPanelReto()
+}
+
+// onClic del prop multímetro: dentro de un reto (inspección) alterna el modo
+// medición; fuera de un reto solo explica su uso.
+function clicMultimetro() {
+    if (modoReto && modoReto.fase === 'inspeccion') { toggleMultimetroReto(); return }
+    droneHabla('Multímetro digital: mide voltajes para diagnosticar la fuente y detectar componentes sin energía. Se usa en los retos de reparación.')
 }
 
 function clicReto(e) {
@@ -4040,7 +4327,11 @@ function clicReto(e) {
 
     if (M.fase === 'inspeccion') {
         const hits = raycaster.intersectObjects(slotDiscs)
-        if (hits.length) { inspeccionarReto(hits[0].object.userData.id); return }
+        if (hits.length) {
+            const id = hits[0].object.userData.id
+            if (retoMedicion) medirComponenteReto(id); else inspeccionarReto(id)
+            return
+        }
 
         const sHits = raycaster.intersectObjects(shelfMeshes)
         if (sHits.length) {
@@ -4081,7 +4372,8 @@ function clicReto(e) {
         const pHits = raycaster.intersectObjects(propsInteractivos, true)
         if (pHits.length) {
             let obj = pHits[0].object
-            while (obj && !obj.userData.fact) obj = obj.parent
+            while (obj && !obj.userData.fact && !obj.userData.onClic) obj = obj.parent
+            if (obj?.userData.onClic) { obj.userData.onClic(); return }
             if (obj?.userData.fact) droneHabla(obj.userData.fact)
         }
     }
@@ -4188,6 +4480,8 @@ function mostrarFinalReto(res, logrosNuevos, guardado) {
     document.getElementById('btn-reto-reintentar')?.addEventListener('click', () => location.reload())
     const panel = document.getElementById('reto-panel')
     if (panel) panel.style.display = 'none'
+    retoMedicion = false
+    ocultarMultimetroReadout()
 }
 
 async function initGame() {

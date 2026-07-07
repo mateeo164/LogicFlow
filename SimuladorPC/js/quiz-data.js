@@ -94,6 +94,39 @@ export const PREGUNTAS_COMPONENTE = {
         ],
         correcta: 1,
         explica: 'La fuente transforma la corriente alterna del enchufe en las corrientes continuas (12V, 5V, 3.3V) que necesitan los componentes, y sus protecciones evitan daños por picos o cortocircuitos.'
+    },
+    fans: {
+        pregunta: '¿Por qué importa la dirección en la que giran los ventiladores del gabinete?',
+        opciones: [
+            'No importa, todos empujan aire igual',
+            'Define si entran aire frío o expulsan el aire caliente, creando el flujo',
+            'Determina la velocidad del procesador',
+            'Sirve solo para la iluminación RGB'
+        ],
+        correcta: 1,
+        explica: 'La orientación marca el flujo de aire: unos ventiladores meten aire frío (frente) y otros sacan el caliente (atrás/arriba). Un buen flujo mantiene bajas las temperaturas de todo el sistema.'
+    },
+    hdd: {
+        pregunta: '¿Cuál es la principal ventaja del disco duro (HDD) frente al SSD?',
+        opciones: [
+            'Es mucho más rápido',
+            'No tiene partes móviles',
+            'Ofrece mucha más capacidad por el mismo precio',
+            'Arranca el sistema operativo más rápido'
+        ],
+        correcta: 2,
+        explica: 'El HDD es más lento que un SSD, pero cuesta mucho menos por cada gigabyte, así que es ideal para almacenamiento masivo (archivos, fotos, respaldos). Por velocidad, el SO conviene en el SSD.'
+    },
+    sata: {
+        pregunta: '¿Qué transporta el cable de datos SATA?',
+        opciones: [
+            'La energía de la fuente hacia el disco',
+            'Los datos entre el disco y la placa base',
+            'La señal de video hacia el monitor',
+            'La refrigeración líquida del sistema'
+        ],
+        correcta: 1,
+        explica: 'El cable SATA lleva los DATOS entre el disco y la placa base. La energía llega por un cable SATA distinto que viene de la fuente. Su conector en "L" evita conectarlo al revés.'
     }
 }
 

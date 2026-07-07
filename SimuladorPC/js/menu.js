@@ -7,11 +7,14 @@ import { initTutorPanel, initClasesEstudiante, initNotificaciones } from './tuto
 
 const COMPONENTS = [
     { id: 'case',    label: 'Gabinete (Case)',              icon: '🗄' },
+    { id: 'fans',    label: 'Ventiladores de gabinete',     icon: '🌀' },
     { id: 'mb',      label: 'Placa base (Motherboard)',     icon: '🖥' },
     { id: 'cpu',     label: 'Procesador (CPU)',             icon: '⚡' },
     { id: 'cooler',  label: 'Disipador (Cooler)',           icon: '❄' },
     { id: 'ram',     label: 'Memoria RAM',                  icon: '📊' },
     { id: 'storage', label: 'Almacenamiento NVMe',          icon: '💾' },
+    { id: 'hdd',     label: 'Disco duro (HDD)',             icon: '🗃' },
+    { id: 'sata',    label: 'Cable de datos SATA',          icon: '🔗' },
     { id: 'gpu',     label: 'Tarjeta gráfica (GPU)',        icon: '🎮' },
     { id: 'power',   label: 'Fuente de poder (PSU)',        icon: '🔌' }
 ]

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { PC_COMPONENTS } from '../constants/components'
 
 export interface ProgresoUsuario {
   id?: string
@@ -57,7 +58,7 @@ export async function guardarProgreso(params: {
   segundos?: number
   total?: number
 }): Promise<boolean> {
-  const { componenteId, segundos = 0, total = 8 } = params
+  const { componenteId, segundos = 0, total = PC_COMPONENTS.length } = params
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return false

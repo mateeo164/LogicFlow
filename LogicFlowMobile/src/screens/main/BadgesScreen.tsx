@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { obtenerProgreso, obtenerEstadisticas, ProgresoUsuario, Estadisticas } from '../../services/progress'
 import { obtenerLogrosUsuario, otorgarLogros } from '../../services/logros'
-import { calculateXp, getLevelProgress, LEVELS, GRANULAR_LOGROS, bonoPorLogros } from '../../constants/components'
+import { calculateXp, getLevelProgress, LEVELS, GRANULAR_LOGROS, bonoPorLogros, PC_COMPONENTS } from '../../constants/components'
 import { XPBar } from '../../components/XPBar'
 import { GradientCard } from '../../components/GradientCard'
 import { SectionTitle } from '../../components/ui'
@@ -35,7 +35,7 @@ function computeBadges(p: ProgresoUsuario | null, s: Estadisticas | null): Badge
     { id: 'tecnico', name: 'Técnico Certificado', description: 'Alcanza el nivel Técnico (300 XP).', icon: '🔧', unlocked: ['Técnico', 'Experto', 'Master Builder'].includes(levelName), xpReward: 100 },
     { id: 'experto', name: 'Experto en Hardware', description: 'Alcanza el nivel Experto (600 XP).', icon: '🧠', unlocked: ['Experto', 'Master Builder'].includes(levelName), xpReward: 200 },
     { id: 'master_builder', name: 'Master Builder', description: 'Alcanza el nivel máximo (1000 XP). El pináculo del ensamblaje.', icon: '👑', unlocked: levelName === 'Master Builder', xpReward: 500 },
-    { id: 'curioso', name: 'Curioso Digital', description: 'Aprende los 8 componentes en el módulo de aprendizaje.', icon: '📚', unlocked: instalados.length >= 8, xpReward: 100 },
+    { id: 'curioso', name: 'Curioso Digital', description: `Instala los ${PC_COMPONENTS.length} componentes del ensamble.`, icon: '📚', unlocked: instalados.length >= PC_COMPONENTS.length, xpReward: 100 },
     { id: 'perseverante', name: 'Perseverante', description: 'Completa 3 simulaciones de ensamblaje.', icon: '🏆', unlocked: simulaciones >= 3, xpReward: 300 },
   ]
 }

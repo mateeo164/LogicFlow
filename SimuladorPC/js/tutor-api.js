@@ -98,6 +98,14 @@ export async function misClasesEstudiante() {
     return Array.isArray(data) ? data : []
 }
 
+// Ranking entre pares de una clase. Lo puede pedir cualquier miembro de la
+// clase (tutor o estudiante inscrito); la RPC valida la pertenencia y no
+// expone correos, solo el nombre visible. Ver supabase/ranking.sql.
+export async function rankingClase(claseId) {
+    const data = await rpc('lf_ranking_clase', { p_clase_id: claseId })
+    return Array.isArray(data) ? data : []
+}
+
 export async function crearTarea({ claseId, titulo, descripcion = null, puntajeMax = 10, venceAt = null }) {
     const data = await dataRequest('/lf_tareas', {
         method: 'POST',

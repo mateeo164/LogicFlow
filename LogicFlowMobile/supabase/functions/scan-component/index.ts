@@ -20,6 +20,9 @@ const KNOWN_COMPONENTS = [
   { id: 'storage', label: 'Almacenamiento NVMe', pista: 'tarjeta pequeña tipo "chicle" con chips, sin cables' },
   { id: 'gpu', label: 'Tarjeta gráfica (GPU)', pista: 'tarjeta grande con ventiladores grandes y disipador masivo' },
   { id: 'power', label: 'Fuente de poder (PSU)', pista: 'caja metálica rectangular con ventilador y cables de salida' },
+  { id: 'fans', label: 'Ventiladores de gabinete', pista: 'ventilador cuadrado con aspas y marco, a veces con LEDs RGB en el borde' },
+  { id: 'hdd', label: 'Disco duro (HDD)', pista: 'caja metálica rectangular plana de 3.5", con etiqueta arriba y conectores SATA, más gruesa que un SSD' },
+  { id: 'sata', label: 'Cable de datos SATA', pista: 'cable delgado y plano (rojo o negro) con conectores en forma de "L" en los extremos' },
 ]
 
 const RESPONSE_SCHEMA = {

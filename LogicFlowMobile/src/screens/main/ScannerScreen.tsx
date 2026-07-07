@@ -70,7 +70,7 @@ export function ScannerScreen() {
     if (cooldownTimer.current) clearTimeout(cooldownTimer.current)
   }, [])
 
-  // Carga las piezas ya escaneadas para que el contador N/8 sea persistente
+  // Carga las piezas ya escaneadas para que el contador sea persistente
   // entre sesiones y el ensamble se complete al escanear todas las piezas.
   useEffect(() => {
     obtenerProgreso().then(p => {
@@ -176,12 +176,12 @@ export function ScannerScreen() {
     Speech.stop()
     setSaving(true)
     const start = Date.now()
-    await guardarProgreso({ componenteId: detected.id, segundos: 0 })
+    await guardarProgreso({ componenteId: detected.id, segundos: 0, total: PC_COMPONENTS.length })
     await registrarEvento({ tipo: 'acierto', componenteId: detected.id, segundos: Math.round((Date.now() - start) / 1000) })
     const nuevos = instalados.includes(detected.id) ? instalados : [...instalados, detected.id]
     setInstalados(nuevos)
     setSaving(false)
-    // Al escanear las 8 piezas se completa el ensamble móvil (condición del
+    // Al escanear TODAS las piezas se completa el ensamble móvil (condición del
     // certificado) y se otorga el logro correspondiente.
     if (nuevos.length >= PC_COMPONENTS.length) {
       otorgarLogros(['instalacion_real'], 'scanner')
@@ -216,7 +216,7 @@ export function ScannerScreen() {
     setQuizFeedback(null)
     setConversacion([])
     lastPhotoBase64.current = null
-    // Si ya se escanearon las 8 piezas, muestra la celebración de ensamble.
+    // Si ya se escanearon todas las piezas, muestra la celebración de ensamble.
     if (instalados.length >= PC_COMPONENTS.length) setShowComplete(true)
   }
 
@@ -280,7 +280,7 @@ export function ScannerScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Escáner AR</Text>
           <View style={styles.counterChip}>
-            <Text style={styles.counterText}>{instalados.length}/8</Text>
+            <Text style={styles.counterText}>{instalados.length}/{PC_COMPONENTS.length}</Text>
           </View>
         </View>
 
@@ -470,7 +470,7 @@ export function ScannerScreen() {
               <Text style={{ fontSize: 56 }}>🎉</Text>
               <Text style={styles.quizTitle}>¡PC ensamblada!</Text>
               <Text style={styles.quizQuestion}>
-                Escaneaste e instalaste los 8 componentes. Tu PC virtual está lista y el ensamble móvil quedó completado.
+                Escaneaste e instalaste los {PC_COMPONENTS.length} componentes. Tu PC virtual está lista y el ensamble móvil quedó completado.
               </Text>
             </View>
             <PrimaryButton label="Seguir explorando" onPress={() => setShowComplete(false)} style={{ marginTop: Spacing.sm }} />
