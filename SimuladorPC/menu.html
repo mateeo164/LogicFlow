@@ -16,8 +16,14 @@
     <link rel="stylesheet" href="css/dashboard-v2.css">
     <script>
         (function() {
-            var token = localStorage.getItem('logicflow_access_token');
-            var refresh = localStorage.getItem('logicflow_refresh_token');
+            // La sesión vive en sessionStorage (se cierra al cerrar la pestaña).
+            // Barremos restos de sesiones antiguas guardadas en localStorage.
+            try {
+                ['logicflow_access_token','logicflow_refresh_token','logicflow_user','logicflow_expires_at']
+                    .forEach(function(k){ localStorage.removeItem(k); });
+            } catch (e) {}
+            var token = sessionStorage.getItem('logicflow_access_token');
+            var refresh = sessionStorage.getItem('logicflow_refresh_token');
             if (!token && !refresh) { window.location.replace('login.html'); }
         })();
 </script>
@@ -197,12 +203,24 @@
             </div>
         </div>
 
+        <section class="retos-banner reco-card student-only" id="recomendacion-card" aria-label="Tu siguiente paso recomendado" hidden>
+            <div class="retos-banner__icon" aria-hidden="true" id="reco-icono">✨</div>
+            <div class="retos-banner__body">
+                <div class="retos-banner__top">
+                    <h2 class="retos-banner__title" id="reco-titulo">Tu siguiente paso</h2>
+                    <span class="retos-banner__badge">Recomendado para ti</span>
+                </div>
+                <p class="retos-banner__sub" id="reco-razon">Calculando tu recomendación…</p>
+            </div>
+            <a class="btn retos-banner__btn" id="reco-accion" href="#">Ver</a>
+        </section>
+
         <section class="retos-banner student-only" aria-label="Retos de reparación">
             <div class="retos-banner__icon" aria-hidden="true">🔧</div>
             <div class="retos-banner__body">
                 <div class="retos-banner__top">
                     <h2 class="retos-banner__title">Retos de reparación</h2>
-                    <span class="retos-banner__badge" id="retos-banner-count">0 / 4</span>
+                    <span class="retos-banner__badge" id="retos-banner-count">0 / 8</span>
                 </div>
                 <p class="retos-banner__sub" id="retos-banner-sub">Diagnostica y repara PCs con fallas reales.</p>
                 <div class="retos-banner__bar"><div class="retos-banner__fill" id="retos-banner-fill" style="width:0%"></div></div>

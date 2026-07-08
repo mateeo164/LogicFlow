@@ -4,6 +4,7 @@ import {
   Animated, Alert, ActivityIndicator, Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import {
   useAudioRecorder, useAudioRecorderState, RecordingPresets,
@@ -44,6 +45,7 @@ function mostrarErrorIA(err: unknown, mensajeGenerico: string) {
 
 export function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions()
+  const tabBarHeight = useBottomTabBarHeight()
   const [scanState, setScanState] = useState<ScanState>('idle')
   const [detected, setDetected] = useState<PCComponent | null>(null)
   const [instalados, setInstalados] = useState<string[]>([])
@@ -272,7 +274,7 @@ export function ScannerScreen() {
         <View style={[StyleSheet.absoluteFill, styles.scrim]} />
       </View>
 
-      <SafeAreaView style={styles.cameraUi} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.cameraUi} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.glassBtn} hitSlop={8}>
@@ -304,8 +306,9 @@ export function ScannerScreen() {
           </Text>
         </View>
 
-        {/* Bottom */}
-        <View style={styles.bottom}>
+        {/* Bottom — reserva la altura de la tab bar flotante para que el
+            obturador no quede oculto tras la barra inferior de menús. */}
+        <View style={[styles.bottom, { paddingBottom: tabBarHeight + Spacing.md }]}>
           {scanState === 'idle' && (
             <>
               <Text style={styles.bottomTitle}>Detección por IA</Text>

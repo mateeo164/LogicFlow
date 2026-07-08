@@ -8,6 +8,11 @@ const path = require('path')
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// La mayoría de plataformas de hosting (Render, Railway, Fly, etc.) ponen la
+// app detrás de un proxy TLS. Confiar en el primer proxy hace que Express lea
+// bien el protocolo/IP reales (X-Forwarded-*).
+app.set('trust proxy', 1)
+
 const SUPABASE_HOST = 'https://kgyhbimpwwtnkiozymyr.supabase.co'
 
 // Cabeceras de seguridad. La CSP permite inline scripts/styles porque el
@@ -50,11 +55,21 @@ app.use(express.static(__dirname, {
     }
 }))
 
+// Health-check para los monitores del proveedor de hosting.
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime() })
+})
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'))
 })
 
 app.listen(PORT, () => {
+    const env = process.env.NODE_ENV || 'development'
     console.log('\n  LogicFlow — Simulador de Ensamblaje')
-    console.log(`  ▶ Abre el navegador en: http://localhost:${PORT}\n`)
+    console.log(`  ▶ Entorno: ${env} | Puerto: ${PORT}`)
+    if (env !== 'production') {
+        console.log(`  ▶ Abre el navegador en: http://localhost:${PORT}`)
+    }
+    console.log('')
 })

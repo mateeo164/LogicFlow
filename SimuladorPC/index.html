@@ -50,6 +50,8 @@
                 </button>
                 <a href="login.html" class="btn btn-secondary btn-sm" id="nav-login">Iniciar sesión</a>
                 <a href="registro.html" class="btn btn-primary btn-sm" id="nav-cta">Comenzar gratis</a>
+                <a href="menu.html" class="lf-account-chip" id="nav-account" title="Ir a mi panel" hidden></a>
+                <button type="button" class="btn btn-secondary btn-sm" id="nav-logout" hidden>Salir</button>
                 <button class="academic-nav-toggle" id="nav-toggle" aria-label="Abrir menú" aria-expanded="false">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
@@ -223,7 +225,7 @@
             <h2>¿Listo para ensamblar?</h2>
             <div class="academic-cta-actions">
                 <a href="registro.html" class="btn btn-accent btn-lg" id="cta-register">Crear cuenta gratis</a>
-                <a href="login.html" class="btn btn-cta-ghost btn-lg">Ya tengo cuenta</a>
+                <a href="login.html" class="btn btn-cta-ghost btn-lg" id="cta-login">Ya tengo cuenta</a>
             </div>
         </div>
     </section>
@@ -236,8 +238,8 @@
             </a>
             <nav class="academic-footer-links">
                 <a href="academia.html">Academia</a>
-                <a href="login.html">Iniciar sesión</a>
-                <a href="registro.html">Crear cuenta</a>
+                <a href="login.html" id="footer-login">Iniciar sesión</a>
+                <a href="registro.html" id="footer-register">Crear cuenta</a>
                 <a href="calculadora.html">Calculadora PSU</a>
                 <a href="glosario.html">Glosario</a>
             </nav>
@@ -286,16 +288,48 @@
                 links.classList.toggle('is-open');
             });
 
-            const token = localStorage.getItem('logicflow_access_token');
-            const refresh = localStorage.getItem('logicflow_refresh_token');
+            // Sesión en sessionStorage: se cierra al cerrar la pestaña.
+            // Barremos restos de sesiones antiguas guardadas en localStorage.
+            const SESSION_KEYS = ['logicflow_access_token','logicflow_refresh_token','logicflow_user','logicflow_expires_at'];
+            try { SESSION_KEYS.forEach(k => localStorage.removeItem(k)); } catch (e) {}
+
+            const token = sessionStorage.getItem('logicflow_access_token');
+            const refresh = sessionStorage.getItem('logicflow_refresh_token');
             if (token || refresh) {
-                const cta = document.getElementById('nav-cta');
+                let nombre = 'Estudiante';
+                try {
+                    const u = JSON.parse(sessionStorage.getItem('logicflow_user') || 'null');
+                    nombre = u?.user_metadata?.full_name || u?.email?.split('@')[0] || 'Estudiante';
+                } catch (e) {}
+
+                const hide = el => { if (el) el.hidden = true; el && (el.style.display = 'none'); };
+                const show = el => { if (el) { el.hidden = false; el.style.removeProperty('display'); } };
+
+                // Oculta los botones de acceso/registro en toda la landing.
+                hide(document.getElementById('nav-login'));
+                hide(document.getElementById('nav-cta'));
+                hide(document.getElementById('cta-login'));
+                hide(document.getElementById('footer-login'));
+                hide(document.getElementById('footer-register'));
+                hide(document.getElementById('hero-lab-cta'));
+
+                // Muestra el identificador de la cuenta: @Nombre Apellido.
+                const account = document.getElementById('nav-account');
+                if (account) { account.textContent = '@' + nombre; show(account); }
+                const logout = document.getElementById('nav-logout');
+                if (logout) {
+                    show(logout);
+                    logout.addEventListener('click', () => {
+                        try { SESSION_KEYS.forEach(k => sessionStorage.removeItem(k)); } catch (e) {}
+                        try { SESSION_KEYS.forEach(k => localStorage.removeItem(k)); } catch (e) {}
+                        window.location.reload();
+                    });
+                }
+
+                // Reencamina los CTA hacia el panel del usuario.
                 const heroCta = document.getElementById('hero-cta');
-                const heroLab = document.getElementById('hero-lab-cta');
                 const ctaRegister = document.getElementById('cta-register');
-                if (cta) { cta.textContent = 'Mi panel'; cta.href = 'menu.html'; }
                 if (heroCta) { heroCta.textContent = 'Continuar aprendiendo'; heroCta.href = 'menu.html'; }
-                if (heroLab) { heroLab.style.display = 'none'; }
                 if (ctaRegister) { ctaRegister.textContent = 'Ir a mi panel'; ctaRegister.href = 'menu.html'; }
             }
 

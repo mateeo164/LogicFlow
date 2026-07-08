@@ -69,6 +69,13 @@ export function error() {
     tone({ freq: 220, type: 'sawtooth', duration: 0.25, peak: 0.16, freqEnd: 140, filterFreq: 800 })
 }
 
+// Pitido del altavoz interno de la PC durante el POST (arranque en el banco de
+// pruebas). Un beep = POST correcto; se puede llamar varias veces para el
+// patrón de error.
+export function beep() {
+    tone({ freq: 1180, type: 'square', duration: 0.14, peak: 0.14, attack: 0.002 })
+}
+
 export function complete() {
     if (!ctx || muted) return
     ;[523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {

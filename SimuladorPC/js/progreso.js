@@ -1,9 +1,9 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, supabaseAuthRequest } from './supabase-config.js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, supabaseAuthRequest, authStore } from './supabase-config.js'
 
 const TIMEOUT = 12000
 
 function getUserId() {
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     if (!token) return null
     try {
         const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
@@ -12,7 +12,7 @@ function getUserId() {
 }
 
 async function dataRequest(path, options = {}) {
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     const headers = {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,
@@ -59,6 +59,24 @@ export async function obtenerProgreso() {
 export async function guardarProgreso({ componenteId, segundos = 0, total = 6 }) {
     const userId = getUserId()
     if (!userId) return false
+
+    // Camino ATÓMICO (preferido): el servidor hace array_append con lock de fila,
+    // así usar la web y el móvil a la vez en la misma corrida no pierde componentes.
+    // Si la RPC no está desplegada (supabase/progreso-merge.sql) o falla, se cae al
+    // camino clásico de abajo — la app funciona igual con o sin ese SQL.
+    try {
+        await dataRequest('/rpc/lf_instalar_componente', {
+            method: 'POST',
+            body: {
+                p_componente: componenteId,
+                p_segundos: Math.max(0, Math.round(segundos)),
+                p_total: total
+            }
+        })
+        return true
+    } catch {
+        // Silencioso a propósito: seguimos con el read-modify-write clásico.
+    }
 
     try {
         const actual = await obtenerProgreso()
@@ -144,7 +162,7 @@ export async function actualizarPerfil({ full_name, institucion }) {
             }
         })
 
-        const raw = localStorage.getItem(STORAGE_KEYS.user)
+        const raw = authStore.getItem(STORAGE_KEYS.user)
         if (raw) {
             const user = JSON.parse(raw)
             user.user_metadata = {
@@ -152,7 +170,7 @@ export async function actualizarPerfil({ full_name, institucion }) {
                 ...(full_name ? { full_name } : {}),
                 institucion: institucion ?? null
             }
-            localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user))
+            authStore.setItem(STORAGE_KEYS.user, JSON.stringify(user))
         }
 
         return { exito: true }
@@ -235,9 +253,33 @@ export async function guardarComprension({ comprensionPct = null, preTest = null
     }
 }
 
+// Registra que el estudiante llevó la PC al banco de pruebas y la encendió
+// (primer arranque / POST). Guarda la marca de tiempo y si el arranque fue
+// exitoso, para que el docente vea quién cerró el ciclo montaje→prueba.
+export async function marcarPruebaArranque({ exito = false }) {
+    const userId = getUserId()
+    if (!userId) return false
+
+    try {
+        await dataRequest(`/progreso_usuario?user_id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: {
+                prueba_arranque_at: new Date().toISOString(),
+                arranque_exitoso: !!exito,
+                updated_at: new Date().toISOString()
+            }
+        })
+        return true
+    } catch (err) {
+        console.warn('[LogicFlow] No se pudo marcar la prueba de arranque:', err.message)
+        return false
+    }
+}
+
 export async function subirFotoSimulador(blob) {
     const userId = getUserId()
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     if (!userId || !token || !blob) return null
 
     const path = `${userId}/simulador.png`

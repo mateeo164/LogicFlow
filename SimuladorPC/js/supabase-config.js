@@ -15,6 +15,26 @@ const ERROR_CODES = {
     timeout: 'TIMEOUT_ERROR'
 }
 
+// La sesión vive en sessionStorage: se limpia automáticamente cuando el usuario
+// cierra la pestaña, de modo que no queda una sesión "abierta" de forma
+// permanente. Las preferencias (tema, progreso local, etc.) siguen en
+// localStorage porque no dependen de la sesión.
+const authStore = window.sessionStorage
+
+// Limpieza de sesiones heredadas: en versiones anteriores el token se guardaba
+// en localStorage y quedaba abierto indefinidamente, lo que provocaba estados
+// inconsistentes (p. ej. la landing mostrando "Iniciar sesión" con la sesión
+// abierta). Borramos esas claves para que no reaparezcan.
+function purgarSesionLegacy() {
+    try {
+        Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key))
+    } catch (error) {
+        // localStorage puede no estar disponible (modo privado estricto).
+    }
+}
+
+purgarSesionLegacy()
+
 function getAuthHeaders(extra = {}) {
     const headers = {
         apikey: SUPABASE_ANON_KEY,
@@ -22,7 +42,7 @@ function getAuthHeaders(extra = {}) {
         ...(extra.headers || {})
     }
 
-    const accessToken = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const accessToken = authStore.getItem(STORAGE_KEYS.accessToken)
     if (accessToken) {
         headers.Authorization = `Bearer ${accessToken}`
     }
@@ -75,7 +95,7 @@ export async function supabaseAuthRequest(path, options = {}) {
 
     if (!response.ok) {
 
-        if (response.status === 401 && !_reintentado && localStorage.getItem(STORAGE_KEYS.refreshToken)) {
+        if (response.status === 401 && !_reintentado && authStore.getItem(STORAGE_KEYS.refreshToken)) {
             const refrescada = await refreshSession()
             if (refrescada) {
                 return supabaseAuthRequest(path, { ...resto, _reintentado: true })
@@ -95,7 +115,7 @@ export async function supabaseAuthRequest(path, options = {}) {
 }
 
 export async function refreshSession() {
-    const refreshToken = localStorage.getItem(STORAGE_KEYS.refreshToken)
+    const refreshToken = authStore.getItem(STORAGE_KEYS.refreshToken)
     if (!refreshToken) return false
 
     try {
@@ -123,36 +143,40 @@ export function guardarSesion(session) {
     if (!session) return
 
     if (session.access_token) {
-        localStorage.setItem(STORAGE_KEYS.accessToken, session.access_token)
+        authStore.setItem(STORAGE_KEYS.accessToken, session.access_token)
     }
 
     if (session.refresh_token) {
-        localStorage.setItem(STORAGE_KEYS.refreshToken, session.refresh_token)
+        authStore.setItem(STORAGE_KEYS.refreshToken, session.refresh_token)
     }
 
     if (session.user) {
-        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(session.user))
+        authStore.setItem(STORAGE_KEYS.user, JSON.stringify(session.user))
     }
 
     if (session.expires_at) {
-        localStorage.setItem(STORAGE_KEYS.expiresAt, String(session.expires_at))
+        authStore.setItem(STORAGE_KEYS.expiresAt, String(session.expires_at))
     } else if (session.expires_in) {
         const expiraEn = Math.floor(Date.now() / 1000) + Number(session.expires_in)
-        localStorage.setItem(STORAGE_KEYS.expiresAt, String(expiraEn))
+        authStore.setItem(STORAGE_KEYS.expiresAt, String(expiraEn))
     }
 }
 
 export function limpiarSesion() {
-    Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key))
+    Object.values(STORAGE_KEYS).forEach(key => {
+        authStore.removeItem(key)
+    })
+    // Barremos también posibles restos en localStorage (sesiones heredadas).
+    purgarSesionLegacy()
 }
 
 export function obtenerSesionGuardada() {
-    const accessToken = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const accessToken = authStore.getItem(STORAGE_KEYS.accessToken)
     if (!accessToken) return null
 
-    const refreshToken = localStorage.getItem(STORAGE_KEYS.refreshToken)
-    const userRaw = localStorage.getItem(STORAGE_KEYS.user)
-    const expiresAt = localStorage.getItem(STORAGE_KEYS.expiresAt)
+    const refreshToken = authStore.getItem(STORAGE_KEYS.refreshToken)
+    const userRaw = authStore.getItem(STORAGE_KEYS.user)
+    const expiresAt = authStore.getItem(STORAGE_KEYS.expiresAt)
 
     let user = null
     try {
@@ -183,12 +207,12 @@ export function tokenExpirado() {
     const ahora = Math.floor(Date.now() / 1000)
     const margen = 30
 
-    const expiresAt = localStorage.getItem(STORAGE_KEYS.expiresAt)
+    const expiresAt = authStore.getItem(STORAGE_KEYS.expiresAt)
     if (expiresAt) {
         return Number(expiresAt) - margen <= ahora
     }
 
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     if (!token) return true
 
     const payload = decodificarJwt(token)
@@ -200,4 +224,4 @@ export function esErrorDeRed(error) {
     return error?.code === ERROR_CODES.network || error?.code === ERROR_CODES.timeout
 }
 
-export { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, ERROR_CODES }
+export { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, ERROR_CODES, authStore }

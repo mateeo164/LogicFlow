@@ -91,6 +91,47 @@
   gap: 10px;
 }
 
+/* Identificador de cuenta cuando hay sesión abierta (@Nombre Apellido). */
+.lf-account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 220px;
+  padding: 7px 14px 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--lf-border-medium);
+  background: var(--lf-surface-0);
+  color: var(--lf-primary-600);
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.lf-account-chip::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lf-primary-500);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.lf-account-chip:hover {
+  border-color: var(--lf-primary-500);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.18);
+}
+
+[data-theme="dark"] .lf-account-chip {
+  color: var(--lf-primary-300);
+}
+
 .academic-nav-toggle {
   display: none;
   width: 38px;

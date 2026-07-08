@@ -114,7 +114,7 @@
     document.querySelectorAll(selector).forEach(el => observer.observe(el));
   }
 
-  function initNavbarScroll(selector = '.inicio-nav, .lf-header, .dashboard-header') {
+  function initNavbarScroll(selector = '.lf-header, .dashboard-header') {
     const navs = document.querySelectorAll(selector);
     if (!navs.length) return;
 

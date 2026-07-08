@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Variables de entorno / secretos
+.env
+.env.*
+!.env.example
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+*.swp
+*~
+
+# Caché de herramientas
+.cache/
+.tmp/
+
+# Artefactos de build de modelos (se regeneran con npm run optimize:models)
+assets/**/*-original.*

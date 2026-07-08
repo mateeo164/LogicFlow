@@ -37,13 +37,14 @@ Plataforma web educativa para aprender a ensamblar computadoras de forma interac
 ├── glosario.html              # Glosario de hardware
 ├── css/
 │   ├── estilos.css            # Estilos base legacy
-│   ├── inicio.css             # Landing legacy
 │   ├── logicflow-premium.css  # Design system V2
 │   ├── landing-v2.css         # Mejoras landing
 │   ├── auth-v2.css            # Mejoras auth
 │   ├── dashboard-v2.css       # Mejoras dashboard
 │   ├── sim-v2.css             # Mejoras simulador
-│   └── tools-v2.css           # Mejoras herramientas
+│   ├── tools-v2.css           # Mejoras herramientas
+│   ├── retos.css              # Módulo de retos
+│   └── academia.css           # Módulo de academia
 ├── js/
 │   ├── theme.js               # Modo claro/oscuro
 │   ├── ui-effects.js          # Toasts, animaciones, utilidades
@@ -58,17 +59,44 @@ Plataforma web educativa para aprender a ensamblar computadoras de forma interac
 │   └── juego.js               # Motor 3D y lógica del simulador
 ├── manifest.json              # PWA manifest
 ├── service-worker.js          # Cache offline
-└── server.js                  # Servidor Express
+└── server.cjs                 # Servidor Express
 ```
 
-## ▶️ Cómo ejecutar
+## ▶️ Cómo ejecutar (local)
 
 ```bash
 npm install
 npm start
 ```
 
-El servidor se levanta en `http://localhost:3000`.
+El servidor se levanta en `http://localhost:3000`. Para probar el laboratorio 3D con modelos optimizados: `npm run optimize:models`.
+
+Ejecutar la batería de pruebas:
+
+```bash
+npm test
+```
+
+## 🚀 Deploy
+
+El proyecto es un servidor **Node.js + Express** que sirve los archivos estáticos (HTML/CSS/JS) y los assets 3D; el backend (auth y persistencia) es **Supabase**, así que no hay base de datos que aprovisionar en el host.
+
+Requisitos del host:
+
+- **Node.js ≥ 18** (definido en `engines` de `package.json`).
+- Comando de build: _ninguno_ (no hay bundler).
+- Comando de arranque: `npm start` (equivale a `node server.cjs`; también hay `Procfile`).
+- El servidor escucha en `process.env.PORT` (lo inyecta la plataforma) o `3000` por defecto.
+- Health-check disponible en `GET /health`.
+
+Pasos genéricos (Render, Railway, Fly.io, Cloud Run, VPS, etc.):
+
+1. Conecta el repositorio o sube el código al host.
+2. Configura **Build Command**: vacío · **Start Command**: `npm start`.
+3. (Opcional) Define `NODE_ENV=production` — ver `.env.example`.
+4. Despliega. El proveedor asignará el puerto vía `PORT`.
+
+> **Nota Supabase:** la URL del proyecto y la `anon key` son públicas por diseño (protegidas por RLS). Tras el deploy, añade el dominio de producción a la _allowlist_ de redirecciones de Auth en Supabase para que funcionen los correos de confirmación y recuperación.
 
 ## 🎓 Contexto
 

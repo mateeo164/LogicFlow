@@ -16,11 +16,16 @@
     <link rel="stylesheet" href="css/sim-v2.css">
     <script>
         (function() {
-            var token = localStorage.getItem('logicflow_access_token');
-            var refresh = localStorage.getItem('logicflow_refresh_token');
+            // La sesión vive en sessionStorage (se cierra al cerrar la pestaña).
+            try {
+                ['logicflow_access_token','logicflow_refresh_token','logicflow_user','logicflow_expires_at']
+                    .forEach(function(k){ localStorage.removeItem(k); });
+            } catch (e) {}
+            var token = sessionStorage.getItem('logicflow_access_token');
+            var refresh = sessionStorage.getItem('logicflow_refresh_token');
             if (!token && !refresh) { window.location.replace('login.html'); return; }
             try {
-                var u = JSON.parse(localStorage.getItem('logicflow_user') || 'null');
+                var u = JSON.parse(sessionStorage.getItem('logicflow_user') || 'null');
                 if (u && u.user_metadata && u.user_metadata.rol === 'Tutor') {
                     window.location.replace('menu.html');
                 }

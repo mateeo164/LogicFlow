@@ -1,8 +1,10 @@
 import { protegerRuta, cerrarSesion } from './auth.js'
+import { STORAGE_KEYS, authStore } from './supabase-config.js'
 import { obtenerProgreso, actualizarPerfil, obtenerEstadisticas } from './progreso.js'
 import { getProgressSummary, formatXp, bonoPorLogros } from './achievements.js'
 import { obtenerLogrosUsuario, obtenerResultadosRetos, resumirResultados } from './retos-api.js'
 import { RETOS } from './retos-data.js'
+import { recomendarSiguiente } from './recomendacion.js'
 import { initTutorPanel, initClasesEstudiante, initNotificaciones } from './tutor.js'
 
 const COMPONENTS = [
@@ -179,6 +181,37 @@ function renderRetosBanner(retosSuperados = 0) {
 
     const btn = document.getElementById('retos-banner-btn')
     if (btn) btn.textContent = superados === 0 ? '🔧 Empezar retos' : completo ? '🔁 Repasar retos' : '🔧 Continuar retos'
+}
+
+function renderRecomendacion(progreso, resumenRetos) {
+    const card = document.getElementById('recomendacion-card')
+    if (!card) return
+
+    const reco = recomendarSiguiente({
+        progreso: progreso || {},
+        resumenRetos: resumenRetos || {},
+        retos: RETOS,
+        componentes: COMPONENTS
+    })
+
+    const setEl = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt }
+    setEl('reco-icono', reco.icono)
+    setEl('reco-titulo', reco.titulo)
+    setEl('reco-razon', reco.razon)
+
+    const btn = document.getElementById('reco-accion')
+    if (btn) {
+        btn.textContent = reco.accion.label
+        if (reco.accion.href) {
+            btn.href = reco.accion.href
+            btn.style.display = ''
+        } else {
+            // Las recomendaciones móviles no tienen enlace web: solo el mensaje.
+            btn.style.display = 'none'
+        }
+    }
+
+    card.removeAttribute('hidden')
 }
 
 function formatHora(iso) {
@@ -372,7 +405,7 @@ async function init() {
     const session = await protegerRuta()
     if (!session) return
 
-    const rawUser = localStorage.getItem('logicflow_user')
+    const rawUser = authStore.getItem(STORAGE_KEYS.user)
     const user = rawUser ? JSON.parse(rawUser) : null
     renderPerfil(user)
 
@@ -393,6 +426,7 @@ async function init() {
 
         renderProgreso(progreso, retosSuperados)
         renderRetosBanner(retosSuperados)
+        renderRecomendacion(progreso, resumenRetos)
 
         const estadisticas = await obtenerEstadisticas()
         renderEstadisticas(estadisticas)
@@ -447,7 +481,7 @@ async function init() {
         }
 
         if (result.exito) {
-            const rawUser = localStorage.getItem('logicflow_user')
+            const rawUser = authStore.getItem(STORAGE_KEYS.user)
             const updatedUser = rawUser ? JSON.parse(rawUser) : null
             renderPerfil(updatedUser)
             mostrarMensajeModal('Perfil actualizado correctamente.', 'success')

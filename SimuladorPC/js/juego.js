@@ -1,5 +1,5 @@
 import { protegerRuta } from './auth.js'
-import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, marcarAprobacionWeb, subirFotoSimulador, guardarComprension } from './progreso.js'
+import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, marcarAprobacionWeb, subirFotoSimulador, guardarComprension, marcarPruebaArranque } from './progreso.js'
 import { PROC_LOGRO, notaConBono } from './achievements.js'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
@@ -12,10 +12,13 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { obtenerReto, calcularNotaReto, LOGROS_RETO, NOTA_MINIMA_RETO } from './retos-data.js'
 import { guardarResultadoReto, obtenerResultadosRetos, otorgarLogros, obtenerLogrosUsuario } from './retos-api.js'
 import * as LFSound from './audio.js'
-import { PREGUNTAS_COMPONENTE, EVALUACION, notaConceptual, combinarNota, gananciaAprendizaje } from './quiz-data.js'
+import { PREGUNTAS_COMPONENTE, EVALUACION, notaConceptual, combinarNota, gananciaAprendizaje, notaDestreza } from './quiz-data.js'
 
 import { PASOS } from './pasos-data.js'
 import { crearTexturaRadial, crearTexturaMadera, crearTexturaMaderaClara, crearTexturaLetreroComponentes, crearTexturaPisoModerno, crearTexturaPegboard, crearTexturaMat, crearTexturaEtiqueta, crearTexturaPared, crearTexturaCielo, crearTexturaCartel, crearTexturaBlueprint } from './texturas.js'
+import { crearLampara, crearCajaHerramientas, crearDestornillador, crearTaza, crearBobinaCable } from './juego-props.js'
+import { tweenProc, crearHotspot, crearNumeroLabel, crearTextoLabel, crearTrianguloProc, ponerTornillo, conectarCable } from './juego-proc-helpers.js'
+import { construirProcedimientoCPU, construirProcedimientoMB, construirProcedimientoCooler, construirProcedimientoRAM, construirProcedimientoGPU, construirProcedimientoPSU } from './juego-procedimientos.js'
 
 const TOTAL = PASOS.length
 
@@ -118,6 +121,24 @@ const _scrRight = new THREE.Vector3()
 const _scrLook  = new THREE.Vector3()
 const _UP       = new THREE.Vector3(0, 1, 0)
 const _CENTER   = new THREE.Vector2(0, 0)
+
+// ── Post-ensamble: llevar la PC terminada al banco de pruebas y arrancarla ──
+// La PC ensamblada (todas las piezas de PASOS) se reagrupa en `pcCarryGrp` para
+// cargarla en brazos; se posa sobre el banco (bancoPruebas) y el monitor de la
+// estación muestra un arranque (POST→BIOS→escritorio) que refleja si el
+// ensamble quedó aprobado. Estado calibrable por consola con `__lab`.
+let pcCargando = false          // el usuario lleva la PC en brazos (modo caminar)
+let pcEnBanco  = false          // la PC ya está posada sobre el banco de pruebas
+let pcCarryGrp = null           // grupo temporal que sostiene todas las piezas
+let pcTween    = null           // traslado de la PC (mesa→banco / banco→mesa)
+let bancoPruebas = null         // { x, z, topY } de la estación de pruebas
+let cablePC    = null           // cable visual PC→monitor
+let bootPC     = null           // { inicio, aprobado, beep } arranque en pantalla
+let pruebaArranqueGuardada = false  // evita duplicar el registro de la prueba en la BD
+let pantallaPCcanvas = null, pantallaPCtex = null, pantallaPCmesh = null
+const PC_CARRY_S = 0.42         // escala de la PC mientras se carga
+const PC_BANCO_S = 0.52         // escala de la PC posada en el banco
+let pcBancoCfg = null           // { x, y, z, ry } destino calibrable; se rellena al montar
 
 const canvas = document.getElementById('game-canvas')
 
@@ -406,13 +427,13 @@ const NOTA_MINIMA = 7
 let notaFinalSesion = 0
 
 function calcularNota() {
-    const notaDestreza = Math.max(0, Math.min(10, 10 - erroresSesion * 1.0 - demorasSesion * 0.5))
+    const nd = notaDestreza(erroresSesion, demorasSesion)
     // La nota final mezcla la destreza en el ensamble con la comprensión demostrada
     // en las preguntas conceptuales. Así aprobar exige entender, no solo hacer clic.
     if (preguntasRespondidas > 0) {
-        return combinarNota(notaDestreza, notaConceptual(aciertosConceptuales, preguntasRespondidas))
+        return combinarNota(nd, notaConceptual(aciertosConceptuales, preguntasRespondidas))
     }
-    return notaDestreza
+    return nd
 }
 
 function obtenerNombreUsuario() {
@@ -568,7 +589,8 @@ function explorarTaller() {
     fase = '3d'
     mostrarOverlay('3d')
     actualizarOverlayWalk()
-    droneHabla('¡Tu PC está lista! Camina por el taller y observa el sistema que construiste. Usa W/A/S/D para moverte.')
+    guiaBanco('¡PC ensamblada con éxito!', 'Camina con W/A/S/D. Acércate a la PC en la mesa central, apúntala y pulsa E para levantarla y llevarla al banco de pruebas (pared derecha) — ahí se conecta al monitor y arranca.')
+    droneHabla('¡Tu PC está lista! Llévala al banco de pruebas para encenderla: apúntala y pulsa E para cargarla.')
 }
 
 function construirCanvasEnsamble(nota, aprobado) {
@@ -1091,6 +1113,22 @@ function initMotor3D() {
             if (ssdPartes) { ssdProg = ssdTarget = p; aplicarTeardownSSD(p); renderer.render(scene, camera) }
             return p
         },
+        // ── Prueba de arranque: calibración/depuración ──
+        setPantallaPC(cfg = {}) { setPantallaPC(cfg); return pantallaPCmesh ? { pos: pantallaPCmesh.position.toArray(), size: [pantallaPCmesh.geometry.parameters.width, pantallaPCmesh.geometry.parameters.height] } : 'aún no cargó el monitor' },
+        setPCBanco(cfg = {}) { if (pcBancoCfg) Object.assign(pcBancoCfg, cfg); if (pcEnBanco && pcCarryGrp && pcBancoCfg) { pcCarryGrp.position.set(pcBancoCfg.x, alturaBaseBanco(), pcBancoCfg.z); pcCarryGrp.rotation.y = pcBancoCfg.ry; crearCablePC(); renderer.render(scene, camera) } return pcBancoCfg },
+        agarrarPC() { agarrarPC(); return 'PC en brazos' },
+        probarPC() {   // debug: teletransporta la PC al banco y arranca (sin caminar)
+            if (fase !== '3d') fase = '3d'
+            if (!pcCarryGrp) agarrarPC()
+            if (pcBancoCfg && pcCarryGrp) { pcCargando = false; pcEnBanco = true; pcCarryGrp.scale.setScalar(PC_BANCO_S); pcCarryGrp.position.set(pcBancoCfg.x, alturaBaseBanco(), pcBancoCfg.z); pcCarryGrp.rotation.y = pcBancoCfg.ry; arrancarPC() }
+            return 'arrancando'
+        },
+        bootPC(el = 3.5, forzarAprobado = null) {   // debug: pinta un fotograma del arranque a t=el segundos
+            const aprobado = forzarAprobado != null ? !!forzarAprobado : notaFinalSesion >= NOTA_MINIMA
+            bootPC = { inicio: performance.now() - el * 1000, aprobado, beep: true, chime: true }
+            dibujarPantallaPC(); if (renderer) renderer.render(scene, camera)
+            return { aprobado, el, canvas: pantallaPCcanvas ? pantallaPCcanvas.toDataURL('image/png') : null }
+        },
         medirReto(id) {   // debug: activa el multímetro y mide un componente en un reto
             if (!modoReto || modoReto.fase !== 'inspeccion') return 'no hay reto en inspección'
             retoMedicion = true
@@ -1572,6 +1610,20 @@ function interactuarE() {
 
     if (modoReto) { interactuarEReto(eRay); return }
 
+    // Post-ensamble: cargar la PC terminada y probarla en el banco de pruebas.
+    if (indiceActual >= TOTAL && !heldComponent) {
+        if (pcCargando) {
+            const near = bancoPruebas && camera &&
+                Math.hypot(camera.position.x - bancoPruebas.x, camera.position.z - bancoPruebas.z) < 1.9
+            const banco = [propsTaller.workbench, propsTaller.monitor].filter(Boolean)
+            if (near || eRay.intersectObjects(banco, true).length) { colocarPCEnBanco(); return }
+            guiaBanco('Prueba de arranque', 'Acércate al banco de pruebas (pared derecha) y pulsa E para conectar la PC. Q para dejarla.')
+            return
+        }
+        if (eRay.intersectObjects(pcPickList(), true).length) { agarrarPC(); return }
+        // Si no apunta a la PC ni al banco, continúa con el manejo normal.
+    }
+
     if (!heldComponent) {
 
         const hits = eRay.intersectObjects(shelfMeshes)
@@ -1804,17 +1856,6 @@ function enfocarCamara(toPos, toLook, dur = 0.7, onDone = null) {
     }
 }
 
-function tweenProc(applyFn, from, to, ms, done) {
-    const t0 = performance.now()
-    function step(now) {
-        const k = Math.min(1, (now - t0) / ms)
-        const e = k * k * (3 - 2 * k)
-        applyFn(from + (to - from) * e)
-        if (k < 1) requestAnimationFrame(step)
-        else if (done) done()
-    }
-    requestAnimationFrame(step)
-}
 
 function disposeGroup(g) {
     g.traverse(o => {
@@ -1867,805 +1908,9 @@ function ocultarPanelProc() {
     document.getElementById('hint-box')?.classList.remove('con-panel-proc')
 }
 
-function crearHotspot(color = 0x3a8bff, r = 0.028) {
-    const g = new THREE.Group()
-    const ring = new THREE.Mesh(
-        new THREE.RingGeometry(r * 0.68, r, 28),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false })
-    )
-    g.add(ring)
-    const hit = new THREE.Mesh(
-        new THREE.CircleGeometry(r * 2.6, 20),
-        new THREE.MeshBasicMaterial({ visible: false })
-    )
-    g.add(hit)
-    g.userData.ring = ring
-    g.userData.pulse = true
-    return g
-}
-
-function crearNumeroLabel(n) {
-    const c = document.createElement('canvas'); c.width = c.height = 64
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = '#ffd54a'; ctx.font = 'bold 46px Inter, sans-serif'
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(String(n), 32, 35)
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
-    return new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.07),
-        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }))
-}
-
-function crearTextoLabel(texto, ancho = 0.15, color = '#cfe3ff') {
-    const c = document.createElement('canvas'); c.width = 256; c.height = 64
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = 'rgba(8,16,28,0.85)'; ctx.fillRect(0, 0, 256, 64)
-    ctx.strokeStyle = 'rgba(120,180,255,0.5)'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, 252, 60)
-    ctx.fillStyle = color; ctx.font = 'bold 30px Inter, monospace'
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(texto, 128, 35)
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
-    return new THREE.Mesh(new THREE.PlaneGeometry(ancho, ancho * 0.25),
-        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }))
-}
-
-function crearTrianguloProc(color = 0xffd54a, s = 0.014) {
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute([0, s, 0, -s * 0.9, -s * 0.7, 0, s * 0.9, -s * 0.7, 0], 3))
-    geo.computeVertexNormals()
-    return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, side: THREE.DoubleSide }))
-}
-
-function ponerTornillo(G, x, y, s = 1) {
-    const g = new THREE.Group()
-    const metal = new THREE.MeshStandardMaterial({ color: 0xc0c6cc, metalness: 0.9, roughness: 0.3 })
-    const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * s, 0.008 * s, 0.02 * s, 12), metal)
-    cuerpo.rotation.x = Math.PI / 2; g.add(cuerpo)
-    const cabeza = new THREE.Mesh(new THREE.CylinderGeometry(0.014 * s, 0.014 * s, 0.006 * s, 14), metal)
-    cabeza.rotation.x = Math.PI / 2; cabeza.position.z = 0.012 * s; g.add(cabeza)
-    const zArriba = 0.06 * s, zFinal = 0.014 * s
-    g.position.set(x, y, zArriba)
-    G.add(g)
-
-    tweenProc(v => { g.position.z = v; g.rotation.z = (zArriba - v) * 60 }, zArriba, zFinal, 420)
-}
-
-function conectarCable(G, a, b) {
-    const dir = new THREE.Vector3().subVectors(b, a)
-    const len = dir.length() || 0.001
-    const cable = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.004, 0.004, len, 8),
-        new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.7 })
-    )
-    cable.position.copy(a).addScaledVector(dir, 0.5)
-    cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize())
-    cable.scale.y = 0.01
-    G.add(cable)
-    const plug = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.014, 0.014),
-        new THREE.MeshStandardMaterial({ color: 0x222831, metalness: 0.4, roughness: 0.6 }))
-    plug.position.copy(b); G.add(plug)
-    tweenProc(v => { cable.scale.y = v }, 0.01, 1, 420)
-}
-
-function construirProcedimientoCPU(P) {
-    const G = P.grupo
-    P.focusOffset = new THREE.Vector3(0.10, 0.10, 0.58)
-    const dark  = new THREE.MeshStandardMaterial({ color: 0x1c2530, metalness: 0.6, roughness: 0.5 })
-    const metal = new THREE.MeshStandardMaterial({ color: 0x2b3440, metalness: 0.8, roughness: 0.35 })
-
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.17, 0.012), dark)
-    base.position.z = -0.006; G.add(base)
-    const inner = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.13), metal)
-    inner.position.z = 0.002; G.add(inner)
-
-    const triSocket = crearTrianguloProc(0xffd54a, 0.016)
-    triSocket.position.set(-0.05, -0.05, 0.005); G.add(triSocket)
-
-    const palanca = new THREE.Group()
-    palanca.position.set(0.085, -0.07, 0.012)
-    const barra = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.14, 0.012), metal)
-    barra.position.y = 0.07; palanca.add(barra)
-    const codo = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.014, 0.012), metal)
-    codo.position.set(-0.022, 0.135, 0); palanca.add(codo)
-    palanca.rotation.z = -Math.PI / 2.1
-    G.add(palanca)
-
-    const chip = new THREE.Group()
-    const substrate = new THREE.Mesh(
-        new THREE.BoxGeometry(0.12, 0.12, 0.014),
-        new THREE.MeshStandardMaterial({ color: 0x14130f, metalness: 0.25, roughness: 0.78 })
-    )
-    chip.add(substrate)
-    const ihs = new THREE.Mesh(
-        new THREE.BoxGeometry(0.092, 0.092, 0.016),
-        new THREE.MeshStandardMaterial({ color: 0xc9ced4, metalness: 0.85, roughness: 0.3 })
-    )
-    ihs.position.z = 0.013; chip.add(ihs)
-    const triChip = crearTrianguloProc(0xffd54a, 0.014)
-    triChip.position.set(-0.05, -0.05, 0.023); chip.add(triChip)
-    const parqueo = new THREE.Vector3(-0.20, 0.0, 0.085)
-    chip.position.copy(parqueo)
-    chip.visible = false
-    G.add(chip)
-
-    return [
-        {
-            titulo: 'Abrir el socket',
-            instruccion: 'Haz clic en la palanca de retención para abrir el socket ZIF.',
-            activar(P) {
-                const hs = crearHotspot(0x3a8bff)
-                hs.position.set(0.085, 0.07, 0.03)
-                P.hotspot(hs, { accion: 'ok', alAcertar: done => tweenProc(v => { palanca.rotation.z = v }, palanca.rotation.z, -0.12, 450, done) })
-            }
-        },
-        {
-            titulo: 'Alinear el procesador',
-            instruccion: 'El triángulo dorado del CPU debe coincidir con la marca del socket. Haz clic en esa esquina.',
-            activar(P) {
-                chip.visible = true
-                const corners = [[-0.05, -0.05, true], [0.05, -0.05, false], [-0.05, 0.05, false], [0.05, 0.05, false]]
-                corners.forEach(([x, y, ok]) => {
-                    const hs = crearHotspot(0x3a8bff, 0.032)
-                    hs.position.set(x, y, 0.02)
-                    P.hotspot(hs, ok
-                        ? { accion: 'ok', alAcertar: done => done() }
-                        : { accion: 'mal', motivo: 'Esa no es la esquina: alinea el triángulo dorado del CPU con la marca del socket.' })
-                })
-            }
-        },
-        {
-            titulo: 'Colocar el procesador',
-            instruccion: 'Haz clic para depositar el procesador en el socket, sin forzarlo.',
-            activar(P) {
-                const hs = crearHotspot(0x22c55e, 0.046)
-                hs.position.set(0, 0, 0.11)
-                const desde = chip.position.clone()
-                const destino = new THREE.Vector3(0, 0, 0.012)
-                P.hotspot(hs, { accion: 'ok', alAcertar: done => tweenProc(v => chip.position.lerpVectors(desde, destino, v), 0, 1, 550, done) })
-            }
-        },
-        {
-            titulo: 'Cerrar el socket',
-            instruccion: 'Baja la palanca para fijar el procesador en su lugar.',
-            activar(P) {
-                const hs = crearHotspot(0x3a8bff)
-                hs.position.set(0.085, 0.07, 0.03)
-                P.hotspot(hs, { accion: 'ok', alAcertar: done => tweenProc(v => { palanca.rotation.z = v }, palanca.rotation.z, -Math.PI / 2.1, 450, done) })
-            }
-        },
-        {
-            titulo: 'Pasta térmica',
-            instruccion: 'Aplica un punto de pasta térmica del tamaño de un guisante en el centro del procesador.',
-            activar(P) {
-                const hs = crearHotspot(0xc8c8c8, 0.042)
-                hs.position.set(0, 0, 0.05)
-                P.hotspot(hs, {
-                    accion: 'ok',
-                    alAcertar: done => {
-                        const pasta = new THREE.Mesh(
-                            new THREE.SphereGeometry(0.016, 16, 12),
-                            new THREE.MeshStandardMaterial({ color: 0xeef2f5, roughness: 0.3, metalness: 0.1 })
-                        )
-                        pasta.position.set(0, 0, 0.036); G.add(pasta)
-                        pasta.scale.setScalar(0.01)
-                        tweenProc(v => pasta.scale.set(v, v, v * 0.4), 0.01, 1, 380, done)
-                    }
-                })
-            }
-        }
-    ]
-}
-
-function construirProcedimientoMB(P) {
-    const G = P.grupo
-    P.focusOffset = new THREE.Vector3(0, 0.28, 1.40)
-    const verdePCB = new THREE.MeshStandardMaterial({ color: 0x14301f, metalness: 0.2, roughness: 0.8 })
-    const metal    = new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.85, roughness: 0.35 })
-
-    const bandeja = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.92, 0.014),
-        new THREE.MeshStandardMaterial({ color: 0x2a2f36, metalness: 0.7, roughness: 0.45 }))
-    bandeja.position.z = -0.03; G.add(bandeja)
-
-    const corners = [[-0.44, -0.33], [0.44, -0.33], [-0.44, 0.33], [0.44, 0.33]]
-    corners.forEach(([x, y]) => {
-        const so = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.04, 14), metal)
-        so.rotation.x = Math.PI / 2; so.position.set(x, y, -0.012); G.add(so)
-    })
-
-    const placa = new THREE.Group()
-    const pcb = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.78, 0.02), verdePCB)
-    placa.add(pcb)
-    const sock = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.02),
-        new THREE.MeshStandardMaterial({ color: 0x3a3f47, metalness: 0.6, roughness: 0.4 }))
-    sock.position.set(-0.08, 0.12, 0.02); placa.add(sock)
-    for (let i = 0; i < 4; i++) {
-        const ram = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.30, 0.014),
-            new THREE.MeshStandardMaterial({ color: 0x1b1b1b }))
-        ram.position.set(0.20 + i * 0.04, 0.06, 0.02); placa.add(ram)
-    }
-    placa.position.set(0, 0, 0.32)
-    G.add(placa)
-
-    return [
-        {
-            titulo: 'Colocar la placa',
-            instruccion: 'Alinea la placa sobre los separadores y haz clic para depositarla en la bandeja.',
-            activar(P) {
-                const hs = crearHotspot(0x3a8bff, 0.07)
-                hs.position.set(0, 0, 0.34)
-                P.hotspot(hs, { accion: 'ok', alAcertar: done => tweenProc(v => { placa.position.z = v }, placa.position.z, 0.012, 500, done) })
-            }
-        },
-        {
-            titulo: 'Atornillar en cruz',
-            instruccion: 'Atornilla siguiendo los números (patrón en cruz). El tornillo resaltado es el siguiente.',
-            activar(P) {
-                const orden = [0, 3, 1, 2]
-                let next = 0
-                const puestos = new Set()
-                const refs = [], labels = []
-
-                function refrescar() {
-                    refs.forEach((hs, i) => {
-                        const placed = puestos.has(i)
-                        const esSig = !placed && i === orden[next]
-                        hs.userData.proc.accion = placed ? 'nada' : (esSig ? 'ok' : 'espera')
-                        const ring = hs.userData.ring
-                        ring.visible = !placed
-                        ring.material.opacity = esSig ? 1 : 0.22
-                        hs.userData.pulse = esSig
-                        labels[i].visible = !placed
-                        labels[i].material.opacity = esSig ? 1 : 0.4
-                    })
-                }
-
-                corners.forEach(([x, y], i) => {
-                    const hs = crearHotspot(0xffd54a, 0.05)
-                    hs.position.set(x, y, 0.03)
-                    P.hotspot(hs, {
-                        accion: 'espera',
-                        espera: 'Aprieta primero el tornillo resaltado (sigue los números).',
-                        alAcertar: done => {
-                            ponerTornillo(G, x, y, 2.6)
-                            puestos.add(i); next++
-                            if (next >= orden.length) done()
-                            else { refrescar(); P.bloqueado = false; setHint(`<strong>Atornillar en cruz</strong> — quedan ${orden.length - next} tornillo(s).`) }
-                        }
-                    })
-                    refs.push(hs)
-                    const num = crearNumeroLabel(orden.indexOf(i) + 1)
-                    num.position.set(x, y + 0.085, 0.04)
-                    G.add(num); labels.push(num)
-                })
-                refrescar()
-            }
-        }
-    ]
-}
-
-function construirProcedimientoCooler(P) {
-    const G = P.grupo
-
-    const cpuPos = (PASOS.find(p => p.id === 'cpu')?.pos || P.paso.pos).clone()
-    G.position.copy(cpuPos)
-    P.focusTarget = cpuPos.clone()
-    P.focusOffset = new THREE.Vector3(0.12, 0.14, 0.72)
-    const metal = new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.85, roughness: 0.35 })
-
-    const socketRef = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.13, 0.012),
-        new THREE.MeshStandardMaterial({ color: 0x14130f, metalness: 0.3, roughness: 0.7 }))
-    socketRef.position.z = -0.004; G.add(socketRef)
-    const ihsRef = new THREE.Mesh(new THREE.BoxGeometry(0.092, 0.092, 0.012),
-        new THREE.MeshStandardMaterial({ color: 0xc9ced4, metalness: 0.85, roughness: 0.3 }))
-    ihsRef.position.z = 0.006; G.add(ihsRef)
-    const pastaRef = new THREE.Mesh(new THREE.SphereGeometry(0.014, 14, 10),
-        new THREE.MeshStandardMaterial({ color: 0xeef2f5, roughness: 0.3 }))
-    pastaRef.scale.set(1, 1, 0.4); pastaRef.position.z = 0.014; G.add(pastaRef)
-
-    const headerMat = new THREE.MeshStandardMaterial({ color: 0x1b2330, metalness: 0.5, roughness: 0.5 })
-    const headers = [
-        { nombre: 'CPU_FAN', x: 0.21, y: 0.10, ok: true },
-        { nombre: 'SYS_FAN', x: 0.21, y: -0.05, ok: false }
-    ]
-    headers.forEach(h => {
-        const box = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.018, 0.014), headerMat)
-        box.position.set(h.x, h.y, 0.01); G.add(box)
-        const lbl = crearTextoLabel(h.nombre, 0.13)
-        lbl.position.set(h.x + 0.005, h.y + 0.035, 0.02); G.add(lbl)
-    })
-
-    const cool = new THREE.Group()
-    const baseC = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.13, 0.04), new THREE.MeshStandardMaterial({ color: 0x3a3f46, metalness: 0.8, roughness: 0.35 }))
-    cool.add(baseC)
-    const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.022, 24), new THREE.MeshStandardMaterial({ color: 0x14151a, metalness: 0.4, roughness: 0.6 }))
-    fan.rotation.x = Math.PI / 2; fan.position.z = 0.031; cool.add(fan)
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.026, 16), new THREE.MeshStandardMaterial({ color: 0xb23b34, metalness: 0.3, roughness: 0.5 }))
-    hub.rotation.x = Math.PI / 2; hub.position.z = 0.034; cool.add(hub)
-    const parqueo = new THREE.Vector3(-0.26, 0.0, 0.12)
-    cool.position.copy(parqueo); cool.visible = false; G.add(cool)
-
-    const clips = [-1, 1].map(sgn => {
-        const c = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.012), metal)
-        c.position.set(sgn * 0.085, 0, 0.05); c.rotation.z = sgn * 0.6; c.visible = false; G.add(c)
-        return c
-    })
-    const cam = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.05, 0.012), metal)
-    cam.position.set(0.10, 0.07, 0.06); cam.rotation.z = -0.5; cam.visible = false; G.add(cam)
-
-    return [
-        {
-            titulo: 'Colocar el disipador',
-            instruccion: 'Apoya el disipador sobre el procesador (con la pasta). Haz clic para asentarlo.',
-            activar(P) {
-                cool.visible = true
-                const hs = crearHotspot(0x22c55e, 0.05)
-                hs.position.copy(parqueo).setZ(0.14)
-                const desde = parqueo.clone(), destino = new THREE.Vector3(0, 0, 0.055)
-                P.hotspot(hs, { accion: 'ok', alAcertar: done => tweenProc(v => cool.position.lerpVectors(desde, destino, v), 0, 1, 550, () => { clips.forEach(c => c.visible = true); cam.visible = true; done() }) })
-            }
-        },
-        {
-            titulo: 'Enganchar los clips',
-            instruccion: 'Engancha los dos clips de retención a los lados del socket (en cualquier orden).',
-            activar(P) {
-                let hechos = 0
-                ;[-1, 1].forEach((sgn, i) => {
-                    const hs = crearHotspot(0x3a8bff, 0.03)
-                    hs.position.set(sgn * 0.085, 0, 0.06)
-                    P.hotspot(hs, {
-                        accion: 'ok',
-                        alAcertar: done => {
-                            tweenProc(v => { clips[i].rotation.z = v }, clips[i].rotation.z, 0, 320)
-                            hs.userData.proc.accion = 'nada'; hs.userData.ring.visible = false
-                            hechos++
-                            if (hechos >= 2) done()
-                            else { P.bloqueado = false; setHint('Engancha también el otro clip.') }
-                        }
-                    })
-                })
-            }
-        },
-        {
-            titulo: 'Bloquear la palanca',
-            instruccion: 'Gira la palanca de leva para tensar el disipador contra el procesador.',
-            activar(P) {
-                const hs = crearHotspot(0x3a8bff, 0.032)
-                hs.position.set(0.10, 0.07, 0.07)
-                P.hotspot(hs, { accion: 'ok', alAcertar: done => tweenProc(v => { cam.rotation.z = v }, cam.rotation.z, -Math.PI / 2, 380, done) })
-            }
-        },
-        {
-            titulo: 'Conectar el ventilador',
-            instruccion: 'Conecta el cable del ventilador al header correcto de la placa. ¿Cuál es?',
-            activar(P) {
-                headers.forEach(h => {
-                    const hs = crearHotspot(h.ok ? 0x3a8bff : 0xff7676, 0.03)
-                    hs.position.set(h.x, h.y, 0.03)
-                    P.hotspot(hs, h.ok
-                        ? { accion: 'ok', alAcertar: done => { conectarCable(G, new THREE.Vector3(0.06, -0.02, 0.05), new THREE.Vector3(h.x, h.y, 0.02)); done() } }
-                        : { accion: 'mal', motivo: 'Ese es para los ventiladores del gabinete. El disipador del CPU va en el header CPU_FAN.' })
-                })
-            }
-        }
-    ]
-}
-
-function construirProcedimientoRAM(P) {
-    const G = P.grupo
-    P.focusOffset = new THREE.Vector3(0.05, 0.10, 0.76)
-
-    const pcbMat = new THREE.MeshStandardMaterial({ color: 0x14301f, metalness: 0.2, roughness: 0.8 })
-    const negro  = new THREE.MeshStandardMaterial({ color: 0x1a1c21, metalness: 0.35, roughness: 0.75 })
-    const metal  = new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.85, roughness: 0.35 })
-
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.38, 0.010), pcbMat)
-    base.position.z = -0.006; G.add(base)
-
-    const sockRef = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.010),
-        new THREE.MeshStandardMaterial({ color: 0x2e3340, metalness: 0.5, roughness: 0.5 }))
-    sockRef.position.set(-0.09, 0, 0.002); G.add(sockRef)
-    const lblCpu = crearTextoLabel('CPU', 0.065)
-    lblCpu.position.set(-0.09, 0, 0.010); G.add(lblCpu)
-
-    const SLOT_H = 0.26
-    const SLOT_W = 0.024
-    const KEY_Y  = -0.042
-    const slotX  =  0.05
-
-    const slotBody = new THREE.Mesh(new THREE.BoxGeometry(SLOT_W, SLOT_H, 0.013), negro)
-    slotBody.position.set(slotX, 0, 0.002); G.add(slotBody)
-
-    const key = new THREE.Mesh(new THREE.BoxGeometry(SLOT_W + 0.002, 0.010, 0.016),
-        new THREE.MeshStandardMaterial({ color: 0x060810 }))
-    key.position.set(slotX, KEY_Y, 0.003); G.add(key)
-
-    const clipMeshes = []
-    ;[-1, 1].forEach(side => {
-        const clip = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.010, 0.010), metal)
-        clip.position.set(slotX, side * (SLOT_H / 2 + 0.006), 0.016)
-        G.add(clip)
-        clipMeshes.push({ mesh: clip, side })
-    })
-
-    const stick = new THREE.Group()
-
-    stick.add(new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.23, 0.008), pcbMat))
-
-    const hsBody = new THREE.Mesh(new THREE.BoxGeometry(0.020, 0.17, 0.018),
-        new THREE.MeshStandardMaterial({ color: 0x1f2847, metalness: 0.80, roughness: 0.30 }))
-    hsBody.position.set(0, 0.015, 0.010); stick.add(hsBody)
-
-    const rgb = new THREE.Mesh(new THREE.BoxGeometry(0.020, 0.010, 0.020),
-        new THREE.MeshStandardMaterial({ color: 0x5c63ff, emissive: 0x5c63ff, emissiveIntensity: 0.75 }))
-    rgb.position.set(0, 0.100, 0.011); stick.add(rgb)
-
-    for (let i = 0; i < 6; i++) {
-        const chip = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.022, 0.005),
-            new THREE.MeshStandardMaterial({ color: 0x0a0c10, roughness: 0.9 }))
-        chip.position.set(0, -0.075 + i * 0.030, 0.007); stick.add(chip)
-    }
-
-    const notch = new THREE.Mesh(new THREE.BoxGeometry(0.010, 0.010, 0.012),
-        new THREE.MeshStandardMaterial({ color: 0x060810 }))
-    notch.position.set(0, KEY_Y, 0); stick.add(notch)
-
-    const parqueo = new THREE.Vector3(slotX - 0.22, 0, 0.18)
-    stick.position.copy(parqueo); stick.visible = false
-    G.add(stick)
-
-    return [
-
-        {
-            titulo: 'Abrir los clips de retención',
-            instruccion: 'Abre los dos seguros de la ranura DDR4 (superior e inferior) en cualquier orden.',
-            activar(P) {
-                let abiertos = 0
-                clipMeshes.forEach(c => {
-                    const hs = crearHotspot(0x3a8bff, 0.024)
-                    hs.position.copy(c.mesh.position); hs.position.z += 0.020
-                    P.hotspot(hs, {
-                        accion: 'ok',
-                        alAcertar: done => {
-
-                            tweenProc(v => { c.mesh.rotation.z = v }, 0, c.side * 0.55, 280)
-                            hs.userData.proc.accion = 'nada'; hs.userData.ring.visible = false
-                            abiertos++
-                            if (abiertos >= 2) done()
-                            else { P.bloqueado = false; setHint('Abre también el clip del otro extremo.') }
-                        }
-                    })
-                })
-            }
-        },
-
-        {
-            titulo: 'Alinear la muesca',
-            instruccion: 'La muesca del módulo debe coincidir con la llave de la ranura. ¿En qué orientación encaja?',
-            activar(P) {
-                stick.visible = true
-                stick.position.copy(parqueo)
-
-                const hsOk = crearHotspot(0x22c55e, 0.034)
-                hsOk.position.set(slotX - 0.04, KEY_Y, 0.12)
-                P.hotspot(hsOk, { accion: 'ok', alAcertar: done => done() })
-
-                const hsMal = crearHotspot(0xff7676, 0.034)
-                hsMal.position.set(slotX - 0.04, -KEY_Y, 0.12)
-                P.hotspot(hsMal, {
-                    accion: 'mal',
-                    motivo: 'La muesca no coincide con la llave. Los módulos DDR4 son asimétricos: solo encajan en una orientación para proteger los pines.'
-                })
-            }
-        },
-
-        {
-            titulo: 'Insertar el módulo RAM',
-            instruccion: 'Presiona el módulo hacia abajo con ambos pulgares hasta escuchar el clic. Los clips se cierran solos.',
-            activar(P) {
-                const desde   = parqueo.clone()
-                const destino = new THREE.Vector3(slotX, 0, 0.010)
-                stick.position.copy(desde)
-                const hs = crearHotspot(0x22c55e, 0.050)
-                hs.position.set(slotX - 0.11, 0, 0.20)
-                P.hotspot(hs, {
-                    accion: 'ok',
-                    alAcertar: done => {
-                        tweenProc(v => stick.position.lerpVectors(desde, destino, v), 0, 1, 550, () => {
-                            clipMeshes.forEach(c => {
-                                tweenProc(v => { c.mesh.rotation.z = v }, c.mesh.rotation.z, 0, 300)
-                            })
-                            done()
-                        })
-                    }
-                })
-            }
-        }
-    ]
-}
-
-function construirProcedimientoGPU(P) {
-    const G = P.grupo
-    P.focusOffset = new THREE.Vector3(0.10, 0.16, 0.98)
-
-    const pcbMat = new THREE.MeshStandardMaterial({ color: 0x14301f, metalness: 0.2, roughness: 0.8 })
-    const negro  = new THREE.MeshStandardMaterial({ color: 0x1a1c21, metalness: 0.35, roughness: 0.75 })
-    const metal  = new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.85, roughness: 0.35 })
-
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.30, 0.010), pcbMat)
-    base.position.z = -0.006; G.add(base)
-
-    const slotY = -0.08
-    const slot = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.013, 0.014), negro)
-    slot.position.set(0, slotY, 0.002); G.add(slot)
-    const lblSlot = crearTextoLabel('PCIe x16', 0.11)
-    lblSlot.position.set(-0.02, slotY - 0.022, 0.010); G.add(lblSlot)
-
-    const latch = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.022, 0.010), metal)
-    latch.position.set(0.155, slotY, 0.014)
-    latch.rotation.z = -0.55
-    G.add(latch)
-
-    const gpu = new THREE.Group()
-
-    gpu.add(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.010),
-        new THREE.MeshStandardMaterial({ color: 0x0e1a0e, metalness: 0.25, roughness: 0.75 })))
-
-    const shroud = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.10, 0.046),
-        new THREE.MeshStandardMaterial({ color: 0x1c1e24, metalness: 0.65, roughness: 0.40 }))
-    shroud.position.z = 0.026; gpu.add(shroud)
-
-    ;[-0.07, 0.07].forEach(fx => {
-        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.008, 24),
-            new THREE.MeshStandardMaterial({ color: 0x111418, metalness: 0.4, roughness: 0.6 }))
-        ring.rotation.x = Math.PI / 2; ring.position.set(fx, 0, 0.048); gpu.add(ring)
-        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.010, 14),
-            new THREE.MeshStandardMaterial({ color: 0x232830, metalness: 0.3 }))
-        hub.rotation.x = Math.PI / 2; hub.position.set(fx, 0, 0.052); gpu.add(hub)
-    })
-
-    const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.009, 0.13, 0.013), metal)
-    bracket.position.set(0.145, 0, 0.002); gpu.add(bracket)
-
-    const powerPort = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.015, 0.015),
-        new THREE.MeshStandardMaterial({ color: 0x1a1d24, metalness: 0.4, roughness: 0.6 }))
-    powerPort.position.set(0.08, 0.067, 0.006); gpu.add(powerPort)
-    const lblPwr = crearTextoLabel('8-pin', 0.07)
-    lblPwr.position.set(0.08, 0.088, 0.010); gpu.add(lblPwr)
-
-    const parqueo = new THREE.Vector3(0, 0.20, 0.24)
-    gpu.position.copy(parqueo); gpu.visible = false
-    G.add(gpu)
-
-    const opciones = [
-        { nombre: 'PCIe 8-pin', ok: true,  x: -0.08, color: 0x252d42 },
-        { nombre: 'EPS CPU',    ok: false, x:  0.16, color: 0x2d1a1a }
-    ]
-    const connGrupos = opciones.map(o => {
-        const g = new THREE.Group()
-        g.add(new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.020, 0.015),
-            new THREE.MeshStandardMaterial({ color: o.color, metalness: 0.45, roughness: 0.6 })))
-        const lbl = crearTextoLabel(o.nombre, 0.11)
-        lbl.position.set(0, 0.026, 0); g.add(lbl)
-        g.position.set(o.x, 0.13, 0.08)
-        g.visible = false; G.add(g)
-        return g
-    })
-
-    return [
-
-        {
-            titulo: 'Insertar en el slot PCIe x16',
-            instruccion: 'Alinea la GPU con el slot PCIe x16 (el más largo de la placa) y empújala hasta escuchar el clic del seguro.',
-            activar(P) {
-                gpu.visible = true
-                const desde   = parqueo.clone()
-                const destino = new THREE.Vector3(0, slotY, 0.006)
-                const hs = crearHotspot(0x22c55e, 0.060)
-                hs.position.copy(desde); hs.position.z += 0.04
-                P.hotspot(hs, {
-                    accion: 'ok',
-                    alAcertar: done => {
-                        tweenProc(v => gpu.position.lerpVectors(desde, destino, v), 0, 1, 620, () => {
-                            tweenProc(v => { latch.rotation.z = v }, latch.rotation.z, 0, 340, done)
-                        })
-                    }
-                })
-            }
-        },
-
-        {
-            titulo: 'Fijar el bracket con tornillo',
-            instruccion: 'Atornilla el bracket de la GPU al panel trasero del gabinete para que no se mueva.',
-            activar(P) {
-                const hs = crearHotspot(0xffd54a, 0.034)
-                hs.position.set(0.145, 0.072, 0.036)
-                P.hotspot(hs, {
-                    accion: 'ok',
-                    alAcertar: done => {
-                        ponerTornillo(G, 0.145, 0.072, 2.0)
-                        done()
-                    }
-                })
-            }
-        },
-
-        {
-            titulo: 'Conectar el cable de poder',
-            instruccion: 'La GPU exige alimentación directa de la fuente. ¿Cuál cable conectas al puerto 8-pin de la GPU?',
-            activar(P) {
-                connGrupos.forEach(g => { g.visible = true })
-                opciones.forEach((o, i) => {
-                    const hs = crearHotspot(o.ok ? 0x3a8bff : 0xff7676, 0.030)
-                    hs.position.set(o.x, 0.13, 0.10)
-                    P.hotspot(hs, o.ok
-                        ? {
-                            accion: 'ok',
-                            alAcertar: done => {
-
-                                const puertoPos = new THREE.Vector3(0.08, slotY + 0.067, 0.016)
-                                conectarCable(G, new THREE.Vector3(o.x, 0.13, 0.07), puertoPos)
-                                done()
-                            }
-                          }
-                        : {
-                            accion: 'mal',
-                            motivo: 'El conector EPS 8-pin alimenta el procesador, no la GPU. Busca el cable marcado "PCIe" o "VGA" en la fuente de poder.'
-                          })
-                })
-            }
-        }
-    ]
-}
-
-function construirProcedimientoPSU(P) {
-    const G = P.grupo
-
-    const mbPos = (PASOS.find(p => p.id === 'mb')?.pos || P.paso.pos).clone()
-    G.position.copy(mbPos)
-    P.focusTarget = mbPos.clone()
-    P.focusOffset = new THREE.Vector3(0.24, 0.12, 0.94)
-
-    const negro    = new THREE.MeshStandardMaterial({ color: 0x1a1c21, metalness: 0.35, roughness: 0.75 })
-    const dorado   = new THREE.MeshStandardMaterial({ color: 0xd4aa50, metalness: 0.90, roughness: 0.20 })
-    const cableMat = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.80 })
-
-    const POS_ATX  = new THREE.Vector3( 0.18,  0.01, 0.005)
-    const POS_EPS  = new THREE.Vector3(-0.14,  0.13, 0.005)
-    const POS_PCIE = new THREE.Vector3( 0.05, -0.09, 0.005)
-
-    function crearSocket(cols, rows, w, h) {
-        const g = new THREE.Group()
-        g.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.012), negro))
-        const sw = (w - 0.010) / Math.max(cols - 1, 1)
-        const sh = (h - 0.010) / Math.max(rows - 1, 1)
-        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-            const pin = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.004, 0.007), dorado)
-            pin.position.set(-w / 2 + 0.005 + c * sw, -h / 2 + 0.005 + r * sh, 0.010)
-            g.add(pin)
-        }
-        return g
-    }
-
-    function crearPlug(w, h, color = 0x252830) {
-        const g = new THREE.Group()
-        g.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.030),
-            new THREE.MeshStandardMaterial({ color, metalness: 0.40, roughness: 0.60 })))
-        const mazo = new THREE.Mesh(new THREE.BoxGeometry(w * 0.45, 0.20, 0.012), cableMat)
-        mazo.position.set(0, 0, 0.12); g.add(mazo)
-        return g
-    }
-
-    const sockAtx = crearSocket(12, 2, 0.150, 0.055)
-    sockAtx.position.copy(POS_ATX); G.add(sockAtx)
-    const lAtx = crearTextoLabel('ATX 24-pin', 0.11)
-    lAtx.position.set(POS_ATX.x, POS_ATX.y - 0.046, 0.014); G.add(lAtx)
-
-    const sockEps = crearSocket(4, 2, 0.072, 0.055)
-    sockEps.position.copy(POS_EPS); G.add(sockEps)
-    const lEps = crearTextoLabel('EPS 8-pin', 0.09)
-    lEps.position.set(POS_EPS.x, POS_EPS.y + 0.046, 0.014); G.add(lEps)
-
-    const sockPcie = crearSocket(4, 2, 0.072, 0.055)
-    sockPcie.position.copy(POS_PCIE); G.add(sockPcie)
-    const lPcie = crearTextoLabel('PCIe 8-pin', 0.09)
-    lPcie.position.set(POS_PCIE.x, POS_PCIE.y - 0.046, 0.014); G.add(lPcie)
-
-    const plugAtx = crearPlug(0.150, 0.055)
-    plugAtx.position.set(POS_ATX.x, POS_ATX.y, 0.22); plugAtx.visible = false
-    G.add(plugAtx)
-
-    const epsOpts = [
-        { nombre: 'EPS CPU',    ok: true,  dx: -0.10, color: 0x1e2d44 },
-        { nombre: 'PCIe 8-pin', ok: false, dx:  0.10, color: 0x2d1a1a }
-    ]
-    const epsGrupos = epsOpts.map(o => {
-        const g = crearPlug(0.072, 0.055, o.color)
-        const lbl = crearTextoLabel(o.nombre, 0.09); lbl.position.set(0, 0.050, 0); g.add(lbl)
-        g.position.set(POS_EPS.x + o.dx, POS_EPS.y, 0.22)
-        g.visible = false; G.add(g)
-        return { group: g, ...o }
-    })
-
-    const plugPcie = crearPlug(0.072, 0.055, 0x1e2534)
-    plugPcie.position.set(POS_PCIE.x, POS_PCIE.y, 0.22); plugPcie.visible = false
-    G.add(plugPcie)
-
-    function zoomSock(camOff, lookOff) {
-        const ft = P.focusTarget.clone()
-        enfocarCamara(ft.clone().add(camOff), ft.clone().add(lookOff), 0.55)
-    }
-
-    return [
-
-        {
-            titulo: 'Conectar ATX 24-pin a la placa',
-            instruccion: 'El ATX 24-pin es el conector principal: suministra energía a toda la placa base. Encájalo en el socket del borde derecho.',
-            activar(P) {
-                zoomSock(
-                    new THREE.Vector3(0.22, 0.08, 0.90),
-                    new THREE.Vector3(0.18, 0.01, 0)
-                )
-                plugAtx.visible = true
-                const desde   = new THREE.Vector3(POS_ATX.x, POS_ATX.y, 0.22)
-                const destino = new THREE.Vector3(POS_ATX.x, POS_ATX.y, 0.008)
-                const hs = crearHotspot(0x22c55e, 0.056)
-                hs.position.set(POS_ATX.x, POS_ATX.y, 0.24)
-                P.hotspot(hs, {
-                    accion: 'ok',
-                    alAcertar: done => tweenProc(v => plugAtx.position.lerpVectors(desde, destino, v), 0, 1, 580, done)
-                })
-            }
-        },
-
-        {
-            titulo: 'Conectar EPS 8-pin al CPU',
-            instruccion: 'Este cable alimenta los VRM del procesador. ¡Ojo! El EPS 8-pin y el PCIe 8-pin son físicamente idénticos. ¿Cuál va al CPU?',
-            activar(P) {
-                zoomSock(
-                    new THREE.Vector3(-0.04, 0.22, 0.90),
-                    new THREE.Vector3(-0.14, 0.13, 0)
-                )
-                epsGrupos.forEach(e => { e.group.visible = true })
-                epsOpts.forEach((o, i) => {
-                    const hs = crearHotspot(o.ok ? 0x3a8bff : 0xff7676, 0.032)
-                    hs.position.set(POS_EPS.x + o.dx, POS_EPS.y, 0.24)
-                    P.hotspot(hs, o.ok
-                        ? {
-                            accion: 'ok',
-                            alAcertar: done => {
-                                const desde   = epsGrupos[i].group.position.clone()
-                                const destino = new THREE.Vector3(POS_EPS.x, POS_EPS.y, 0.008)
-                                tweenProc(v => epsGrupos[i].group.position.lerpVectors(desde, destino, v), 0, 1, 520, done)
-                            }
-                          }
-                        : {
-                            accion: 'mal',
-                            motivo: 'El PCIe 8-pin alimenta la GPU, no el CPU. Los conectores parecen idénticos, pero el cable de la fuente los distingue con la etiqueta "CPU" o "EPS". Conectarlo al revés puede dañar el equipo.'
-                          })
-                })
-            }
-        },
-
-        {
-            titulo: 'Conectar PCIe 8-pin a la GPU',
-            instruccion: 'La RTX 3090 necesita alimentación directa de la fuente. Conecta el cable PCIe 8-pin al puerto de la tarjeta gráfica.',
-            activar(P) {
-                zoomSock(
-                    new THREE.Vector3(0.14, 0.00, 0.90),
-                    new THREE.Vector3(0.05, -0.09, 0)
-                )
-                plugPcie.visible = true
-                const desde   = new THREE.Vector3(POS_PCIE.x, POS_PCIE.y, 0.22)
-                const destino = new THREE.Vector3(POS_PCIE.x, POS_PCIE.y, 0.008)
-                const hs = crearHotspot(0x22c55e, 0.036)
-                hs.position.set(POS_PCIE.x, POS_PCIE.y, 0.24)
-                P.hotspot(hs, {
-                    accion: 'ok',
-                    alAcertar: done => tweenProc(v => plugPcie.position.lerpVectors(desde, destino, v), 0, 1, 500, done)
-                })
-            }
-        }
-    ]
-}
+// Las primitivas de procedimiento viven en ./juego-proc-helpers.js y los
+// constructores construirProcedimiento* en ./juego-procedimientos.js (ambos
+// importados arriba). Aquí abajo queda solo su orquestación.
 
 const SALA = { xMin: -5, xMax: 5, zMin: -4, zMax: 5, y0: -1.0, h: 3.6 }
 
@@ -2921,16 +2166,24 @@ function montarEstacionPruebas() {
         fact: 'Banco de pruebas: aquí se enciende la PC terminada para su primer arranque (POST).',
         onReady: (g, half) => {
             const topY = g.position.y + half.y
+            // Guarda la estación para poder posar aquí la PC ensamblada.
+            bancoPruebas = { x: wbX, z: wbZ, topY }
+            // La Y se calcula al posar la PC (alturaBaseBanco) según su altura real.
+            pcBancoCfg = { x: wbX - 0.52, z: wbZ + 0.12, ry: 0 }
+            // Tamaños proporcionales a la PC ensamblada (que sobre el banco mide
+            // ~0.9 de alto): el monitor queda a la par del gabinete y el teclado
+            // y mouse a escala realista respecto al monitor.
             cargarProp('pc_monitor.opt.glb', {
-                id: 'monitor', size: 0.9, x: wbX + 0.16, z: wbZ, y: topY, rotY: faceCentro, anim: false,
-                fact: 'Monitor de pruebas: muestra el POST/BIOS cuando la PC arranca por primera vez.'
+                id: 'monitor', size: 1.2, x: wbX + 0.34, z: wbZ, y: topY, rotY: faceCentro, anim: false,
+                fact: 'Monitor de pruebas: muestra el POST/BIOS cuando la PC arranca por primera vez.',
+                onReady: (mg, mHalf) => crearPantallaPC(mg, mHalf)
             })
             cargarProp('keyboard.opt.glb', {
-                id: 'keyboard', size: 0.55, x: wbX - 0.18, z: wbZ, y: topY, rotY: faceCentro, anim: false,
+                id: 'keyboard', size: 0.72, x: wbX + 0.02, z: wbZ + 0.16, y: topY, rotY: faceCentro, anim: false,
                 fact: 'Teclado de diagnóstico: con Supr o F2 se entra a la BIOS.'
             })
             cargarProp('mouse.opt.glb', {
-                id: 'mouse', size: 0.12, x: wbX - 0.18, z: wbZ + 0.34, y: topY, rotY: faceCentro,
+                id: 'mouse', size: 0.16, x: wbX + 0.02, z: wbZ + 0.52, y: topY, rotY: faceCentro,
                 fact: 'Mouse de pruebas.'
             })
             cargarProp('desk_lamp.opt.glb', {
@@ -2939,6 +2192,314 @@ function montarEstacionPruebas() {
             })
         }
     })
+}
+
+// ── Pantalla del monitor de la estación de pruebas ──────────────────────────
+// Plano con CanvasTexture (mismo patrón que la pantalla de pared del taller),
+// hijo del grupo del monitor. El monitor está rotado para mirar al centro de la
+// sala, así que el +Z local del plano queda de cara al espectador. Las medidas
+// son aproximadas: se calibran en vivo con `__lab.setPantallaPC({...})`.
+function crearPantallaPC(monitorGrp, half) {
+    pantallaPCcanvas = document.createElement('canvas')
+    pantallaPCcanvas.width = 512
+    pantallaPCcanvas.height = 320
+    pantallaPCtex = new THREE.CanvasTexture(pantallaPCcanvas)
+    pantallaPCtex.colorSpace = THREE.SRGBColorSpace
+
+    pantallaPCmesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(half.x * 1.62, half.y * 1.5),
+        new THREE.MeshBasicMaterial({ map: pantallaPCtex })
+    )
+    pantallaPCmesh.position.set(0, half.y * 0.16, half.z + 0.008)
+    monitorGrp.add(pantallaPCmesh)
+    dibujarPantallaPC()   // estado "apagado/en espera"
+}
+
+// Calibración por consola del plano de la pantalla (posición/tamaño relativos
+// al grupo del monitor).
+function setPantallaPC(cfg = {}) {
+    if (!pantallaPCmesh) return
+    if (cfg.w != null || cfg.h != null) {
+        const p = pantallaPCmesh.geometry.parameters
+        pantallaPCmesh.geometry.dispose()
+        pantallaPCmesh.geometry = new THREE.PlaneGeometry(cfg.w ?? p.width, cfg.h ?? p.height)
+    }
+    const q = pantallaPCmesh.position
+    pantallaPCmesh.position.set(cfg.x ?? q.x, cfg.y ?? q.y, cfg.z ?? q.z)
+    if (cfg.flip) pantallaPCmesh.rotation.y += Math.PI
+    dibujarPantallaPC()
+    if (renderer) renderer.render(scene, camera)
+}
+
+// Lista de objetos raycasteables que representan la PC ensamblada (para
+// apuntarle con la mira y agarrarla).
+function pcPickList() {
+    if (pcCarryGrp) return [pcCarryGrp]
+    return PASOS.map(p => modelos3D[p.id]).filter(g => g && g.visible)
+}
+
+// Guía visible del mini-flujo de pruebas (usa el panel lateral, no un toast que
+// tape el 3D — coherente con la retirada de notificaciones flotantes).
+function guiaBanco(titulo, texto) {
+    const t = document.getElementById('mission-title')
+    const i = document.getElementById('instruction-p')
+    if (t && titulo) t.textContent = titulo
+    if (i && texto) i.textContent = texto
+}
+
+// Levanta la PC ensamblada: reagrupa todas las piezas en `pcCarryGrp` centrado
+// en el origen del grupo, para poder cargarla y rotarla cómodamente.
+function agarrarPC() {
+    if (pcCargando || fase !== '3d') return
+    limpiarCablePC()
+    bootPC = null
+    dibujarPantallaPC()   // apaga la pantalla del monitor (SIN SEÑAL)
+
+    if (!pcCarryGrp) {
+        pcCarryGrp = new THREE.Group()
+        scene.add(pcCarryGrp)
+        PASOS.forEach(p => {
+            const g = modelos3D[p.id]
+            if (g && g.visible) pcCarryGrp.attach(g)   // conserva transform mundial
+        })
+        // Recentra los hijos alrededor del origen del grupo y guarda su "casa"
+        // (el sitio en la mesa) para poder devolverla.
+        const c = new THREE.Box3().setFromObject(pcCarryGrp).getCenter(new THREE.Vector3())
+        pcCarryGrp.children.forEach(ch => ch.position.sub(c))
+        pcCarryGrp.position.copy(c)
+        pcCarryGrp.userData.homePos = c.clone()
+        // Semialtura (a escala 1) para apoyar la base al posarla en el banco.
+        pcCarryGrp.updateWorldMatrix(true, true)
+        const s0 = pcCarryGrp.scale.x
+        pcCarryGrp.scale.setScalar(1)
+        pcCarryGrp.userData.halfY = new THREE.Box3().setFromObject(pcCarryGrp).getSize(new THREE.Vector3()).y / 2
+        pcCarryGrp.scale.setScalar(s0)
+    }
+    pcTween = null
+    pcCargando = true
+    pcEnBanco = false
+    pcCarryGrp.scale.setScalar(PC_CARRY_S)
+    LFSound.snap()
+    guiaBanco('Prueba de arranque', 'Llevas la PC ensamblada. Camina hasta el banco de pruebas (pared derecha), apúntalo con la mira y pulsa E para conectarla al monitor. Q para dejarla.')
+}
+
+// Cancela la carga: devuelve la PC a su sitio en la mesa central.
+function devolverPCaMesa() {
+    if (!pcCargando || !pcCarryGrp) return
+    pcCargando = false
+    pcEnBanco = false
+    const home = pcCarryGrp.userData.homePos || new THREE.Vector3(0, 1.1, 0)
+    pcTween = { fromPos: pcCarryGrp.position.clone(), toPos: home.clone(),
+                fromRY: pcCarryGrp.rotation.y, toRY: 0,
+                fromS: pcCarryGrp.scale.x, toS: 1, t: 0, dur: 0.7, alBanco: false }
+    guiaBanco('¡PC ensamblada con éxito!', 'Dejaste la PC en la mesa. Puedes volver a levantarla (E) para probarla en el banco.')
+}
+
+// Altura del origen de la PC para que su base quede apoyada en el banco.
+function alturaBaseBanco() {
+    const topY = bancoPruebas ? bancoPruebas.topY : 0
+    const halfY = (pcCarryGrp && pcCarryGrp.userData.halfY) || 0.85
+    return topY + halfY * PC_BANCO_S + 0.01
+}
+
+// Posa la PC sobre el banco de pruebas y lanza el arranque.
+function colocarPCEnBanco() {
+    if (!pcCargando || !pcCarryGrp || !pcBancoCfg) return
+    pcCargando = false
+    pcEnBanco = true
+    pcTween = {
+        fromPos: pcCarryGrp.position.clone(),
+        toPos: new THREE.Vector3(pcBancoCfg.x, alturaBaseBanco(), pcBancoCfg.z),
+        fromRY: pcCarryGrp.rotation.y, toRY: pcBancoCfg.ry,
+        fromS: pcCarryGrp.scale.x, toS: PC_BANCO_S,
+        t: 0, dur: 0.85, alBanco: true
+    }
+    LFSound.snap()
+    guiaBanco('Conectando al monitor…', 'La PC queda sobre el banco de pruebas. Conectando alimentación y video…')
+}
+
+// Cable simple PC→monitor (curva descendente entre ambos).
+function crearCablePC() {
+    limpiarCablePC()
+    if (!bancoPruebas || !pcCarryGrp) return
+    const a = pcCarryGrp.position.clone()
+    a.x += 0.12; a.y += 0.05
+    const b = new THREE.Vector3(bancoPruebas.x + 0.02, bancoPruebas.topY + 0.05, bancoPruebas.z)
+    const mid = a.clone().lerp(b, 0.5); mid.y -= 0.14
+    const curva = new THREE.QuadraticBezierCurve3(a, mid, b)
+    cablePC = new THREE.Mesh(
+        new THREE.TubeGeometry(curva, 20, 0.012, 6, false),
+        new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.6, metalness: 0.2 })
+    )
+    scene.add(cablePC)
+}
+
+function limpiarCablePC() {
+    if (cablePC) { scene.remove(cablePC); cablePC.geometry.dispose(); cablePC = null }
+}
+
+// Arranca la PC en el monitor: la secuencia depende de si el ensamble aprobó.
+function arrancarPC() {
+    const aprobado = notaFinalSesion >= NOTA_MINIMA
+    bootPC = { inicio: performance.now(), aprobado, beep: false, chime: false }
+    crearCablePC()
+    guiaBanco(
+        aprobado ? '¡La PC enciende!' : 'Arranque con error',
+        aprobado
+            ? 'Pulsaste encender: POST correcto → BIOS → el sistema arranca. Observa el video en el monitor.'
+            : 'El POST falla y el monitor muestra un error: el ensamble no cumple el mínimo. Repasa el orden y las piezas, y vuelve a probar.'
+    )
+
+    // Persistencia: registra la prueba de arranque en la BD una sola vez por sesión.
+    if (!pruebaArranqueGuardada) {
+        pruebaArranqueGuardada = true
+        registrarEvento({
+            tipo: aprobado ? 'prueba_arranque_ok' : 'prueba_arranque_fallo',
+            detalle: aprobado ? 'POST correcto en el banco de pruebas' : 'POST con error en el banco de pruebas'
+        })
+        marcarPruebaArranque({ exito: aprobado }).catch(() => {})
+    }
+}
+
+// Dibuja un fotograma del arranque en el monitor según el tiempo transcurrido.
+function dibujarPantallaPC() {
+    if (!pantallaPCcanvas) return
+    const c = pantallaPCcanvas
+    const ctx = c.getContext('2d')
+    const W = c.width, H = c.height
+
+    if (!bootPC) {                    // monitor en espera (apagado)
+        ctx.fillStyle = '#05070c'; ctx.fillRect(0, 0, W, H)
+        ctx.fillStyle = '#1c2733'; ctx.font = '16px "Segoe UI", sans-serif'
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillText('SIN SEÑAL', W / 2, H / 2)
+        pantallaPCtex.needsUpdate = true
+        return
+    }
+
+    const el = (performance.now() - bootPC.inicio) / 1000
+    ctx.textBaseline = 'alphabetic'
+
+    if (!bootPC.aprobado) {
+        // Arranque fallido: intento de POST y pantalla de error.
+        ctx.fillStyle = '#05070c'; ctx.fillRect(0, 0, W, H)
+        if (el < 1.1) {
+            if (!bootPC.beep && el > 0.25) { bootPC.beep = true; LFSound.beep(); setTimeout(() => LFSound.beep(), 180); setTimeout(() => LFSound.beep(), 360) }
+            ctx.fillStyle = '#8fa5bd'; ctx.font = '15px monospace'; ctx.textAlign = 'left'
+            ctx.fillText('LogicFlow BIOS  —  autotest de encendido (POST)', 22, 40)
+            ctx.fillText('Detectando hardware' + '.'.repeat(1 + (Math.floor(el * 3) % 3)), 22, 70)
+        } else {
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 6; ctx.strokeRect(10, 10, W - 20, H - 20)
+            ctx.textAlign = 'center'
+            ctx.fillStyle = '#ef4444'; ctx.font = 'bold 42px "Segoe UI", sans-serif'
+            ctx.fillText('POST ERROR', W / 2, 110)
+            ctx.fillStyle = '#eaf2ff'; ctx.font = '17px monospace'
+            ctx.fillText('Sistema inestable — el ensamble no cumple el estándar', W / 2, 158)
+            ctx.fillStyle = '#f59e0b'; ctx.font = '15px monospace'
+            ctx.fillText('Codigo: 0x' + (0xE00 + erroresSesion).toString(16).toUpperCase() + '   Errores: ' + erroresSesion, W / 2, 196)
+            ctx.fillStyle = '#8fa5bd'; ctx.font = '14px "Segoe UI", sans-serif'
+            ctx.fillText('Revisa el orden y la elección de piezas, y vuelve a probar.', W / 2, 240)
+            // cursor parpadeante
+            if (Math.floor(el * 2) % 2 === 0) { ctx.fillStyle = '#ef4444'; ctx.fillRect(W / 2 - 130, 270, 10, 18) }
+        }
+        pantallaPCtex.needsUpdate = true
+        return
+    }
+
+    // ── Arranque exitoso ──
+    if (el < 2.4) {
+        // POST: logo + conteo de memoria + componentes detectados.
+        ctx.fillStyle = '#05070c'; ctx.fillRect(0, 0, W, H)
+        if (!bootPC.beep && el > 0.25) { bootPC.beep = true; LFSound.beep() }
+        ctx.textAlign = 'left'
+        ctx.font = 'bold 26px "Segoe UI", sans-serif'
+        ctx.fillStyle = '#3a8bff'; ctx.fillText('Logic', 22, 44)
+        ctx.fillStyle = '#eaf2ff'; ctx.fillText('Flow BIOS  v1.1', 22 + ctx.measureText('Logic').width, 44)
+        ctx.font = '14px monospace'; ctx.fillStyle = '#8fa5bd'
+        const mem = Math.min(16384, Math.floor((el / 1.4) * 16384))
+        ctx.fillText(`Memoria: ${mem} MB  OK`, 22, 78)
+        ctx.fillStyle = '#4ade80'
+        const nDet = Math.min(PASOS.length, Math.floor(el / 0.16))
+        for (let i = 0; i < nDet; i++) {
+            ctx.fillText('  ✓ ' + PASOS[i].nombre + ' detectado', 22, 104 + i * 17)
+        }
+    } else if (el < 3.3) {
+        // Transición: cargando sistema.
+        ctx.fillStyle = '#0b1524'; ctx.fillRect(0, 0, W, H)
+        ctx.textAlign = 'center'
+        ctx.font = 'bold 28px "Segoe UI", sans-serif'; ctx.fillStyle = '#3a8bff'
+        ctx.fillText('LogicFlow OS', W / 2, H / 2 - 20)
+        ctx.fillStyle = '#8fa5bd'; ctx.font = '15px "Segoe UI", sans-serif'
+        ctx.fillText('Iniciando el sistema…', W / 2, H / 2 + 12)
+        const a = (el - 2.4) / 0.9
+        ctx.strokeStyle = '#1e2b3d'; ctx.lineWidth = 4
+        ctx.beginPath(); ctx.arc(W / 2, H / 2 + 52, 16, 0, Math.PI * 2); ctx.stroke()
+        ctx.strokeStyle = '#3a8bff'
+        ctx.beginPath(); ctx.arc(W / 2, H / 2 + 52, 16, el * 6, el * 6 + Math.PI * 1.4); ctx.stroke()
+    } else {
+        // Escritorio con "video" en bucle.
+        if (!bootPC.chime) { bootPC.chime = true; LFSound.complete() }
+        dibujarEscritorioPC(ctx, W, H, el - 3.3)
+    }
+    pantallaPCtex.needsUpdate = true
+}
+
+// Escritorio animado del sistema arrancado: fondo, ventana de "video" con una
+// forma de onda que reacciona, barra de tareas y reloj de sesión.
+function dibujarEscritorioPC(ctx, W, H, t) {
+    // Fondo degradado
+    const grad = ctx.createLinearGradient(0, 0, 0, H)
+    grad.addColorStop(0, '#0e2038'); grad.addColorStop(1, '#0a1424')
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H)
+
+    // Ventana de reproductor de video
+    const vx = 40, vy = 34, vw = W - 80, vh = H - 110
+    ctx.fillStyle = '#050a12'; ctx.fillRect(vx, vy, vw, vh)
+    ctx.strokeStyle = '#1e3550'; ctx.lineWidth = 2; ctx.strokeRect(vx, vy, vw, vh)
+    // Barra de título del reproductor
+    ctx.fillStyle = '#12233c'; ctx.fillRect(vx, vy, vw, 22)
+    ctx.fillStyle = '#7fd4ff'; ctx.font = '12px "Segoe UI", sans-serif'; ctx.textAlign = 'left'
+    ctx.fillText('▶ LogicFlow — demo de video', vx + 10, vy + 15)
+
+    // Forma de onda animada (el "video")
+    ctx.save()
+    ctx.beginPath(); ctx.rect(vx, vy + 22, vw, vh - 22); ctx.clip()
+    const cy = vy + 22 + (vh - 22) / 2
+    ctx.lineWidth = 3
+    for (let b = 0; b < 3; b++) {
+        ctx.strokeStyle = ['#3a8bff', '#7fd4ff', '#4ade80'][b]
+        ctx.globalAlpha = 0.85 - b * 0.22
+        ctx.beginPath()
+        for (let x = 0; x <= vw; x += 6) {
+            const y = cy + Math.sin(x * 0.03 + t * 3 + b * 1.2) * (26 + 14 * Math.sin(t * 1.3 + b)) * Math.sin(x / vw * Math.PI)
+            x === 0 ? ctx.moveTo(vx + x, y) : ctx.lineTo(vx + x, y)
+        }
+        ctx.stroke()
+    }
+    ctx.globalAlpha = 1
+    // Logo pulsante al centro del video
+    const pr = 20 + Math.sin(t * 2.4) * 3
+    ctx.fillStyle = 'rgba(58,139,255,0.16)'
+    ctx.beginPath(); ctx.arc(vx + vw / 2, cy, pr + 12, 0, Math.PI * 2); ctx.fill()
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.font = 'bold 22px "Segoe UI", sans-serif'; ctx.fillStyle = '#eaf2ff'
+    ctx.fillText('LF', vx + vw / 2, cy)
+    ctx.textBaseline = 'alphabetic'
+    ctx.restore()
+
+    // Barra de tareas
+    ctx.fillStyle = '#0a1220'; ctx.fillRect(0, H - 34, W, 34)
+    ctx.fillStyle = '#3a8bff'; ctx.beginPath(); ctx.arc(24, H - 17, 9, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = '#eaf2ff'; ctx.font = 'bold 12px "Segoe UI", sans-serif'; ctx.textAlign = 'left'
+    ctx.fillText('LF', 20, H - 13)
+    ctx.fillStyle = '#4ade80'; ctx.font = '13px "Segoe UI", sans-serif'
+    ctx.fillText('● Sistema estable', 48, H - 13)
+    // Reloj de sesión
+    const total = Math.floor(t)
+    const mm = String(Math.floor(total / 60)).padStart(2, '0')
+    const ss = String(total % 60).padStart(2, '0')
+    ctx.textAlign = 'right'; ctx.fillStyle = '#8fa5bd'
+    ctx.fillText(`${mm}:${ss}`, W - 16, H - 13)
 }
 
 function crearSalaTaller(grupo) {
@@ -3415,133 +2976,9 @@ function crearProps(grupo) {
     }
 }
 
-function meshEntre(p1, p2, radio, mat) {
-    const dir = new THREE.Vector3().subVectors(p2, p1)
-    const len = dir.length()
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(radio, radio, len, 18), mat)
-    m.position.copy(p1).lerp(p2, 0.5)
-    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize())
-    m.castShadow = true
-    return m
-}
-
-function crearLampara() {
-    const g = new THREE.Group()
-    const metalOsc = new THREE.MeshStandardMaterial({ color: 0x23272e, metalness: 0.7, roughness: 0.35 })
-
-    const pBase   = new THREE.Vector3(0,    0.05, 0)
-    const pCodo   = new THREE.Vector3(0,    0.62, 0)
-    const pMuneca = new THREE.Vector3(0.5,  0.86, 0)
-    const pFoco   = new THREE.Vector3(0.66, 0.60, 0)
-
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.045, 36), metalOsc)
-    base.position.y = 0.022; base.castShadow = true; g.add(base)
-    const cuello = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.06, 24), metalOsc)
-    cuello.position.y = 0.07; g.add(cuello)
-
-    g.add(meshEntre(pBase, pCodo, 0.02, metalOsc))
-    g.add(meshEntre(pCodo, pMuneca, 0.018, metalOsc))
-    ;[pCodo, pMuneca].forEach(p => {
-        const j = new THREE.Mesh(new THREE.SphereGeometry(0.034, 18, 18), metalOsc)
-        j.position.copy(p); g.add(j)
-    })
-
-    const eje = new THREE.Vector3().subVectors(pFoco, pMuneca)
-    const pantalla = new THREE.Mesh(
-        new THREE.ConeGeometry(0.15, eje.length() * 1.3, 30, 1, true),
-        new THREE.MeshStandardMaterial({ color: 0x2c79c7, metalness: 0.45, roughness: 0.4, side: THREE.DoubleSide })
-    )
-    pantalla.position.copy(pMuneca).lerp(pFoco, 0.5)
-    pantalla.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), eje.clone().normalize())
-    pantalla.castShadow = true
-    g.add(pantalla)
-
-    const foco = new THREE.Mesh(
-        new THREE.SphereGeometry(0.045, 16, 16),
-        new THREE.MeshStandardMaterial({ color: 0xfff3da, emissive: 0xffd98a, emissiveIntensity: 2.4 })
-    )
-    foco.position.copy(pFoco); g.add(foco)
-
-    const luz = new THREE.PointLight(0xffca70, 8, 4.5, 2)
-    luz.position.copy(pFoco).add(new THREE.Vector3(0.04, -0.06, 0))
-    g.add(luz)
-
-    g.position.set(-1.5, 0, -0.5)
-    g.rotation.y = Math.PI / 4.5
-    return g
-}
-
-function crearCajaHerramientas() {
-    const g = new THREE.Group()
-    const rojo = new THREE.MeshStandardMaterial({ color: 0xb23b34, metalness: 0.4, roughness: 0.45 })
-    const gris = new THREE.MeshStandardMaterial({ color: 0x33373d, metalness: 0.6, roughness: 0.4 })
-
-    const cuerpo = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.26, 0.34), rojo)
-    cuerpo.position.y = 0.13; cuerpo.castShadow = true; g.add(cuerpo)
-
-    const tapa = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.1, 0.36), rojo)
-    tapa.position.y = 0.3; tapa.castShadow = true; g.add(tapa)
-
-    const manija = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.012, 12, 24, Math.PI), gris)
-    manija.position.set(0, 0.36, 0); g.add(manija)
-
-    const cierre = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.02), gris)
-    cierre.position.set(0.2, 0.22, 0.18); g.add(cierre)
-
-    g.position.set(1.5, 0, -0.5)
-    g.rotation.y = -Math.PI / 7
-    return g
-}
-
-function crearDestornillador() {
-    const g = new THREE.Group()
-    const mango = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.035, 0.03, 0.18, 20),
-        new THREE.MeshStandardMaterial({ color: 0xe0a52e, metalness: 0.2, roughness: 0.5 })
-    )
-    const eje = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.012, 0.012, 0.22, 16),
-        new THREE.MeshStandardMaterial({ color: 0xc9ccd2, metalness: 0.85, roughness: 0.25 })
-    )
-    eje.position.y = 0.2
-    mango.add(eje)
-    g.add(mango)
-    g.rotation.z = Math.PI / 2
-    g.rotation.y = Math.PI / 6
-    g.position.set(0.62, 0.04, 0.62)
-    g.traverse(o => { if (o.isMesh) o.castShadow = true })
-    return g
-}
-
-function crearTaza() {
-    const g = new THREE.Group()
-    const blanco = new THREE.MeshStandardMaterial({ color: 0xeef1f4, metalness: 0.05, roughness: 0.4 })
-    const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.16, 28), blanco)
-    cuerpo.position.y = 0.08; cuerpo.castShadow = true; g.add(cuerpo)
-    const cafe = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.082, 0.082, 0.01, 28),
-        new THREE.MeshStandardMaterial({ color: 0x3a2317, roughness: 0.3 })
-    )
-    cafe.position.y = 0.155; g.add(cafe)
-    const asa = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.014, 12, 24), blanco)
-    asa.position.set(0.095, 0.08, 0); asa.rotation.y = Math.PI / 2; g.add(asa)
-    g.position.set(1.15, 0, 0.7)
-    return g
-}
-
-function crearBobinaCable() {
-    const g = new THREE.Group()
-    const negro = new THREE.MeshStandardMaterial({ color: 0x1a1d22, metalness: 0.2, roughness: 0.6 })
-    for (let i = 0; i < 3; i++) {
-        const aro = new THREE.Mesh(new THREE.TorusGeometry(0.13 - i * 0.018, 0.022, 14, 36), negro)
-        aro.rotation.x = Math.PI / 2
-        aro.position.y = 0.022 + i * 0.005
-        aro.castShadow = true
-        g.add(aro)
-    }
-    g.position.set(-1.0, 0.0, 0.68)
-    return g
-}
+// Las fábricas de props del taller (meshEntre, crearLampara,
+// crearCajaHerramientas, crearDestornillador, crearTaza, crearBobinaCable)
+// viven ahora en ./juego-props.js — se importan al inicio del módulo.
 
 function construirIluminacion() {
 
@@ -3869,6 +3306,33 @@ function animar() {
         heldMesh.position.y += -0.19 + Math.sin(t * 2.8) * 0.007
         heldMesh.rotation.set(camera.rotation.x + 0.18, camera.rotation.y, camera.rotation.z)
     }
+
+    // PC ensamblada cargada en brazos: se sostiene al frente, más abajo y
+    // pesada (bamboleo lento), siempre en vertical.
+    if (pcCargando && pcCarryGrp && walkMode && camera) {
+        camera.getWorldDirection(_scrFwd)
+        _scrRight.crossVectors(_scrFwd, _UP).normalize()
+        pcCarryGrp.position.copy(camera.position)
+            .addScaledVector(_scrFwd, 0.85)
+            .addScaledVector(_scrRight, 0.10)
+        pcCarryGrp.position.y += -0.42 + Math.sin(t * 2.2) * 0.012
+        pcCarryGrp.rotation.set(0, camera.rotation.y, 0)
+    }
+
+    // Traslado de la PC (mesa→banco o banco→mesa).
+    if (pcTween && pcCarryGrp) {
+        pcTween.t += delta / pcTween.dur
+        const k = Math.min(1, pcTween.t)
+        const e = k * k * (3 - 2 * k)
+        pcCarryGrp.position.lerpVectors(pcTween.fromPos, pcTween.toPos, e)
+        pcCarryGrp.rotation.y = pcTween.fromRY + (pcTween.toRY - pcTween.fromRY) * e
+        pcCarryGrp.scale.setScalar(pcTween.fromS + (pcTween.toS - pcTween.fromS) * e)
+        pedirActualizarSombras()
+        if (k >= 1) { const al = pcTween.alBanco; pcTween = null; if (al) arrancarPC() }
+    }
+
+    // Arranque en el monitor de la estación de pruebas.
+    if (bootPC && (frameCount & 1) === 0) dibujarPantallaPC()
 
     frameCount++
     if (walkMode && walkControls?.isLocked && frameCount % 12 === 0) {
@@ -4611,7 +4075,10 @@ window.addEventListener('keydown', (e) => {
         case 'KeyD': case 'ArrowRight': if (walkMode) teclas.d = true; break
         case 'ShiftLeft': case 'ShiftRight': if (walkMode) teclas.shift = true; break
         case 'KeyE': interactuarE(); break
-        case 'KeyQ': if (walkMode && heldComponent) soltarComponente(); break
+        case 'KeyQ':
+            if (walkMode && heldComponent) soltarComponente()
+            else if (walkMode && pcCargando) devolverPCaMesa()
+            break
         case 'Escape': if (procActivo) { e.preventDefault(); cancelarProcedimiento() } break
     }
 })

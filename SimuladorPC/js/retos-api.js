@@ -1,9 +1,9 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS } from './supabase-config.js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, authStore } from './supabase-config.js'
 
 const TIMEOUT = 12000
 
 function getUserId() {
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     if (!token) return null
     try {
         const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
@@ -12,7 +12,7 @@ function getUserId() {
 }
 
 async function dataRequest(path, options = {}) {
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     const headers = {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,

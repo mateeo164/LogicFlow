@@ -6,7 +6,7 @@
 //       - al cargar: se FUSIONA (unión) lo local con lo del servidor, sin perder nada
 //         (esto migra el progreso local previo a la nube la primera vez).
 //       - al completar: se guarda local al instante y se empuja al servidor en segundo plano.
-import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS } from './supabase-config.js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, authStore } from './supabase-config.js'
 
 const LOCAL_KEY = 'logicflow_academia_completadas'
 const TIMEOUT = 12000
@@ -30,11 +30,11 @@ function guardarLocal(arr) {
 
 // ------------------------------------------------------------------ sesión
 export function estaLogueado() {
-  return !!localStorage.getItem(STORAGE_KEYS.accessToken)
+  return !!authStore.getItem(STORAGE_KEYS.accessToken)
 }
 
 function getUserId() {
-  const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+  const token = authStore.getItem(STORAGE_KEYS.accessToken)
   if (!token) return null
   try {
     const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
@@ -43,7 +43,7 @@ function getUserId() {
 }
 
 async function dataRequest(path, options = {}) {
-  const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+  const token = authStore.getItem(STORAGE_KEYS.accessToken)
   const headers = {
     apikey: SUPABASE_ANON_KEY,
     Authorization: `Bearer ${token}`,

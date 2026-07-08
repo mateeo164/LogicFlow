@@ -1,9 +1,9 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS } from './supabase-config.js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, authStore } from './supabase-config.js'
 
 const TIMEOUT = 12000
 
 async function dataRequest(path, options = {}) {
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     const headers = {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,
@@ -184,7 +184,7 @@ export async function subirArchivoEntrega(tareaId, file) {
         throw new Error('Formato no permitido. Sube un PDF, Word o imagen.')
     }
 
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     const userId = obtenerUserId()
     if (!userId) throw new Error('Sesión no válida. Vuelve a iniciar sesión.')
 
@@ -230,13 +230,13 @@ export async function urlArchivoEntrega(path, expiraSeg = 3600) {
 
 function obtenerUserId() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEYS.user)
+        const raw = authStore.getItem(STORAGE_KEYS.user)
         return raw ? JSON.parse(raw)?.id || null : null
     } catch { return null }
 }
 
 async function storageRequest(path, options = {}) {
-    const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+    const token = authStore.getItem(STORAGE_KEYS.accessToken)
     const ctrl = new AbortController()
     const tid = setTimeout(() => ctrl.abort(), TIMEOUT)
     try {
