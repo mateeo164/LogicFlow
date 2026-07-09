@@ -1,4 +1,5 @@
 import { protegerRuta } from './auth.js'
+import { academiaAprobada } from './academia-api.js'
 import { STORAGE_KEYS, authStore } from './supabase-config.js'
 import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, marcarAprobacionWeb, subirFotoSimulador, guardarComprension, marcarPruebaArranque } from './progreso.js'
 import { PROC_LOGRO, notaConBono } from './achievements.js'
@@ -13,7 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { obtenerReto, calcularNotaReto, LOGROS_RETO, NOTA_MINIMA_RETO } from './retos-data.js'
 import { guardarResultadoReto, obtenerResultadosRetos, otorgarLogros, obtenerLogrosUsuario } from './retos-api.js'
 import * as LFSound from './audio.js'
-import { PREGUNTAS_COMPONENTE, EVALUACION, notaConceptual, combinarNota, gananciaAprendizaje, notaDestreza } from './quiz-data.js'
+import { EVALUACION, elegirPreguntaComponente, notaConceptual, combinarNota, gananciaAprendizaje, notaDestreza } from './quiz-data.js'
 
 import { PASOS } from './pasos-data.js'
 import { crearTexturaRadial, crearTexturaMadera, crearTexturaMaderaClara, crearTexturaLetreroComponentes, crearTexturaPisoModerno, crearTexturaPegboard, crearTexturaMat, crearTexturaEtiqueta, crearTexturaPared, crearTexturaCielo, crearTexturaCartel, crearTexturaBlueprint } from './texturas.js'
@@ -289,7 +290,10 @@ function droneHabla(msg) {}
 // Da retroalimentación del PORQUÉ y suma a la nota de comprensión.
 // Llama onDone() cuando el estudiante pulsa "Continuar".
 function mostrarQuizComponente(paso, onDone) {
-    const q = PREGUNTAS_COMPONENTE[paso.id]
+    // El banco de preguntas por componente es un ARREGLO; se elige una al azar.
+    // (Antes se usaba PREGUNTAS_COMPONENTE[id] como objeto único y q.opciones era
+    // undefined → el quiz se rompía al intentar pintar las opciones.)
+    const q = elegirPreguntaComponente(paso.id)
     if (!q) { onDone(); return }
 
     fase = 'quiz'
@@ -1053,7 +1057,14 @@ async function finalizarPaso(paso) {
             if (indiceActual < TOTAL) mostrarVideo(indiceActual)
             else mostrarEvaluacion('post', () => iniciarPruebaFinal())  // test final, luego prueba de arranque
         }
-        mostrarQuizComponente(paso, continuar)
+        // El quiz NUNCA debe poder dejar al estudiante en un overlay roto sin salida:
+        // si algo falla al pintarlo, continuamos igual con el siguiente componente.
+        try {
+            mostrarQuizComponente(paso, continuar)
+        } catch (err) {
+            console.warn('[LogicFlow] Quiz de componente falló; se avanza igual:', err?.message)
+            continuar()
+        }
     }, 2400)
 }
 
@@ -2175,7 +2186,7 @@ function cargarHerramientas() {
         fact: 'Brocha antiestática: para limpiar el polvo de ventiladores y disipadores. El polvo es el enemigo nº1 de la temperatura.'
     })
     cargarProp('fluck__probs.opt.glb', {
-        id: 'multimeter', size: 0.5, x: 4.0, z: 2.55, y: -0.3, rotY: -Math.PI / 2,
+        id: 'multimeter', size: 0.5, x: 3.62, z: 2.72, y: -0.01, rotY: -Math.PI / 2,
         fact: 'Multímetro: mide voltajes para diagnosticar la fuente y detectar componentes dañados. Clave en la estación de diagnóstico.',
         onClic: clicMultimetro
     })
@@ -2200,7 +2211,9 @@ function montarEstacionPruebas() {
             bancoPruebas = { x: wbX, z: wbZ, topY }
             // Zona de posado de la PC: al costado del monitor (hacia -Z), bien dentro
             // del banco. La Y se calcula al posar (alturaBaseBanco) según su altura.
-            pcBancoCfg = { x: 4.28, z: 1.02, ry: 0 }
+            // ry=π orienta el gabinete con su cara visible (cristal/componentes) hacia
+            // la persona (-X); con ry=0 quedaba al revés (frente hacia la pared).
+            pcBancoCfg = { x: 4.28, z: 1.02, ry: Math.PI }
             cargarProp('pc_monitor.opt.glb', {
                 id: 'monitor', size: 1.25, x: 4.42, z: 2.08, y: topY, rotY: faceCentro, anim: false,
                 fact: 'Monitor de pruebas: muestra el POST/BIOS cuando la PC arranca por primera vez.',
@@ -2239,11 +2252,15 @@ function crearPantallaPC(monitorGrp, half) {
     pantallaPCtex = new THREE.CanvasTexture(pantallaPCcanvas)
     pantallaPCtex.colorSpace = THREE.SRGBColorSpace
 
+    // El plano se apoya sobre el cristal del monitor, justo delante de su cara frontal
+    // (half.z * 1.03 ≈ 8 mm por delante para evitar z-fighting, no flota de lado). El
+    // alto es MENOR que half.y*2 porque ese bounding incluye la peana: se recorta a la
+    // zona de pantalla y se sube (y = half.y*0.36) para quedar dentro del bisel.
     pantallaPCmesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(half.x * 1.62, half.y * 1.5),
+        new THREE.PlaneGeometry(half.x * 1.34, half.y * 1.10),
         new THREE.MeshBasicMaterial({ map: pantallaPCtex })
     )
-    pantallaPCmesh.position.set(0, half.y * 0.16, half.z + 0.008)
+    pantallaPCmesh.position.set(0, half.y * 0.36, half.z * 1.03)
     monitorGrp.add(pantallaPCmesh)
     dibujarPantallaPC()   // estado "apagado/en espera"
 }
@@ -3459,8 +3476,15 @@ function leerProgresoLocal() {
 }
 
 function guardarProgresoLocal(id) {
-    const arr = leerProgresoLocal()
-    if (!arr.includes(id)) { arr.push(id); localStorage.setItem(LS_KEY, JSON.stringify(arr)) }
+    // El setItem va en try/catch: si el navegador bloquea localStorage (modo
+    // privado, datos de sitio bloqueados por política, cuota llena) NO debe
+    // reventar el avance del ensamble. Antes, esta excepción cortaba
+    // finalizarPaso antes de indiceActual++ y la pieza quedaba "sin instalar"
+    // (el simulador volvía a pedir el mismo componente).
+    try {
+        const arr = leerProgresoLocal()
+        if (!arr.includes(id)) { arr.push(id); localStorage.setItem(LS_KEY, JSON.stringify(arr)) }
+    } catch (_) { /* progreso local no disponible; el avance en memoria sigue */ }
 }
 
 function limpiarProgresoLocal() {
@@ -3470,11 +3494,13 @@ function limpiarProgresoLocal() {
 const LS_STATS_KEY = 'lf_stats'
 
 function guardarStatsLocal() {
-    localStorage.setItem(LS_STATS_KEY, JSON.stringify({
-        errores: erroresSesion,
-        demoras: demorasSesion,
-        tiempoMs: Date.now() - labStartTime
-    }))
+    try {
+        localStorage.setItem(LS_STATS_KEY, JSON.stringify({
+            errores: erroresSesion,
+            demoras: demorasSesion,
+            tiempoMs: Date.now() - labStartTime
+        }))
+    } catch (_) { /* stats locales opcionales; no debe cortar el flujo */ }
 }
 
 function leerStatsLocal() {
@@ -4141,5 +4167,11 @@ window.addEventListener('keyup', (e) => {
 document.addEventListener('DOMContentLoaded', async () => {
     const session = await protegerRuta()
     if (!session) return
+    // Requisito pedagógico: el laboratorio 3D (ensamble y retos) exige completar
+    // la Academia con buena calificación. Si no, se envía a estudiar primero.
+    if (!academiaAprobada()) {
+        window.location.replace('academia.html?bloqueo=sim')
+        return
+    }
     initGame()
 })

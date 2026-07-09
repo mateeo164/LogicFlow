@@ -1,7 +1,7 @@
 // leccion.js — Renderiza una lección individual (?id=), su mini-quiz y la navegación.
 import { LECCIONES, leccionesEnOrden } from './academia-data.js'
-import { PREGUNTAS_COMPONENTE } from './quiz-data.js'
-import { leerLocal, completar, sincronizar } from './academia-api.js'
+import { elegirPreguntaComponente } from './quiz-data.js'
+import { leerLocal, completar, sincronizar, registrarQuiz } from './academia-api.js'
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => (
@@ -34,7 +34,10 @@ function renderBloque(b) {
 
 // --- Mini-quiz ------------------------------------------------------------
 function renderQuiz(quizKey) {
-  const q = PREGUNTAS_COMPONENTE[quizKey]
+  // El banco de cada componente es un ARREGLO de preguntas; se elige UNA al azar.
+  // (Usarlo como objeto único dejaba q.opciones undefined y rompía el render de
+  // toda la lección, dejándola en "Cargando…".)
+  const q = elegirPreguntaComponente(quizKey)
   if (!q) return ''
   const opciones = q.opciones.map((op, i) => `
     <button type="button" class="quiz-opt" data-idx="${i}">
@@ -42,7 +45,7 @@ function renderQuiz(quizKey) {
       <span class="quiz-opt__text">${escapeHtml(op)}</span>
     </button>`).join('')
   return `
-    <section class="lec-quiz" id="lec-quiz" data-correcta="${q.correcta}">
+    <section class="lec-quiz" id="lec-quiz" data-correcta="${q.correcta}" data-explica="${escapeHtml(q.explica || '')}">
       <span class="lec-quiz__eyebrow">Comprueba lo aprendido</span>
       <h2 class="lec-quiz__pregunta">${escapeHtml(q.pregunta)}</h2>
       <div class="quiz-opts" id="quiz-opts">${opciones}</div>
@@ -52,9 +55,9 @@ function renderQuiz(quizKey) {
     </section>`
 }
 
-function bindQuiz(onResuelto) {
+function bindQuiz(id, onResuelto) {
   const quiz = document.getElementById('lec-quiz')
-  if (!quiz) { onResuelto(); return }
+  if (!quiz) { onResuelto(false); return }
   const correcta = parseInt(quiz.dataset.correcta, 10)
   const opts = quiz.querySelectorAll('.quiz-opt')
   const feedback = document.getElementById('quiz-feedback')
@@ -68,6 +71,10 @@ function bindQuiz(onResuelto) {
       const idx = parseInt(btn.dataset.idx, 10)
       const acierto = idx === correcta
 
+      // Anota la calificación de la Academia (acierto suma; fallo resta). De esto
+      // depende el requisito de "buena calificación" para entrar al laboratorio 3D.
+      registrarQuiz(id, acierto)
+
       opts.forEach(o => {
         o.disabled = true
         const oi = parseInt(o.dataset.idx, 10)
@@ -80,7 +87,7 @@ function bindQuiz(onResuelto) {
       feedback.querySelector('.quiz-feedback__text').innerHTML =
         `<strong>${acierto ? '¡Correcto! ' : 'No exactamente. '}</strong>${escapeHtml(explica)}`
 
-      onResuelto()
+      onResuelto(acierto)
     })
   })
 }
@@ -188,12 +195,6 @@ function init() {
       ${renderNav(orden, idx)}
     </article>`
 
-  // Guarda la explicación del quiz para el feedback.
-  if (lec.quiz && PREGUNTAS_COMPONENTE[lec.quiz]) {
-    const quizEl = document.getElementById('lec-quiz')
-    if (quizEl) quizEl.dataset.explica = PREGUNTAS_COMPONENTE[lec.quiz].explica || ''
-  }
-
   const btn = document.getElementById('btn-completar')
   const doneTag = document.getElementById('lec-done-tag')
 
@@ -214,7 +215,7 @@ function init() {
   if (lec.quiz && !yaHecha) {
     // Con quiz: el botón se habilita al responder (haya acierto o no; lo importante es intentarlo).
     if (btn) btn.disabled = true
-    bindQuiz(() => {
+    bindQuiz(id, () => {
       if (btn) {
         btn.disabled = false
         btn.textContent = 'Marcar como completada'
@@ -222,7 +223,8 @@ function init() {
     })
     if (btn) btn.addEventListener('click', onCompletar)
   } else if (lec.quiz && yaHecha) {
-    bindQuiz(() => {})
+    // Ya completada: el quiz sigue activo para poder subir la calificación.
+    bindQuiz(id, () => {})
   } else if (btn) {
     btn.addEventListener('click', onCompletar)
   }

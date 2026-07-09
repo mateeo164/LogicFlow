@@ -7,8 +7,14 @@
 //         (esto migra el progreso local previo a la nube la primera vez).
 //       - al completar: se guarda local al instante y se empuja al servidor en segundo plano.
 import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, authStore } from './supabase-config.js'
+import { leccionesEnOrden } from './academia-data.js'
 
 const LOCAL_KEY = 'logicflow_academia_completadas'
+// Calificación de la Academia: ids de lección cuyo mini-quiz se respondió BIEN.
+// Es la fuente de la "buena calificación" que exige el laboratorio 3D.
+const LOCAL_KEY_ACIERTOS = 'logicflow_academia_aciertos'
+// Nota mínima (proporción de mini-quiz acertados) para desbloquear el simulador.
+export const UMBRAL_APROBACION_ACADEMIA = 0.7
 const TIMEOUT = 12000
 
 // ------------------------------------------------------------------ local
@@ -26,6 +32,71 @@ function guardarLocal(arr) {
   try {
     localStorage.setItem(LOCAL_KEY, JSON.stringify([...new Set(arr)]))
   } catch (e) { /* almacenamiento no disponible */ }
+}
+
+// ------------------------------------------------------- calificación (quiz)
+// Lista de ids de lección cuyo mini-quiz se acertó (fuente instantánea local).
+export function leerAciertos() {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY_ACIERTOS)
+    const arr = raw ? JSON.parse(raw) : []
+    return Array.isArray(arr) ? arr : []
+  } catch (e) {
+    return []
+  }
+}
+
+// Registra el resultado del mini-quiz de una lección: si acierta suma, si falla
+// resta (así reintentar y fallar baja la nota, y reintentar y acertar la sube).
+// Devuelve la lista actualizada de aciertos.
+export function registrarQuiz(id, acierto) {
+  const set = new Set(leerAciertos())
+  if (acierto) set.add(id)
+  else set.delete(id)
+  const lista = [...set]
+  try {
+    localStorage.setItem(LOCAL_KEY_ACIERTOS, JSON.stringify(lista))
+  } catch (e) { /* almacenamiento no disponible */ }
+  return lista
+}
+
+// Estado agregado de la Academia: cuánto se leyó, cuántos quiz se acertaron y si
+// se cumple el requisito para entrar al laboratorio 3D (todo leído + buena nota).
+export function estadoAcademia(completadas = leerLocal(), aciertos = leerAciertos()) {
+  const orden = leccionesEnOrden()
+  const totalLecciones = orden.length
+  const idsConQuiz = orden.filter(l => l.quiz).map(l => l.id)
+  const totalQuizzes = idsConQuiz.length
+
+  const setHechas = new Set(completadas)
+  const setAciertos = new Set(aciertos)
+
+  const leccionesCompletadas = orden.filter(l => setHechas.has(l.id)).length
+  const correctas = idsConQuiz.filter(id => setAciertos.has(id)).length
+
+  const pctQuiz = totalQuizzes ? correctas / totalQuizzes : 1
+  const notaSobre10 = Math.round(pctQuiz * 100) / 10        // 6/8 → 7.5
+  const notaMinima = Math.round(UMBRAL_APROBACION_ACADEMIA * 100) / 10
+  const todoLeido = totalLecciones ? leccionesCompletadas >= totalLecciones : true
+  const buenaNota = pctQuiz >= UMBRAL_APROBACION_ACADEMIA
+
+  return {
+    totalLecciones,
+    leccionesCompletadas,
+    todoLeido,
+    totalQuizzes,
+    correctas,
+    pctQuiz,
+    notaSobre10,
+    notaMinima,
+    buenaNota,
+    aprobada: todoLeido && buenaNota
+  }
+}
+
+// ¿Puede el usuario entrar al laboratorio 3D? (lectura síncrona, sin red).
+export function academiaAprobada() {
+  return estadoAcademia().aprobada
 }
 
 // ------------------------------------------------------------------ sesión

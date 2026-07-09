@@ -746,3 +746,69 @@
 @media (max-width: 768px) {
   .leccion-main { padding: 28px 16px 60px; }
 }
+
+/* ============= Candado del laboratorio 3D (requisito Academia) ============= */
+
+/* Aviso al ser rebotado desde el simulador (?bloqueo=sim) */
+.academia-bloqueo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  margin-bottom: 28px;
+  border-radius: var(--lf-radius-xl);
+  background: color-mix(in srgb, var(--lf-amber-500) 14%, var(--lf-surface-0));
+  border: 1px solid color-mix(in srgb, var(--lf-amber-500) 45%, transparent);
+  color: var(--lf-text-primary);
+}
+.academia-bloqueo__icon { font-size: 22px; flex-shrink: 0; }
+.academia-bloqueo__texto { font-size: 14.5px; line-height: 1.5; margin: 0; }
+
+/* Tarjeta de estado de desbloqueo */
+.academia-gate {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 24px;
+  margin-bottom: 40px;
+  background: var(--lf-surface-0);
+  border: 1px solid var(--lf-border-light);
+  border-left: 4px solid var(--lf-amber-500);
+  border-radius: var(--lf-radius-xl);
+  box-shadow: var(--lf-shadow-sm);
+  transition: border-color .3s ease;
+}
+.academia-gate.is-unlocked { border-left-color: var(--lf-emerald-500); }
+.academia-gate__icon { font-size: 32px; flex-shrink: 0; }
+.academia-gate__body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.academia-gate__title { font-size: 17px; font-weight: 700; margin: 0; color: var(--lf-text-primary); }
+.academia-gate__desc { font-size: 14px; line-height: 1.5; margin: 0; color: var(--lf-text-secondary); }
+.academia-gate__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--lf-text-muted);
+}
+.academia-gate__stat strong {
+  font-family: var(--lf-font-serif);
+  font-size: 16px;
+  color: var(--lf-primary-700);
+}
+[data-theme="dark"] .academia-gate__stat strong { color: var(--lf-primary-300); }
+.academia-gate.is-unlocked .academia-gate__stat strong { color: var(--lf-emerald-600); }
+.academia-gate__btn { flex-shrink: 0; }
+
+/* Enlaces al laboratorio bloqueados */
+.btn.is-locked {
+  opacity: .55;
+  filter: grayscale(.4);
+  cursor: not-allowed;
+}
+.btn.is-locked::before { content: "🔒 "; }
+
+@media (max-width: 640px) {
+  .academia-gate { flex-direction: column; text-align: center; align-items: stretch; }
+  .academia-gate__btn { width: 100%; }
+}

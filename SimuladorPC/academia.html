@@ -37,6 +37,14 @@
 
     <main class="tools-main academia-main">
 
+        <div class="academia-bloqueo" id="academia-bloqueo" role="alert" hidden>
+            <span class="academia-bloqueo__icon" aria-hidden="true">🔒</span>
+            <p class="academia-bloqueo__texto">
+                Para entrar al <strong>laboratorio 3D</strong> primero debes completar la Academia y obtener al menos
+                <strong id="bloqueo-nota">7.0</strong>/10 en los mini-quiz. ¡Termina tu ruta y desbloquéalo!
+            </p>
+        </div>
+
         <section class="tools-hero">
             <span class="tools-eyebrow"><span class="eyebrow-dot"></span>Ruta de aprendizaje</span>
             <h1 class="tools-title">La <span class="lf-text-gradient">Academia</span> de hardware</h1>
@@ -56,6 +64,19 @@
             </div>
         </section>
 
+        <section class="academia-gate" id="academia-gate" aria-label="Desbloqueo del laboratorio 3D">
+            <div class="academia-gate__icon" id="gate-icon" aria-hidden="true">🔒</div>
+            <div class="academia-gate__body">
+                <h2 class="academia-gate__title" id="gate-title">Desbloquea el laboratorio 3D</h2>
+                <p class="academia-gate__desc" id="gate-desc">Completa todas las lecciones y aprueba los mini-quiz para practicar en el simulador.</p>
+                <div class="academia-gate__stats">
+                    <span class="academia-gate__stat"><strong id="gate-lecciones">0/0</strong> lecciones leídas</span>
+                    <span class="academia-gate__stat"><strong id="gate-nota">0.0</strong>/10 en los mini-quiz</span>
+                </div>
+            </div>
+            <a href="juego.html" class="btn btn-primary academia-gate__btn" id="gate-btn" hidden>Ir al laboratorio 3D →</a>
+        </section>
+
         <div class="academia-modulos" id="academia-modulos">
             <p class="academia-cargando">Cargando lecciones…</p>
         </div>
@@ -68,7 +89,7 @@
                     <p>La teoría cobra sentido cuando la aplicas. Arma tu PC pieza por pieza en el laboratorio 3D y luego diagnostica fallas reales en los Retos de reparación.</p>
                 </div>
                 <div class="academia-siguiente__actions">
-                    <a href="juego.html" class="btn btn-primary">Ir al laboratorio 3D</a>
+                    <a href="juego.html" class="btn btn-primary" id="siguiente-lab-btn">Ir al laboratorio 3D</a>
                     <a href="retos.html" class="btn btn-secondary">Retos de reparación</a>
                 </div>
             </div>

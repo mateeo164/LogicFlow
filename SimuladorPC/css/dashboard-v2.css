@@ -1420,3 +1420,11 @@ body.is-tutor .tutor-only { display: block; }
 @media (max-width: 520px) {
   .lf-notif-panel { width: calc(100vw - 16px); right: 8px !important; }
 }
+
+/* Botón "Ir al laboratorio 3D" bloqueado hasta aprobar la Academia */
+.btn.is-locked {
+  opacity: .6;
+  filter: grayscale(.35);
+  cursor: not-allowed;
+}
+.btn.is-locked::before { content: "🔒"; margin-right: 2px; }

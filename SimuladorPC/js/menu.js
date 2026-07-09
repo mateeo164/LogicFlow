@@ -7,6 +7,7 @@ import { RETOS } from './retos-data.js'
 import { recomendarSiguiente } from './recomendacion.js'
 import { initTutorPanel, initClasesEstudiante } from './tutor.js'
 import { initNotificacionesEstudiante } from './notificaciones.js'
+import { estadoAcademia } from './academia-api.js'
 
 const COMPONENTS = [
     { id: 'case',    label: 'Gabinete (Case)',              icon: '🗄' },
@@ -222,11 +223,15 @@ function formatHora(iso) {
 }
 
 const EVENTO_META = {
-    acierto:         { label: 'Ensamblaje correcto',   cls: 'done',    icon: '✓' },
-    acierto_ensamble:{ label: 'Procedimiento correcto', cls: 'done',    icon: '✓' },
-    error_pieza:     { label: 'Pieza equivocada',      cls: 'pending', icon: '✕' },
-    error_ensamble:  { label: 'Error de ensamble',     cls: 'pending', icon: '✕' },
-    demora:          { label: 'Demora',                cls: 'current', icon: '⏱' }
+    acierto:            { label: 'Ensamblaje correcto',    cls: 'done',    icon: '✓' },
+    acierto_ensamble:   { label: 'Procedimiento correcto', cls: 'done',    icon: '✓' },
+    error_pieza:        { label: 'Pieza equivocada',       cls: 'pending', icon: '✕' },
+    error_ensamble:     { label: 'Error de ensamble',      cls: 'pending', icon: '✕' },
+    demora:             { label: 'Demora',                 cls: 'current', icon: '⏱' },
+    quiz_acierto:       { label: 'Pregunta correcta',      cls: 'done',    icon: '✓' },
+    quiz_error:         { label: 'Pregunta incorrecta',    cls: 'pending', icon: '✕' },
+    prueba_arranque_ok: { label: 'Prueba de arranque superada', cls: 'done',    icon: '✓' },
+    prueba_arranque_fallo: { label: 'Prueba de arranque fallida', cls: 'pending', icon: '✕' }
 }
 
 function renderEstadisticas(stats) {
@@ -402,6 +407,29 @@ function limpiarMensajeModal() {
     if (el) el.setAttribute('hidden', '')
 }
 
+// Bloquea el botón "Ir al laboratorio 3D" hasta que la Academia esté aprobada
+// (todas las lecciones + buena calificación en los mini-quiz).
+function renderCandadoLaboratorio() {
+    const btn = document.getElementById('btn-laboratorio')
+    if (!btn) return
+    const est = estadoAcademia()
+    const label = document.getElementById('btn-laboratorio-label')
+
+    if (est.aprobada) {
+        btn.classList.remove('is-locked')
+        btn.removeAttribute('aria-disabled')
+        btn.setAttribute('href', 'juego.html')
+        btn.title = ''
+        if (label) label.textContent = 'Ir al laboratorio 3D'
+    } else {
+        btn.classList.add('is-locked')
+        btn.setAttribute('aria-disabled', 'true')
+        btn.setAttribute('href', 'academia.html?bloqueo=sim')
+        btn.title = `Completa la Academia con al menos ${est.notaMinima.toFixed(1)}/10 para desbloquearlo`
+        if (label) label.textContent = 'Completa la Academia primero'
+    }
+}
+
 async function init() {
     const session = await protegerRuta()
     if (!session) return
@@ -428,6 +456,7 @@ async function init() {
         renderProgreso(progreso, retosSuperados)
         renderRetosBanner(retosSuperados)
         renderRecomendacion(progreso, resumenRetos)
+        renderCandadoLaboratorio()
 
         const estadisticas = await obtenerEstadisticas()
         renderEstadisticas(estadisticas)
