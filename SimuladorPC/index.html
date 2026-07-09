@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>try{if(localStorage.getItem('logicflow-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
     <meta name="description" content="LogicFlow — Simulador educativo de ensamblaje de computadoras. Aprende hardware practicando en un laboratorio 3D.">
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -39,8 +40,9 @@
             <div class="academic-nav-links" id="academic-nav-links">
                 <a href="#metodologia">Método</a>
                 <a href="#ruta">Ruta</a>
-                <a href="academia.html">Academia</a>
                 <a href="#herramientas">Herramientas</a>
+                <a href="#docentes">Docentes</a>
+                <a href="academia.html">Academia</a>
             </div>
 
             <div class="academic-nav-actions">
@@ -50,8 +52,8 @@
                 </button>
                 <a href="login.html" class="btn btn-secondary btn-sm" id="nav-login">Iniciar sesión</a>
                 <a href="registro.html" class="btn btn-primary btn-sm" id="nav-cta">Comenzar gratis</a>
-                <a href="menu.html" class="lf-account-chip" id="nav-account" title="Ir a mi panel" hidden></a>
-                <button type="button" class="btn btn-secondary btn-sm" id="nav-logout" hidden>Salir</button>
+                <a href="menu.html" class="lf-account-chip" id="nav-account" title="Ir a mi panel" hidden style="display:none"></a>
+                <button type="button" class="btn btn-secondary btn-sm" id="nav-logout" hidden style="display:none">Salir</button>
                 <button class="academic-nav-toggle" id="nav-toggle" aria-label="Abrir menú" aria-expanded="false">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
@@ -146,6 +148,36 @@
         </div>
     </header>
 
+    <section class="academic-section" id="beneficios">
+        <div class="academic-section-header" data-reveal>
+            <span class="academic-eyebrow"><span class="eyebrow-dot"></span>Por qué elegirlo</span>
+            <h2>Aprende haciendo, no memorizando</h2>
+            <p class="academic-section-sub">LogicFlow convierte la teoría del hardware en práctica real: manipulas, instalas y te equivocas sin consecuencias, con retroalimentación inmediata en cada paso.</p>
+        </div>
+        <div class="academic-features">
+            <article class="academic-feature" data-reveal>
+                <div class="academic-feature-ic">🧩</div>
+                <h3>Laboratorio 3D realista</h3>
+                <p>Sujeta, alinea y encaja cada pieza con los gestos y el orden reales del ensamblaje.</p>
+            </article>
+            <article class="academic-feature" data-reveal data-delay="80">
+                <div class="academic-feature-ic">🎯</div>
+                <h3>Evaluación al instante</h3>
+                <p>Cada acción se califica sola: nota, precisión, tiempo y errores en tiempo real.</p>
+            </article>
+            <article class="academic-feature" data-reveal data-delay="160">
+                <div class="academic-feature-ic">🏅</div>
+                <h3>Progreso gamificado</h3>
+                <p>Ganas XP, subes de nivel, desbloqueas insignias y obtienes tu certificado.</p>
+            </article>
+            <article class="academic-feature" data-reveal data-delay="240">
+                <div class="academic-feature-ic">🛡️</div>
+                <h3>Sin riesgo y gratis</h3>
+                <p>Repite cuantas veces quieras sin dañar hardware. Acceso libre para estudiantes.</p>
+            </article>
+        </div>
+    </section>
+
     <section class="academic-section" id="metodologia">
         <div class="academic-section-header" data-reveal>
             <span class="academic-eyebrow"><span class="eyebrow-dot"></span>Método</span>
@@ -187,6 +219,41 @@
         </div>
     </section>
 
+    <section class="academic-section" id="progreso">
+        <div class="academic-showcase">
+            <div class="academic-showcase-text" data-reveal>
+                <span class="academic-eyebrow"><span class="eyebrow-dot"></span>Motivación</span>
+                <h2>Tu esfuerzo, recompensado</h2>
+                <p>Cada ensamblaje suma. LogicFlow mide tu avance y lo convierte en logros concretos que puedes mostrar.</p>
+                <ul class="academic-check-list">
+                    <li>Sistema de XP con 5 niveles, de Novato a Master Builder.</li>
+                    <li>Insignias por precisión, velocidad y dominio de cada componente.</li>
+                    <li>Certificado descargable al completar el simulador.</li>
+                    <li>Ranking por clase para medirte con tus compañeros.</li>
+                </ul>
+            </div>
+            <div class="academic-showcase-visual" data-reveal data-delay="120">
+                <div class="progress-card">
+                    <div class="progress-card-head">
+                        <div class="progress-card-avatar">🧠</div>
+                        <div>
+                            <strong>Nivel: Experto</strong>
+                            <span>720 / 1000 XP</span>
+                        </div>
+                    </div>
+                    <div class="progress-card-bar"><span style="width:72%"></span></div>
+                    <div class="progress-card-badges">
+                        <span title="Primera PC">🖥️</span>
+                        <span title="Mano firme">✨</span>
+                        <span title="Velocista">⚡</span>
+                        <span title="Componente estrella">🌟</span>
+                        <span class="more">+3</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="academic-section" id="herramientas">
         <div class="academic-section-header" data-reveal>
             <span class="academic-eyebrow"><span class="eyebrow-dot"></span>Más que un simulador</span>
@@ -217,6 +284,61 @@
                 <p>El vocabulario del hardware, claro y al grano.</p>
                 <span class="academic-tool-link">Ver →</span>
             </a>
+        </div>
+    </section>
+
+    <section class="academic-section" id="docentes">
+        <div class="academic-section-header" data-reveal>
+            <span class="academic-eyebrow"><span class="eyebrow-dot"></span>Para docentes</span>
+            <h2>Diseñado también para el aula</h2>
+            <p class="academic-section-sub">Lleva el laboratorio a tu clase: crea grupos, asigna prácticas y sigue el avance de cada estudiante desde un solo panel.</p>
+        </div>
+        <div class="academic-audience">
+            <div class="academic-audience-item" data-reveal>
+                <span class="academic-audience-num">1</span>
+                <div><h4>Crea una clase</h4><p>Genera un código y compártelo con tus estudiantes.</p></div>
+            </div>
+            <div class="academic-audience-item" data-reveal data-delay="80">
+                <span class="academic-audience-num">2</span>
+                <div><h4>Asigna tareas</h4><p>Con fecha límite, puntaje y descripción.</p></div>
+            </div>
+            <div class="academic-audience-item" data-reveal data-delay="160">
+                <span class="academic-audience-num">3</span>
+                <div><h4>Califica entregas</h4><p>Recibe archivos y da retroalimentación.</p></div>
+            </div>
+            <div class="academic-audience-item" data-reveal data-delay="240">
+                <span class="academic-audience-num">4</span>
+                <div><h4>Sigue el progreso</h4><p>Ranking y avance de cada estudiante.</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="academic-section" id="faq">
+        <div class="academic-section-header" data-reveal>
+            <span class="academic-eyebrow"><span class="eyebrow-dot"></span>Preguntas frecuentes</span>
+            <h2>Resolvemos tus dudas</h2>
+        </div>
+        <div class="academic-faq" data-reveal>
+            <details class="academic-faq-item">
+                <summary>¿Necesito conocimientos previos?</summary>
+                <p>No. La Academia te entrega la teoría base y un mini-quiz antes de cada práctica, así llegas al laboratorio con lo esencial.</p>
+            </details>
+            <details class="academic-faq-item">
+                <summary>¿Tiene algún costo?</summary>
+                <p>Es gratuito para estudiantes. Solo necesitas crear una cuenta con tu correo para guardar tu progreso.</p>
+            </details>
+            <details class="academic-faq-item">
+                <summary>¿Qué necesito para usarlo?</summary>
+                <p>Funciona directamente en el navegador. Para el laboratorio 3D se recomienda una laptop o computadora de escritorio con un navegador actualizado.</p>
+            </details>
+            <details class="academic-faq-item">
+                <summary>¿Puedo usarlo sin conexión?</summary>
+                <p>Una vez cargado, buena parte del simulador funciona sin internet; tu progreso se sincroniza automáticamente al reconectarte.</p>
+            </details>
+            <details class="academic-faq-item">
+                <summary>¿Sirve para docentes?</summary>
+                <p>Sí. Puedes crear clases con un código, asignar tareas, calificar entregas y seguir el progreso y el ranking de tus estudiantes.</p>
+            </details>
         </div>
     </section>
 

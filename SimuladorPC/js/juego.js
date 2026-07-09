@@ -1,4 +1,5 @@
 import { protegerRuta } from './auth.js'
+import { STORAGE_KEYS, authStore } from './supabase-config.js'
 import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, marcarAprobacionWeb, subirFotoSimulador, guardarComprension, marcarPruebaArranque } from './progreso.js'
 import { PROC_LOGRO, notaConBono } from './achievements.js'
 import * as THREE from 'three'
@@ -135,6 +136,7 @@ let bancoPruebas = null         // { x, z, topY } de la estación de pruebas
 let cablePC    = null           // cable visual PC→monitor
 let bootPC     = null           // { inicio, aprobado, beep } arranque en pantalla
 let pruebaArranqueGuardada = false  // evita duplicar el registro de la prueba en la BD
+let pruebaFinalPendiente = false    // el ensamble terminó pero falta la prueba de arranque obligatoria
 let pantallaPCcanvas = null, pantallaPCtex = null, pantallaPCmesh = null
 const PC_CARRY_S = 0.42         // escala de la PC mientras se carga
 const PC_BANCO_S = 0.52         // escala de la PC posada en el banco
@@ -425,6 +427,7 @@ function mostrarEvaluacion(tipo, onDone) {
 
 const NOTA_MINIMA = 7
 let notaFinalSesion = 0
+let notaBaseSesion  = 0   // nota de destreza+comprensión antes del bono por logros
 
 function calcularNota() {
     const nd = notaDestreza(erroresSesion, demorasSesion)
@@ -438,30 +441,34 @@ function calcularNota() {
 
 function obtenerNombreUsuario() {
     try {
-        const u = JSON.parse(localStorage.getItem('logicflow_user') || 'null')
+        const u = JSON.parse(authStore.getItem(STORAGE_KEYS.user) || 'null')
         return u?.user_metadata?.full_name || u?.email?.split('@')[0] || 'Estudiante'
     } catch { return 'Estudiante' }
 }
 
 function mostrarFinal() {
     fase = 'final'
+    pruebaFinalPendiente = false
     guardarStatsLocal()
     mostrarOverlay('overlay-final')
     montarDrone('drone-final')
     LFSound.complete()
 
     const t = Math.round((Date.now() - labStartTime) / 1000)
-    const notaBase = calcularNota()
-    const aprobado = notaBase >= NOTA_MINIMA
-    notaFinalSesion = notaBase
+    // La nota definitiva (con bono de logros) ya se fijó en calcularNotaFinal(),
+    // antes de la prueba de arranque, para que el POST del banco fuera coherente.
+    const notaBase = notaBaseSesion
+    const notaFinal = notaFinalSesion
+    const aprobado = notaFinal >= NOTA_MINIMA
+    const bono = notaFinal - notaBase
 
     const titEl = document.getElementById('final-title')
     const descEl = document.getElementById('final-desc')
-    if (titEl) titEl.innerHTML = aprobado ? '¡PC ensamblada<br>con éxito!' : 'Ensamble<br>completado'
+    if (titEl) titEl.innerHTML = aprobado ? '¡PC ensamblada<br>y probada!' : 'Ensamble<br>completado'
     if (descEl) {
         descEl.textContent = aprobado
-            ? `¡Aprobado! Tu ensamble cumple el estándar (mínimo ${NOTA_MINIMA}/10). Continúa en la app móvil para practicar la instalación real y desbloquear tu certificado.`
-            : `Tu nota está por debajo del mínimo aceptable (${NOTA_MINIMA}/10). Repasa el orden y la elección de las piezas, y vuelve a intentarlo.`
+            ? `¡Aprobado! La PC superó la prueba de arranque (POST) y tu ensamble cumple el estándar (mínimo ${NOTA_MINIMA}/10). Continúa en la app móvil para practicar la instalación real y desbloquear tu certificado.`
+            : `El arranque falló: tu nota está por debajo del mínimo aceptable (${NOTA_MINIMA}/10). Repasa el orden y la elección de las piezas, y vuelve a intentarlo.`
     }
 
     const el = document.getElementById('final-stats')
@@ -471,7 +478,7 @@ function mostrarFinal() {
             <div class="final-stat"><strong>${formatTiempo(t)}</strong><span>Tiempo de<br>ensamblaje</span></div>
             <div class="final-stat"><strong>${erroresSesion}</strong><span>Errores<br>cometidos</span></div>
             <div class="final-stat"><strong>${aciertosConceptuales}/${preguntasRespondidas}</strong><span>Preguntas<br>acertadas</span></div>
-            <div class="final-stat"><strong id="final-nota" style="color:${aprobado ? '#22c55e' : '#ef4444'}">${notaBase.toFixed(1)}/10</strong><span id="final-nota-lbl">Nota<br>${aprobado ? 'APROBADO' : 'NO APROBADO'}</span></div>`
+            <div class="final-stat"><strong id="final-nota" style="color:${aprobado ? '#22c55e' : '#ef4444'}">${notaFinal.toFixed(1)}/10</strong><span id="final-nota-lbl">${bono > 0.001 ? `Nota (base ${notaBase.toFixed(1)} +${bono.toFixed(2)} logros)` : 'Nota'}<br>${aprobado ? 'APROBADO' : 'NO APROBADO'}</span></div>`
     }
 
     const acc = document.getElementById('final-actions')
@@ -532,36 +539,52 @@ function mostrarFinal() {
         ganancia: gan
     }).catch(() => {})
 
-    procesarCierreSesion(notaBase, aprobado)
+    registrarAprobacionWeb(aprobado, notaFinal)
 }
 
-async function procesarCierreSesion(notaBase, aprobado) {
-
+// Nota definitiva de la sesión: otorga los logros ganados y aplica su bono.
+// Se calcula ANTES de la prueba de arranque para que el POST del banco refleje
+// con exactitud si el ensamble aprueba (nota final ≥ mínimo), no la nota base.
+async function calcularNotaFinal() {
     const ganados = ['primera_pc', 'componente_estrella']
     if (erroresSesion === 0) ganados.push('sin_errores')
     try { await otorgarLogros(ganados, 'ensamble:final') } catch (_) {}
 
     let nLogros = 0
     try { nLogros = (await obtenerLogrosUsuario()).length } catch (_) {}
-    const notaFinal = notaConBono(notaBase, nLogros)
-    notaFinalSesion = notaFinal
-    const aprobadoFinal = notaFinal >= NOTA_MINIMA
 
-    const notaEl = document.getElementById('final-nota')
-    const lblEl = document.getElementById('final-nota-lbl')
-    if (notaEl) {
-        notaEl.textContent = `${notaFinal.toFixed(1)}/10`
-        notaEl.style.color = aprobadoFinal ? '#22c55e' : '#ef4444'
-    }
-    const bono = notaFinal - notaBase
-    if (lblEl) {
-        lblEl.innerHTML = bono > 0.001
-            ? `Nota (base ${notaBase.toFixed(1)} +${bono.toFixed(2)} logros)<br>${aprobadoFinal ? 'APROBADO' : 'NO APROBADO'}`
-            : `Nota<br>${aprobadoFinal ? 'APROBADO' : 'NO APROBADO'}`
-    }
+    notaBaseSesion  = calcularNota()
+    notaFinalSesion = notaConBono(notaBaseSesion, nLogros)
+    return notaFinalSesion
+}
 
-    if (!aprobadoFinal) return
+// Tras el ensamble y el test final, la simulación NO termina: el estudiante debe
+// llevar la PC al banco y encenderla. Solo al completar ese arranque se muestra
+// el resumen (mostrarFinal) y se registra la aprobación. En equipos táctiles (sin
+// mouse/teclado para caminar) se omite la prueba manual y se pasa directo al
+// resumen para no dejar bloqueada la sesión.
+async function iniciarPruebaFinal() {
+    await calcularNotaFinal()
 
+    if (ES_TACTIL) { mostrarFinal(); return }
+
+    pruebaFinalPendiente = true
+    fase = '3d'
+    mostrarOverlay('3d')
+
+    const tit = document.getElementById('walk-start-title')
+    const sub = document.getElementById('walk-start-sub')
+    if (tit) tit.textContent = '▶ Probar la PC'
+    if (sub) sub.innerHTML = 'Clic para caminar · lleva la PC al <b>banco de pruebas</b> y pulsa <b>E</b> para encenderla'
+
+    actualizarOverlayWalk()
+    guiaBanco('Prueba de arranque (obligatoria)',
+        'El ensamble está completo, pero la simulación aún no termina. Apunta a la PC de la mesa central y pulsa E para levantarla; llévala al banco de pruebas (pared derecha) y pulsa E para encenderla.')
+    droneHabla('¡Ensamble completo! Falta la prueba final: lleva la PC al banco de pruebas y enciéndela. Solo si arranca correctamente se aprueba la simulación.')
+}
+
+async function registrarAprobacionWeb(aprobado, notaFinal) {
+    if (!aprobado) return
     try {
         const fotoPath = await subirImagenEnsamble(notaFinal, true)
         await marcarAprobacionWeb({ nota: notaFinal, fotoPath })
@@ -588,6 +611,10 @@ function irAppMovil() {
 function explorarTaller() {
     fase = '3d'
     mostrarOverlay('3d')
+    const tit = document.getElementById('walk-start-title')
+    const sub = document.getElementById('walk-start-sub')
+    if (tit) tit.textContent = '▶ Explorar el taller'
+    if (sub) sub.innerHTML = 'Clic para caminar · <b>WASD</b> moverse · <b>Esc</b> para los menús'
     actualizarOverlayWalk()
     guiaBanco('¡PC ensamblada con éxito!', 'Camina con W/A/S/D. Acércate a la PC en la mesa central, apúntala y pulsa E para levantarla y llevarla al banco de pruebas (pared derecha) — ahí se conecta al monitor y arranca.')
     droneHabla('¡Tu PC está lista! Llévala al banco de pruebas para encenderla: apúntala y pulsa E para cargarla.')
@@ -1024,7 +1051,7 @@ async function finalizarPaso(paso) {
     setTimeout(() => {
         const continuar = () => {
             if (indiceActual < TOTAL) mostrarVideo(indiceActual)
-            else mostrarEvaluacion('post', () => mostrarFinal())  // test final antes del cierre
+            else mostrarEvaluacion('post', () => iniciarPruebaFinal())  // test final, luego prueba de arranque
         }
         mostrarQuizComponente(paso, continuar)
     }, 2400)
@@ -2154,42 +2181,48 @@ function cargarHerramientas() {
     })
 }
 
-// Banco de pruebas con periféricos encima. Se calcula la altura real de la
-// superficie del banco (onReady) para apoyar monitor/teclado/mouse sin adivinar.
-// El banco va contra la pared derecha con su lado largo paralelo a la pared
-// (rotY=0). Monitor al fondo y teclado al frente miran hacia el centro (rotY=-90°),
-// apilados en X para no encimarse en la poca profundidad del banco.
+// Banco de pruebas con periféricos encima. Se agranda a un tamaño comparable a la
+// mesa central (antes era mucho más pequeño y todo se encimaba) y a la altura de un
+// escritorio real. El banco va contra la pared derecha con su lado largo paralelo a
+// la pared (rotY=0); todos los periféricos miran hacia el centro (rotY=-90°). La
+// altura real de la superficie se calcula en onReady para apoyar todo sin adivinar.
+// Distribución (X = profundidad hacia la sala, mayor X = fondo junto a la pared):
+//   · monitor al fondo-centro   · teclado y ratón al frente   · la PC a un lado
+//     (hacia -Z) para que la torre NUNCA atraviese el monitor ni el teclado.
 function montarEstacionPruebas() {
-    const wbX = 4.25, wbZ = 1.9, faceCentro = -Math.PI / 2
+    const wbX = 4.1, wbZ = 1.9, faceCentro = -Math.PI / 2
     cargarProp('workbench_low-poly.opt.glb', {
-        id: 'workbench', size: 1.9, x: wbX, z: wbZ, rotY: 0,
+        id: 'workbench', size: 2.7, x: wbX, z: wbZ, rotY: 0,
         fact: 'Banco de pruebas: aquí se enciende la PC terminada para su primer arranque (POST).',
         onReady: (g, half) => {
             const topY = g.position.y + half.y
-            // Guarda la estación para poder posar aquí la PC ensamblada.
+            // Guarda la estación (centro/altura) para posar la PC y trazar el cable.
             bancoPruebas = { x: wbX, z: wbZ, topY }
-            // La Y se calcula al posar la PC (alturaBaseBanco) según su altura real.
-            pcBancoCfg = { x: wbX - 0.52, z: wbZ + 0.12, ry: 0 }
-            // Tamaños proporcionales a la PC ensamblada (que sobre el banco mide
-            // ~0.9 de alto): el monitor queda a la par del gabinete y el teclado
-            // y mouse a escala realista respecto al monitor.
+            // Zona de posado de la PC: al costado del monitor (hacia -Z), bien dentro
+            // del banco. La Y se calcula al posar (alturaBaseBanco) según su altura.
+            pcBancoCfg = { x: 4.28, z: 1.02, ry: 0 }
             cargarProp('pc_monitor.opt.glb', {
-                id: 'monitor', size: 1.2, x: wbX + 0.34, z: wbZ, y: topY, rotY: faceCentro, anim: false,
+                id: 'monitor', size: 1.25, x: 4.42, z: 2.08, y: topY, rotY: faceCentro, anim: false,
                 fact: 'Monitor de pruebas: muestra el POST/BIOS cuando la PC arranca por primera vez.',
                 onReady: (mg, mHalf) => crearPantallaPC(mg, mHalf)
             })
             cargarProp('keyboard.opt.glb', {
-                id: 'keyboard', size: 0.72, x: wbX + 0.02, z: wbZ + 0.16, y: topY, rotY: faceCentro, anim: false,
+                id: 'keyboard', size: 0.78, x: 3.66, z: 2.08, y: topY, rotY: faceCentro, anim: false,
                 fact: 'Teclado de diagnóstico: con Supr o F2 se entra a la BIOS.'
             })
             cargarProp('mouse.opt.glb', {
-                id: 'mouse', size: 0.16, x: wbX + 0.02, z: wbZ + 0.52, y: topY, rotY: faceCentro,
+                id: 'mouse', size: 0.17, x: 3.66, z: 2.68, y: topY, rotY: faceCentro,
                 fact: 'Mouse de pruebas.'
             })
             cargarProp('desk_lamp.opt.glb', {
-                id: 'lamp', size: 0.5, x: wbX + 0.12, z: wbZ - 0.7, y: topY, rotY: faceCentro,
+                id: 'lamp', size: 0.55, x: 4.45, z: 3.02, y: topY, rotY: faceCentro,
                 fact: 'Lámpara de banco: buena luz para no equivocarse al conectar cables pequeños.'
             })
+            // El multímetro (herramienta de diagnóstico) se apoya en este banco: se
+            // recoloca aquí, a la altura real de la superficie, para que no quede
+            // hundido al cambiar el tamaño del banco.
+            const mm = propsTaller.multimeter
+            if (mm) mm.position.set(3.62, topY, 2.72)
         }
     })
 }
@@ -2358,6 +2391,15 @@ function arrancarPC() {
             detalle: aprobado ? 'POST correcto en el banco de pruebas' : 'POST con error en el banco de pruebas'
         })
         marcarPruebaArranque({ exito: aprobado }).catch(() => {})
+    }
+
+    // Prueba obligatoria: al terminar la secuencia de arranque en el monitor se
+    // cierra la simulación con el resumen (aprobado o no). Los arranques posteriores
+    // (al explorar el taller) ya no reabren el resumen.
+    if (pruebaFinalPendiente) {
+        pruebaFinalPendiente = false
+        const espera = aprobado ? 4600 : 3000   // deja ver el POST→escritorio o el POST ERROR
+        setTimeout(() => { if (fase === '3d') mostrarFinal() }, espera)
     }
 }
 
@@ -3975,6 +4017,9 @@ async function initGame() {
         renderChecklist()
         initMotor3D()
         motorListo = true
+        // Sesión ya completada en una visita anterior: se muestra el resumen con la
+        // nota definitiva (la prueba de arranque ya se hizo en su momento).
+        await calcularNotaFinal()
         mostrarFinal()
         return
     }

@@ -18,12 +18,11 @@
     }
   }
 
-  function getSystemTheme() {
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-
   function getEffectiveTheme() {
-    return getStoredTheme() || getSystemTheme();
+    // El modo por defecto es claro; solo se usa oscuro si el usuario lo eligió
+    // explícitamente. No seguimos la preferencia del sistema para que el tema
+    // sea consistente en todo el sistema web.
+    return getStoredTheme() === 'dark' ? 'dark' : 'light';
   }
 
   function applyTheme(theme) {
@@ -61,14 +60,6 @@
     document.querySelectorAll('.lf-theme-toggle').forEach(btn => {
       btn.addEventListener('click', toggleTheme);
     });
-
-    if (window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-        if (!getStoredTheme()) {
-          applyTheme(e.matches ? 'dark' : 'light');
-        }
-      });
-    }
   }
 
   if (document.readyState === 'loading') {

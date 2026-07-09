@@ -23,6 +23,13 @@ Plataforma web educativa para aprender a ensamblar computadoras de forma interac
 - Supabase (autenticación y persistencia de progreso)
 - Node.js + Express (servidor local)
 
+## 📚 Documentación
+
+- **[Base de datos y backend](docs/BASE-DE-DATOS-Y-BACKEND.md)** — cómo funciona Supabase de cero:
+  arquitectura, tablas y su contenido, seguridad (RLS), funciones RPC, flujos de datos y puesta en
+  marcha desde cero.
+- [Informe del proyecto](docs/INFORME-LOGICFLOW.md) · [Metodología ABR + gamificación](docs/metodologia-abr-gamificacion.md)
+
 ## 📁 Estructura destacada
 
 ```

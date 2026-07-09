@@ -5,7 +5,8 @@ import { getProgressSummary, formatXp, bonoPorLogros } from './achievements.js'
 import { obtenerLogrosUsuario, obtenerResultadosRetos, resumirResultados } from './retos-api.js'
 import { RETOS } from './retos-data.js'
 import { recomendarSiguiente } from './recomendacion.js'
-import { initTutorPanel, initClasesEstudiante, initNotificaciones } from './tutor.js'
+import { initTutorPanel, initClasesEstudiante } from './tutor.js'
+import { initNotificacionesEstudiante } from './notificaciones.js'
 
 const COMPONENTS = [
     { id: 'case',    label: 'Gabinete (Case)',              icon: '🗄' },
@@ -435,7 +436,7 @@ async function init() {
         renderNotasCertificado(progreso, logros, resultadosRetos)
 
         initClasesEstudiante()
-        initNotificaciones()
+        initNotificacionesEstudiante({ progreso, estadisticas, logros })
     }
 
     document.getElementById('btn-cerrar-sesion')?.addEventListener('click', () => cerrarSesion())

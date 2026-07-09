@@ -1263,6 +1263,7 @@ body.is-tutor .tutor-only { display: block; }
   cursor: pointer;
 }
 .lf-notif-bell:hover { background: var(--lf-surface-100); }
+.lf-notif-badge[hidden] { display: none; }
 .lf-notif-badge {
   position: absolute;
   top: -5px; right: -5px;
@@ -1301,3 +1302,121 @@ body.is-tutor .tutor-only { display: block; }
 [data-theme="dark"] .lf-notif-bell,
 [data-theme="dark"] .notif-item { background: rgba(255,255,255,0.03); }
 [data-theme="dark"] .notif-item.no-leida { background: rgba(99,102,241,0.12); }
+
+/* ============================================================
+   Panel desplegable de notificaciones (anclado al timbre)
+   ============================================================ */
+.lf-notif-badge--alta {
+  background: #dc2626;
+  animation: lf-notif-pulse 1.8s ease-in-out infinite;
+}
+@keyframes lf-notif-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--lf-paper, #fff); }
+  50%      { box-shadow: 0 0 0 2px var(--lf-paper, #fff), 0 0 0 6px rgba(220,38,38,0.28); }
+}
+
+.lf-notif-panel {
+  position: fixed;
+  z-index: 1200;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  background: var(--lf-surface-0, #fff);
+  border: 1px solid var(--lf-border-medium, var(--lf-border-light));
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+  animation: lf-notif-in 0.16s ease;
+}
+@keyframes lf-notif-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lf-notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--lf-border-light);
+}
+.lf-notif-head strong { font-size: 15px; color: var(--lf-text-primary); }
+.lf-notif-marcar {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--lf-primary-600, #566ab3);
+  cursor: pointer;
+}
+.lf-notif-marcar:hover { text-decoration: underline; }
+
+.lf-notif-items {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.lf-notif-item {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border-left: 3px solid transparent;
+  background: transparent;
+  transition: background 0.14s ease;
+}
+.lf-notif-item:hover { background: var(--lf-surface-100, rgba(0,0,0,0.03)); }
+.lf-notif-item.prio-alta  { border-left-color: #dc2626; }
+.lf-notif-item.prio-media { border-left-color: var(--lf-amber-500, #d97706); }
+.lf-notif-item.prio-baja  { border-left-color: var(--lf-primary-400, #8b93d6); }
+
+.lf-notif-item.no-leida { background: rgba(99,102,241,0.08); }
+.lf-notif-item.no-leida .lf-notif-txt strong::after {
+  content: "";
+  display: inline-block;
+  width: 7px; height: 7px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--lf-primary-500, #566ab3);
+  vertical-align: middle;
+}
+.lf-notif-item.no-leida.prio-alta .lf-notif-txt strong::after { background: #dc2626; }
+
+.lf-notif-ic { font-size: 19px; line-height: 1.25; flex: 0 0 auto; }
+.lf-notif-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lf-notif-txt strong { font-size: 13.5px; color: var(--lf-text-primary); line-height: 1.35; }
+.lf-notif-cuerpo { font-size: 12px; color: var(--lf-text-muted, #7a8699); line-height: 1.4; }
+.lf-notif-fecha { font-size: 10.5px; color: var(--lf-text-muted, #9aa4b2); margin-top: 1px; }
+
+.lf-notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 34px 20px;
+}
+.lf-notif-empty-ic { font-size: 30px; opacity: 0.55; }
+.lf-notif-empty p { margin: 4px 0 0; font-weight: 700; color: var(--lf-text-primary); }
+.lf-notif-empty small { font-size: 12px; color: var(--lf-text-muted, #9aa4b2); }
+
+[data-theme="dark"] .lf-notif-panel {
+  background: #10192e;
+  border-color: rgba(255,255,255,0.10);
+  box-shadow: 0 18px 48px rgba(0,0,0,0.5);
+}
+[data-theme="dark"] .lf-notif-item:hover { background: rgba(255,255,255,0.05); }
+[data-theme="dark"] .lf-notif-item.no-leida { background: rgba(99,102,241,0.16); }
+
+@media (max-width: 520px) {
+  .lf-notif-panel { width: calc(100vw - 16px); right: 8px !important; }
+}
