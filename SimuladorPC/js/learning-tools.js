@@ -218,13 +218,20 @@ export const GLOSARIO = [
   }
 ]
 
+// Quita tildes/diacríticos para que buscar "energia" encuentre "Energía", etc.
+// Sin esto, cualquier término escrito sin acento (muy común al teclear rápido)
+// devolvía 0 resultados aunque la entrada existiera con el nombre casi idéntico.
+function normalizar(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
 export function filterGlosario(query = '') {
-  const q = query.toLowerCase().trim()
+  const q = normalizar(query.trim())
   if (!q) return GLOSARIO
   return GLOSARIO.filter(item =>
-    item.term.toLowerCase().includes(q) ||
-    item.title.toLowerCase().includes(q) ||
-    item.description.toLowerCase().includes(q) ||
-    item.tags.some(t => t.toLowerCase().includes(q))
+    normalizar(item.term).includes(q) ||
+    normalizar(item.title).includes(q) ||
+    normalizar(item.description).includes(q) ||
+    item.tags.some(t => normalizar(t).includes(q))
   )
 }

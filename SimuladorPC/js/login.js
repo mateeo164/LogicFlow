@@ -51,16 +51,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (!resultado.exito) {
                 mostrarMensajeGlobal(mensajeGlobal, resultado.mensaje || '✗ No se pudo iniciar sesión.', 'error')
+                setBotonCargando(btnSubmit, false, 'Continuar', 'Iniciando sesión...')
                 return
             }
 
             mostrarMensajeGlobal(mensajeGlobal, resultado.mensaje || '✓ Sesión iniciada correctamente.', 'success')
             form.reset()
+            // El botón queda deshabilitado a propósito: ya vamos camino a menu.html.
+            // Reactivarlo aquí permitía un doble submit en la ventana de 600ms, que con
+            // el formulario ya reseteado mostraba un error de validación justo antes
+            // de que la redirección (ya en curso) se completara.
             window.setTimeout(() => {
                 window.location.href = 'menu.html'
             }, 600)
-        } finally {
+        } catch (err) {
             setBotonCargando(btnSubmit, false, 'Continuar', 'Iniciando sesión...')
+            throw err
         }
     })
 })

@@ -27,8 +27,12 @@ function leerLeidas() {
 
 function guardarLeidas(set) {
     try {
-        // Acotamos para no crecer sin límite.
-        localStorage.setItem(LEIDAS_KEY, JSON.stringify([...set].slice(-300)))
+        // Acotamos para no crecer sin límite. slice(-N) se queda con los N insertados
+        // más recientemente (el Set preserva orden de inserción); un tope bajo hacía
+        // que ids marcados "leídos" hace tiempo (sin volver a tocarse) se cayeran de
+        // la ventana y la notificación reapareciera como no leída tras mucha actividad.
+        // 2000 cubre holgadamente un semestre de tareas + insignias + avisos de servidor.
+        localStorage.setItem(LEIDAS_KEY, JSON.stringify([...set].slice(-2000)))
     } catch (e) { /* almacenamiento no disponible */ }
 }
 

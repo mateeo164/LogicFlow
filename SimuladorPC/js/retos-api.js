@@ -72,6 +72,9 @@ export async function guardarResultadoReto({ retoId, nota, exito, erroresDiagnos
     }
 }
 
+// Devuelve [] cuando la consulta funcionó y de verdad no hay filas, o null cuando la
+// petición en sí falló (red/timeout/sesión). Distinguirlo importa: un guardado que
+// acaba de tener éxito pero cuyo GET posterior falla NO debe leerse como "sin historial".
 export async function obtenerResultadosRetos() {
     try {
         const data = await dataRequest(
@@ -81,13 +84,13 @@ export async function obtenerResultadosRetos() {
         return Array.isArray(data) ? data : []
     } catch (err) {
         console.warn('[LogicFlow] No se pudieron cargar los resultados de retos:', err.message)
-        return []
+        return null
     }
 }
 
 export function resumirResultados(resultados) {
     const resumen = {}
-    for (const r of resultados) {
+    for (const r of resultados || []) {
         const cur = resumen[r.reto_id] || { nota: 0, exito: false, intentos: 0 }
         cur.intentos++
         cur.nota = Math.max(cur.nota, Number(r.nota) || 0)

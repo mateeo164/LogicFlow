@@ -118,11 +118,19 @@ export async function refreshSession() {
     const refreshToken = authStore.getItem(STORAGE_KEYS.refreshToken)
     if (!refreshToken) return false
 
+    // A diferencia de supabaseAuthRequest, este fetch no tenía AbortController: en
+    // una red que "cuelga" la conexión sin cerrarla, protegerRuta() (que llama a
+    // refreshSession antes de mostrar cualquier página) podía quedar esperando
+    // indefinidamente en vez de fallar y mostrar el error de red esperado.
+    const controlador = new AbortController()
+    const timeoutId = setTimeout(() => controlador.abort(), REQUEST_TIMEOUT)
+
     try {
         const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
             method: 'POST',
             headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken })
+            body: JSON.stringify({ refresh_token: refreshToken }),
+            signal: controlador.signal
         })
 
         if (!response.ok) {
@@ -136,6 +144,8 @@ export async function refreshSession() {
     } catch (error) {
 
         return false
+    } finally {
+        clearTimeout(timeoutId)
     }
 }
 
@@ -215,8 +225,11 @@ export function tokenExpirado() {
     const token = authStore.getItem(STORAGE_KEYS.accessToken)
     if (!token) return true
 
+    // Sin expiresAt guardado y con un token que no se puede decodificar (o sin
+    // "exp"), no hay forma de saber si sigue vigente: se trata como expirado
+    // (falla cerrado) en vez de como sesión válida indefinida.
     const payload = decodificarJwt(token)
-    if (!payload?.exp) return false
+    if (!payload?.exp) return true
     return payload.exp - margen <= ahora
 }
 

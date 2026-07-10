@@ -1,5 +1,5 @@
 import { protegerRuta } from './auth.js'
-import { academiaAprobada } from './academia-api.js'
+import { academiaAprobada, sincronizar as sincronizarAcademia } from './academia-api.js'
 import { STORAGE_KEYS, authStore } from './supabase-config.js'
 import { obtenerProgreso, guardarProgreso, reiniciarProgreso, registrarEvento, marcarAprobacionWeb, subirFotoSimulador, guardarComprension, marcarPruebaArranque } from './progreso.js'
 import { PROC_LOGRO, notaConBono } from './achievements.js'
@@ -57,6 +57,10 @@ const UMBRAL_DEMORA_SEG = 45
 let fase = 'bienvenida'
 let indiceActual = 0
 let selectedComponent = null
+// Evita que un doble clic o una tecla E mantenida presionada (key-repeat) reentren en
+// finalizarPaso() mientras el guardado async del paso anterior sigue en vuelo, lo que
+// saltaría un componente completo (indiceActual++ se dispararía más de una vez).
+let instalandoPaso = false
 let sessionStartTime = Date.now()
 let labStartTime = Date.now()
 let erroresSesion = 0
@@ -87,6 +91,12 @@ const _texLoader = new THREE.TextureLoader()
 let ssdPartes = null, ssdProg = 0, ssdTarget = 0
 
 const ES_TACTIL = window.matchMedia('(pointer: coarse)').matches || !window.matchMedia('(pointer: fine)').matches
+
+// Heurística de equipo modesto (pocos núcleos y/o poca RAM reportada, o táctil):
+// baja antialiasing/resolución/sombras para evitar bajones de FPS en esas PCs.
+const EQUIPO_MODESTO = ES_TACTIL
+    || (navigator.hardwareConcurrency || 8) <= 4
+    || (navigator.deviceMemory || 8) <= 4
 
 let walkControls = null
 let walkMode = false
@@ -269,6 +279,10 @@ function mostrarVideo(idx) {
 function mostrarFase3D(idx) {
     indiceActual = idx
     fase = '3d'
+    // El reloj de "demora" arranca aquí, cuando el estudiante queda libre para
+    // interactuar con la pieza — no al terminar el paso anterior (eso incluía de
+    // más el tiempo del video y del quiz de comprensión, inflando falsas demoras).
+    sessionStartTime = Date.now()
     mostrarOverlay('3d')
     montarDrone('drone-float-svg')
 
@@ -453,7 +467,7 @@ function obtenerNombreUsuario() {
 function mostrarFinal() {
     fase = 'final'
     pruebaFinalPendiente = false
-    guardarStatsLocal()
+    guardarStatsLocal(true)
     mostrarOverlay('overlay-final')
     montarDrone('drone-final')
     LFSound.complete()
@@ -757,21 +771,36 @@ function renderChecklist() {
     }).join('')
 }
 
+// Deshace el paso "idx" (y todos los posteriores) y deja al estudiante listo para
+// reinstalarlo. El checklist marca "clickable" (con el ícono ↩) los pasos i < indiceActual
+// esperando que hacer clic en uno de ellos lo deshaga a ÉL, no al siguiente.
 function retrocederA(idx) {
     PASOS.forEach((p, i) => {
-        if (i > idx) {
+        if (i >= idx) {
             const m = modelos3D[p.id]
             if (m) m.visible = false
+            // Restaura el aspecto "disponible" del estante: soltarComponenteInstalado()
+            // lo había dejado atenuado (opacity 0.35) al marcarlo como ya instalado.
+            const slotGrupo = shelfSlotObjs[p.id]
+            if (slotGrupo) {
+                slotGrupo.traverse(n => {
+                    if (n.isMesh && !n.userData.isPlaceholder && n.material) {
+                        n.material.opacity = 1
+                        n.material.transparent = false
+                    }
+                })
+                slotGrupo.visible = true
+            }
         }
     })
-    indiceActual = idx + 1
-    localStorage.setItem(LS_KEY, JSON.stringify(PASOS.slice(0, idx + 1).map(p => p.id)))
+    indiceActual = idx
+    localStorage.setItem(LS_KEY, JSON.stringify(PASOS.slice(0, idx).map(p => p.id)))
     selectedComponent = null
     renderChecklist()
     updateMissionProgress()
     renderDrawer()
     mostrarFase3D(indiceActual)
-    appendLog(`Regresaste al paso ${idx + 2}: ${PASOS[indiceActual]?.nombre || ''}`, 'info')
+    appendLog(`Regresaste al paso ${idx + 1}: ${PASOS[indiceActual]?.nombre || ''}`, 'info')
 }
 
 function updateMissionProgress() {
@@ -1022,6 +1051,16 @@ function colisionarSala(pos, prevX, prevZ) {
 }
 
 async function finalizarPaso(paso) {
+    if (instalandoPaso) return
+    instalandoPaso = true
+    try {
+        await finalizarPasoInterno(paso)
+    } finally {
+        instalandoPaso = false
+    }
+}
+
+async function finalizarPasoInterno(paso) {
     ocultarMarcador(paso.id)
     colocarModelo(paso, true)
 
@@ -1049,6 +1088,7 @@ async function finalizarPaso(paso) {
     selectedComponent = null
     if (heldComponent?.id === paso.id) soltarComponenteInstalado(paso.id)
     indiceActual++
+    guardarStatsLocal()
     renderChecklist()
     updateMissionProgress()
 
@@ -1080,14 +1120,14 @@ function initMotor3D() {
     camera = new THREE.PerspectiveCamera(46, w / h, 0.05, 100)
     camera.position.set(1.45, 1.30, 2.85)
 
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: !EQUIPO_MODESTO, powerPreference: 'high-performance' })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, EQUIPO_MODESTO ? 1 : 1.5))
     renderer.setSize(w, h, false)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.2
     renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFShadowMap
+    renderer.shadowMap.type = EQUIPO_MODESTO ? THREE.BasicShadowMap : THREE.PCFShadowMap
 
     renderer.shadowMap.autoUpdate = false
     renderer.shadowMap.needsUpdate = true
@@ -1456,7 +1496,11 @@ function actualizarSlotEstante(paso, innerObj) {
     if (!slotGrupo) return
 
     const ph = slotGrupo.children.find(c => c.userData.isPlaceholder)
-    if (ph) slotGrupo.remove(ph)
+    if (ph) {
+        slotGrupo.remove(ph)
+        ph.geometry?.dispose()
+        ph.material?.dispose()
+    }
 
     const DISP_MAX = 0.40
     const clone = innerObj.clone(true)
@@ -1529,6 +1573,8 @@ function fusionarMallasEstante(root) {
     for (const [mat, geos] of porMaterial) {
         const merged = geos.length > 1 ? mergeGeometries(geos, false) : geos[0]
         if (merged) grupo.add(new THREE.Mesh(merged, mat))
+        // Solo son intermedias cuando hubo fusión; con un único mesh, "merged" ES geos[0].
+        if (geos.length > 1) geos.forEach(g => g.dispose())
     }
     return grupo
 }
@@ -1540,7 +1586,7 @@ function agarrarComponente(pasoId) {
     const slotGrupo = shelfSlotObjs[pasoId]
     if (slotGrupo) slotGrupo.visible = false
 
-    if (heldMesh) scene.remove(heldMesh)
+    if (heldMesh) { scene.remove(heldMesh); disposeGroup(heldMesh) }
     heldMesh = new THREE.Group()
     const modelGrp = modelos3D[paso.id]
     if (modelGrp && modelGrp.children[0]) {
@@ -1579,7 +1625,7 @@ function soltarComponente() {
     if (!heldComponent) return
     const slotGrupo = shelfSlotObjs[heldComponent.id]
     if (slotGrupo) slotGrupo.visible = true
-    if (heldMesh) { scene.remove(heldMesh); heldMesh = null }
+    if (heldMesh) { scene.remove(heldMesh); disposeGroup(heldMesh); heldMesh = null }
     const nombre = heldComponent.nombre
     heldComponent = null
     droneHabla(`"${nombre}" devuelto a la estantería.`)
@@ -1594,16 +1640,23 @@ function soltarComponenteInstalado(pasoId) {
         slotGrupo.traverse(n => {
             if (n.isMesh && !n.userData.isPlaceholder) {
                 if (n.material) {
+                    // Algunos meshes del estante (pedestal, divisores) comparten un
+                    // material entre TODOS los slots (ver mTrim en la construcción
+                    // del estante); solo podemos liberar el clon que nosotros mismos
+                    // creamos en una vuelta anterior, nunca el material compartido.
+                    const anterior = n.material
                     n.material = n.material.clone()
                     n.material.opacity = 0.35
                     n.material.transparent = true
                     n.material.emissiveIntensity = 0
+                    n.material.userData.esClonEstante = true
+                    if (anterior.userData?.esClonEstante) anterior.dispose()
                 }
             }
         })
         slotGrupo.visible = true
     }
-    if (heldMesh) { scene.remove(heldMesh); heldMesh = null }
+    if (heldMesh) { scene.remove(heldMesh); disposeGroup(heldMesh); heldMesh = null }
     heldComponent = null
 }
 
@@ -1619,6 +1672,7 @@ function intentarInstalar() {
     } else {
 
         erroresSesion++
+        guardarStatsLocal()
         const elapsed = Math.round((Date.now() - sessionStartTime) / 1000)
         registrarEvento({
             tipo: 'error_pieza',
@@ -1670,6 +1724,10 @@ function interactuarE() {
             const pasoIdx = PASOS.findIndex(p => p.id === pasoId)
             if (pasoIdx < indiceActual) {
                 droneHabla('Este componente ya está instalado en el PC.')
+                return
+            }
+            if (pasoIdx > indiceActual) {
+                droneHabla(`Aún no toca: instala "${PASOS[indiceActual]?.nombre}".`)
                 return
             }
             agarrarComponente(pasoId)
@@ -1725,33 +1783,16 @@ function interactuarEReto(eRay) {
         return
     }
 
-    // Fase reparación: tomar el repuesto de la vitrina e instalarlo
-    const fallaId = M.reto.componenteFalla
+    // Fase reparación: tomar el repuesto de la vitrina, instalarlo y, en la
+    // secuencia especial de CPU, retirar/montar el disipador y aplicar pasta.
     const sHits = eRay.intersectObjects(shelfMeshes)
-    if (sHits.length) {
-        const pasoId = sHits[0].object.userData.pasoId
-        const paso = PASOS.find(p => p.id === pasoId)
-        if (pasoId === fallaId) {
-            M.piezaLista = true
-            droneHabla(`Perfecto: ${paso.nombre} nuevo en mano. Ahora apunta al disco luminoso de la PC y pulsa E para instalarlo.`)
-            setHint(`<strong>En mano: ${paso.nombre} (repuesto).</strong> Apunta al disco luminoso y pulsa E para instalarlo.`)
-            appendLog(`Repuesto tomado: ${paso.nombre}`, 'info')
-            renderPanelReto()
-        } else {
-            droneHabla(`Ese es ${paso.nombre}, pero la pieza dañada es ${PASOS.find(p => p.id === fallaId).nombre}.`)
-        }
-        return
-    }
+    if (sHits.length) { tomarRepuestoReto(sHits[0].object.userData.pasoId); return }
 
     const dHits = eRay.intersectObjects(slotDiscs)
-    if (dHits.find(h => h.object.userData.id === fallaId)) {
-        if (!M.piezaLista) {
-            droneHabla('Primero toma el repuesto de la vitrina: apúntale y pulsa E.')
-            return
-        }
-        instalarReemplazoReto()
-        return
-    }
+    if (dHits.length && clicDiscoReto(dHits)) return
+
+    if (clicPropReto(eRay.intersectObjects(propsInteractivos, true))) return
+
     droneHabla('Apunta al repuesto en la vitrina o al disco luminoso de la PC y pulsa E.')
 }
 
@@ -1780,7 +1821,9 @@ function iniciarProcedimiento(paso) {
     procActivo = {
         paso, grupo, pasos: [], idx: 0, errores: 0, bloqueado: false,
         hotspots: [], focusTarget: paso.pos.clone(), orbitaPrev,
-        hotspot(mesh, data) { mesh.userData.proc = data; grupo.add(mesh); this.hotspots.push(mesh); return mesh }
+        hotspot(mesh, data) { mesh.userData.proc = data; grupo.add(mesh); this.hotspots.push(mesh); return mesh },
+        enfocarCamara(...args) { enfocarCamara(...args) },
+        setHint(...args) { setHint(...args) }
     }
     procActivo.pasos = construir(procActivo)
 
@@ -1895,12 +1938,18 @@ function enfocarCamara(toPos, toLook, dur = 0.7, onDone = null) {
 }
 
 
+const MATERIAL_MAP_KEYS = ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap', 'bumpMap']
+
 function disposeGroup(g) {
     g.traverse(o => {
         if (o.isMesh) {
             o.geometry?.dispose?.()
             const m = o.material
-            ;(Array.isArray(m) ? m : [m]).forEach(x => x?.dispose?.())
+            ;(Array.isArray(m) ? m : [m]).forEach(x => {
+                if (!x) return
+                MATERIAL_MAP_KEYS.forEach(k => x[k]?.dispose?.())
+                x.dispose?.()
+            })
         }
     })
 }
@@ -2006,7 +2055,6 @@ function construirEntorno() {
     crearDecoracionPared(grupo)
     crearVentana(grupo)
     crearPantallaTaller(grupo)
-    crearLedPerimetral(grupo)
     crearPlantas(grupo)
     crearSombraContacto(grupo)
     crearProps(grupo)
@@ -2175,7 +2223,8 @@ function cargarHerramientas() {
     })
     cargarProp('syringe.opt.glb', {
         id: 'paste', size: 0.3, x: -0.35, z: 0.85, y: 0, rotY: -0.4,
-        fact: 'Pasta térmica: se aplica una gota del tamaño de un guisante sobre el CPU. Rellena los microporos y conduce el calor al disipador.'
+        fact: 'Pasta térmica: se aplica una gota del tamaño de un guisante sobre el CPU. Rellena los microporos y conduce el calor al disipador.',
+        onClic: clicPastaTermica
     })
     cargarProp('cc0_-_wooden_spatula.opt.glb', {
         id: 'spatula', size: 0.16, x: -0.15, z: 0.9, y: 0, rotY: 0.8,
@@ -2385,7 +2434,7 @@ function crearCablePC() {
 }
 
 function limpiarCablePC() {
-    if (cablePC) { scene.remove(cablePC); cablePC.geometry.dispose(); cablePC = null }
+    if (cablePC) { scene.remove(cablePC); cablePC.geometry.dispose(); cablePC.material.dispose(); cablePC = null }
 }
 
 // Arranca la PC en el monitor: la secuencia depende de si el ensamble aprobó.
@@ -2829,23 +2878,6 @@ function dibujarPantallaTaller() {
     pantallaTallerTex && (pantallaTallerTex.needsUpdate = true)
 }
 
-function crearLedPerimetral(grupo) {
-    const { xMin, xMax, zMin, zMax, y0, h } = SALA
-    const y = y0 + h - 0.16
-    const mat = new THREE.MeshStandardMaterial({ color: 0x1cc9ff, emissive: 0x1cc9ff, emissiveIntensity: 1.5, roughness: 1 })
-    const W = xMax - xMin, D = zMax - zMin
-    const t = 0.035
-    const mk = (sx, sz, px, pz) => {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(sx, t, sz), mat)
-        m.position.set(px, y, pz)
-        grupo.add(m)
-    }
-    mk(W - 0.2, t, 0, zMin + 0.05)
-    mk(W - 0.2, t, 0, zMax - 0.05)
-    mk(t, D - 0.2, xMin + 0.05, 0)
-    mk(t, D - 0.2, xMax - 0.05, 0)
-}
-
 function crearPlantas(grupo) {
     const hoja = new THREE.MeshStandardMaterial({ color: 0x3f7a44, roughness: 0.85, flatShading: true })
     const hoja2 = new THREE.MeshStandardMaterial({ color: 0x4f9152, roughness: 0.85, flatShading: true })
@@ -3047,7 +3079,7 @@ function construirIluminacion() {
     const key = new THREE.DirectionalLight(0xfff4e2, 1.6)
     key.position.set(2.5, 5, 3)
     key.castShadow = true
-    key.shadow.mapSize.set(2048, 2048)
+    key.shadow.mapSize.set(EQUIPO_MODESTO ? 1024 : 2048, EQUIPO_MODESTO ? 1024 : 2048)
     key.shadow.camera.near = 0.5
     key.shadow.camera.far = 14
     key.shadow.camera.left = -3; key.shadow.camera.right = 3
@@ -3224,7 +3256,7 @@ function precargarModelos() {
 
                 actualizarSlotEstante(paso, obj)
                 appendLog(`Modelo listo: ${paso.nombre}`, 'success')
-                if (PASOS.indexOf(paso) < indiceActual) colocarModelo(paso, false)
+                if (PASOS.indexOf(paso) < indiceActual && !debeOcultarsePorReto(paso.id)) colocarModelo(paso, false)
                 marcarCargado()
                 siguiente()
             },
@@ -3236,7 +3268,7 @@ function precargarModelos() {
                 scene.add(ph)
                 modelos3D[paso.id] = ph
                 appendLog(`Usando representación básica de ${paso.nombre}.`, 'system')
-                if (PASOS.indexOf(paso) < indiceActual) colocarModelo(paso, false)
+                if (PASOS.indexOf(paso) < indiceActual && !debeOcultarsePorReto(paso.id)) colocarModelo(paso, false)
                 marcarCargado()
                 siguiente()
             }
@@ -3493,12 +3525,18 @@ function limpiarProgresoLocal() {
 
 const LS_STATS_KEY = 'lf_stats'
 
-function guardarStatsLocal() {
+// bootDone = ya se completó la prueba de arranque obligatoria (solo mostrarFinal()
+// lo pasa en true). Se guarda en cada paso, no solo al final: si el estudiante
+// recarga entre instalar la última pieza y terminar la prueba de arranque, initGame()
+// necesita saber que la nota de esta sesión (errores/demoras) es real y que el
+// arranque sigue pendiente, en vez de asumir 0 errores y saltárselo.
+function guardarStatsLocal(bootDone = false) {
     try {
         localStorage.setItem(LS_STATS_KEY, JSON.stringify({
             errores: erroresSesion,
             demoras: demorasSesion,
-            tiempoMs: Date.now() - labStartTime
+            tiempoMs: Date.now() - labStartTime,
+            bootDone
         }))
     } catch (_) { /* stats locales opcionales; no debe cortar el flujo */ }
 }
@@ -3519,6 +3557,9 @@ function iniciarModoReto(reto) {
         erroresDiag: 0,
         pistasUsadas: 0,
         piezaLista: false,
+        subpaso: null,
+        dependientes: [],
+        ocultos: new Set(),
         t0: null
     }
     indiceActual = TOTAL
@@ -3629,6 +3670,28 @@ function actualizarNotaReto() {
     if (txt) txt.textContent = 'Puntaje del reto'
 }
 
+// Lista ordenada de pasos de la fase reparación, con su estado (done/current/
+// pending), para el panel lateral. Es la guía principal del jugador: droneHabla
+// y setHint son no-op (ver notificaciones eliminadas), así que este checklist
+// tiene que bastar por sí solo.
+function pasosReparacionUI(M, paso) {
+    if (M.reto.componenteFalla === 'cpu') {
+        const orden = ['retirar-cooler', 'reemplazar-cpu', 'aplicar-pasta', 'montar-cooler']
+        const i = orden.indexOf(M.subpaso)
+        const textos = [
+            'Retira el disipador (clic en su disco luminoso).',
+            `Toma un ${paso.nombre} nuevo de la vitrina e instálalo (clic en su disco).`,
+            'Aplica pasta térmica nueva (clic en la jeringa, junto a la mesa de herramientas).',
+            'Vuelve a montar el disipador (clic en su disco luminoso).'
+        ]
+        return textos.map((texto, idx) => ({ texto, estado: idx < i ? 'done' : idx === i ? 'current' : 'pending' }))
+    }
+    return [
+        { texto: `Toma un/a ${paso.nombre} nuevo/a de la vitrina (clic).`, estado: M.piezaLista ? 'done' : 'current' },
+        { texto: 'Haz clic en el disco luminoso de la PC para instalarlo.', estado: M.piezaLista ? 'current' : 'pending' }
+    ]
+}
+
 function renderPanelReto() {
     const M = modoReto; if (!M) return
     let el = document.getElementById('reto-panel')
@@ -3642,12 +3705,19 @@ function renderPanelReto() {
 
     if (M.fase === 'reparacion') {
         const paso = PASOS.find(p => p.id === M.reto.componenteFalla)
+        const pasos = pasosReparacionUI(M, paso)
+        const nombresDep = M.reto.componenteFalla !== 'cpu'
+            ? (M.dependientes || []).map(dId => PASOS.find(p => p.id === dId)?.nombre).filter(Boolean)
+            : []
+        const notaDep = nombresDep.length
+            ? `<div style="color:#9fb3c8;font-size:.76rem;margin:-4px 0 10px;">Piezas retiradas para acceder: ${nombresDep.join(', ')}. Se remontan solas al terminar.</div>`
+            : ''
         el.innerHTML = `
             <div style="font-weight:700;font-size:.95rem;">✓ Falla diagnosticada</div>
             <div style="color:#4ade80;font-size:.85rem;margin:6px 0 12px;">${paso.nombre}: ${M.reto.descripcionFalla}</div>
+            ${notaDep}
             <ol style="padding-left:18px;margin:0;display:flex;flex-direction:column;gap:8px;font-size:.83rem;color:#cdd9e8;">
-                <li style="${M.piezaLista ? 'opacity:.55;text-decoration:line-through;' : 'font-weight:600;color:#eaf2ff;'}">Toma un/a ${paso.nombre} nuevo/a de la vitrina (clic).</li>
-                <li style="${M.piezaLista ? 'font-weight:600;color:#eaf2ff;' : 'opacity:.55;'}">Haz clic en el disco luminoso de la PC para instalarlo.</li>
+                ${pasos.map(p => `<li style="${p.estado === 'done' ? 'opacity:.55;text-decoration:line-through;' : p.estado === 'current' ? 'font-weight:600;color:#eaf2ff;' : 'opacity:.55;'}">${p.texto}</li>`).join('')}
             </ol>`
         return
     }
@@ -3727,14 +3797,38 @@ function diagnosticarReto(id) {
         M.fase = 'reparacion'
         retoMedicion = false
         ocultarMultimetroReadout()
-        const m = modelos3D[id]
-        if (m) { m.visible = false; pedirActualizarSombras() }
         PASOS.forEach(p => { if (p.marker) p.marker.visible = false })
-        if (paso.marker) { paso.marker.visible = true; paso.marker.userData.intenso = true }
+
+        // Oculta la falla y, si hace falta desmontar piezas para acceder a ella
+        // (todo lo del gabinete, o lo montado en la placa), también se ocultan.
+        M.dependientes = dependientesDe(id)
+        // Se recuerda qué ids deben permanecer ocultos aunque su modelo termine
+        // de cargar recién ahora (carrera entre precargarModelos, que muestra
+        // todo lo "ya instalado", y este diagnóstico); ver debeOcultarsePorReto.
+        M.ocultos = new Set([id, ...M.dependientes])
+        const m = modelos3D[id]
+        if (m) m.visible = false
+        M.dependientes.forEach(dId => { const dm = modelos3D[dId]; if (dm) dm.visible = false })
+        pedirActualizarSombras()
 
         appendLog(`✓ Diagnóstico correcto: ${paso.nombre}. Pieza retirada.`, 'success')
-        droneHabla(`¡Diagnóstico correcto! ${M.reto.descripcionFalla} Retiré la pieza dañada: toma un repuesto de la vitrina.`)
-        setHint(`<strong>✓ Falla encontrada: ${paso.nombre}.</strong> Toma el repuesto en la vitrina (clic) y luego haz clic en el disco luminoso.`)
+
+        if (id === 'cpu') {
+            // El disipador cubre el CPU: hay que retirarlo primero (ya se ocultó
+            // arriba) antes de poder cambiar el procesador, y al remontarlo hace
+            // falta pasta térmica nueva.
+            M.subpaso = 'retirar-cooler'
+            const cooler = PASOS.find(p => p.id === 'cooler')
+            if (cooler?.marker) { cooler.marker.visible = true; cooler.marker.userData.intenso = true }
+            droneHabla(`¡Diagnóstico correcto! ${M.reto.descripcionFalla} Primero retira el disipador para acceder al procesador: haz clic en su disco.`)
+            setHint(`<strong>✓ Falla encontrada: ${paso.nombre}.</strong> Primero retira el disipador (clic en su disco luminoso) para acceder al CPU.`)
+        } else {
+            if (paso.marker) { paso.marker.visible = true; paso.marker.userData.intenso = true }
+            const nombresDep = M.dependientes.map(dId => PASOS.find(p => p.id === dId)?.nombre).filter(Boolean)
+            const notaDep = nombresDep.length ? ` Para acceder también retiré: ${nombresDep.join(', ')}; se remontan solas al terminar.` : ''
+            droneHabla(`¡Diagnóstico correcto! ${M.reto.descripcionFalla} Retiré la pieza dañada: toma un repuesto de la vitrina.${notaDep}`)
+            setHint(`<strong>✓ Falla encontrada: ${paso.nombre}.</strong> Toma el repuesto en la vitrina (clic) y luego haz clic en el disco luminoso.`)
+        }
         dibujarPantallaTaller()
         renderPanelReto()
     } else {
@@ -3766,6 +3860,30 @@ const RIELES = {
 // caso donde el multímetro es decisivo; en fallas térmicas/lógicas/de VRAM los
 // voltajes salen normales (y eso también es un dato: la avería no es eléctrica).
 function esFallaElectricaReto(M) { return !!M && M.reto.componenteFalla === 'power' }
+
+// Componentes que hay que retirar temporalmente para acceder al que se está
+// reparando (van montados encima o dentro de él). Se ocultan junto con la
+// falla y se restauran (con animación de caída) al terminar la reparación —
+// evita que queden "flotando" sin soporte cuando la falla es el gabinete o
+// la placa base. El CPU es un caso aparte: el disipador se retira/remonta
+// como un paso interactivo propio (ver retirarCoolerReto/montarCoolerReto),
+// no automáticamente.
+const DEPENDIENTES_REPARACION = {
+    case: PASOS.filter(p => p.id !== 'case').map(p => p.id),
+    mb:   ['cpu', 'cooler', 'ram', 'storage', 'sata', 'gpu'],
+    cpu:  ['cooler']
+}
+function dependientesDe(id) { return DEPENDIENTES_REPARACION[id] || [] }
+
+// precargarModelos muestra automáticamente todo lo "ya instalado" (idx <
+// indiceActual) en cuanto cada GLB termina de cargar — pero en modo reto
+// TOTAL ya está instalado desde el inicio (indiceActual=TOTAL), así que una
+// pieza que siga cargando cuando el jugador ya diagnosticó la falla (rápido,
+// o con conexión lenta) reaparecería sola encima del diagnóstico. M.ocultos
+// es la fuente de verdad de qué debe seguir oculto ahora mismo.
+function debeOcultarsePorReto(pasoId) {
+    return !!(modoReto && modoReto.ocultos && modoReto.ocultos.has(pasoId))
+}
 
 function medicionReto(id) {
     const M = modoReto
@@ -3851,6 +3969,66 @@ function clicMultimetro() {
     droneHabla('Multímetro digital: mide voltajes para diagnosticar la fuente y detectar componentes sin energía. Se usa en los retos de reparación.')
 }
 
+// ── Fase reparación: helpers compartidos por clicReto (mouse/órbita) e
+// interactuarEReto (tecla E/caminar) ─────────────────────────────────────────
+
+// Toma de la vitrina el repuesto de la pieza dañada. Al caminar, se muestra en
+// la mano con el mismo aparato visual que en el ensamblaje normal
+// (agarrarComponente); en modo órbita se mantiene el flag simple, igual que la
+// selección de componentes fuera de reto.
+function tomarRepuestoReto(pasoId) {
+    const M = modoReto
+    const fallaId = M.reto.componenteFalla
+    const paso = PASOS.find(p => p.id === pasoId)
+    if (pasoId !== fallaId) {
+        droneHabla(`Ese es ${paso.nombre}, pero la pieza dañada es ${PASOS.find(p => p.id === fallaId).nombre}.`)
+        return
+    }
+    if (fallaId === 'cpu' && M.subpaso !== 'reemplazar-cpu') {
+        droneHabla(M.subpaso === 'retirar-cooler'
+            ? 'Primero retira el disipador (clic en su disco) para acceder al procesador.'
+            : 'Termina de reinstalar el disipador antes de continuar.')
+        return
+    }
+    M.piezaLista = true
+    if (walkMode) agarrarComponente(pasoId)
+    droneHabla(`Perfecto: ${paso.nombre} nuevo en mano. Ahora haz clic (o E) en el disco luminoso para instalarlo.`)
+    setHint(`<strong>En mano: ${paso.nombre} (repuesto).</strong> Haz clic o pulsa E en el disco luminoso para instalarlo.`)
+    appendLog(`Repuesto tomado: ${paso.nombre}`, 'info')
+    renderPanelReto()
+}
+
+// Clic/E sobre un disco luminoso en fase reparación. Despacha según a cuál
+// corresponde: el de la falla (instala el repuesto), o el del disipador
+// durante la secuencia especial de CPU (retirarlo / volver a montarlo).
+// Devuelve true si consumió la interacción.
+function clicDiscoReto(dHits) {
+    const M = modoReto
+    const fallaId = M.reto.componenteFalla
+    const tieneId = id => dHits.some(h => h.object.userData.id === id)
+
+    if (fallaId === 'cpu' && tieneId('cooler')) {
+        if (M.subpaso === 'retirar-cooler') { retirarCoolerReto(); return true }
+        if (M.subpaso === 'montar-cooler') { montarCoolerReto(); return true }
+    }
+    if (!tieneId(fallaId)) return false
+    if (fallaId === 'cpu' && M.subpaso !== 'reemplazar-cpu') return false
+    if (!M.piezaLista) { droneHabla('Primero toma el repuesto de la vitrina.'); return true }
+    instalarReemplazoReto()
+    return true
+}
+
+// Clic/E sobre un prop interactivo (herramientas, multímetro…). Devuelve true
+// si consumió la interacción.
+function clicPropReto(hits) {
+    if (!hits.length) return false
+    let obj = hits[0].object
+    while (obj && !obj.userData.fact && !obj.userData.onClic) obj = obj.parent
+    if (obj?.userData.onClic) { obj.userData.onClic(); return true }
+    if (obj?.userData.fact) { droneHabla(obj.userData.fact); return true }
+    return false
+}
+
 function clicReto(e) {
     const M = modoReto
     if (!M || M.fase === 'brief' || M.fase === 'final') return
@@ -3871,56 +4049,103 @@ function clicReto(e) {
             return
         }
     } else if (M.fase === 'reparacion') {
-        const fallaId = M.reto.componenteFalla
-
         const sHits = raycaster.intersectObjects(shelfMeshes)
-        if (sHits.length) {
-            const pasoId = sHits[0].object.userData.pasoId
-            const paso = PASOS.find(p => p.id === pasoId)
-            if (pasoId === fallaId) {
-                M.piezaLista = true
-                droneHabla(`Perfecto: ${paso.nombre} nuevo en mano. Ahora haz clic en el disco luminoso de la PC.`)
-                setHint(`<strong>En mano: ${paso.nombre} (repuesto).</strong> Haz clic en el disco luminoso para instalarlo.`)
-                appendLog(`Repuesto tomado: ${paso.nombre}`, 'info')
-                renderPanelReto()
-            } else {
-                droneHabla(`Ese es ${paso.nombre}, pero la pieza dañada es ${PASOS.find(p => p.id === fallaId).nombre}.`)
-            }
-            return
-        }
+        if (sHits.length) { tomarRepuestoReto(sHits[0].object.userData.pasoId); return }
 
         const dHits = raycaster.intersectObjects(slotDiscs)
-        if (dHits.find(h => h.object.userData.id === fallaId)) {
-            if (!M.piezaLista) {
-                droneHabla('Primero toma el repuesto de la vitrina (haz clic sobre la pieza).')
-                return
-            }
-            instalarReemplazoReto()
-            return
-        }
+        if (dHits.length && clicDiscoReto(dHits)) return
     }
 
-    if (propsInteractivos.length) {
-        const pHits = raycaster.intersectObjects(propsInteractivos, true)
-        if (pHits.length) {
-            let obj = pHits[0].object
-            while (obj && !obj.userData.fact && !obj.userData.onClic) obj = obj.parent
-            if (obj?.userData.onClic) { obj.userData.onClic(); return }
-            if (obj?.userData.fact) droneHabla(obj.userData.fact)
-        }
-    }
+    if (clicPropReto(raycaster.intersectObjects(propsInteractivos, true))) return
 }
 
 function instalarReemplazoReto() {
     const M = modoReto
     const paso = PASOS.find(p => p.id === M.reto.componenteFalla)
+
+    ocultarMarcador(paso.id)
+    colocarModelo(paso, true)
+    soltarComponenteInstalado(paso.id)
+    M.ocultos.delete(paso.id)
+    appendLog(`${paso.nombre} reemplazado.`, 'success')
+
+    if (M.reto.componenteFalla === 'cpu') {
+        // No se finaliza todavía: falta reaplicar pasta térmica y remontar el
+        // disipador antes de encender la PC.
+        M.subpaso = 'aplicar-pasta'
+        droneHabla('¡Procesador nuevo instalado! Antes de montar el disipador, aplica pasta térmica nueva: haz clic en la jeringa junto a la mesa de herramientas.')
+        setHint('<strong>CPU instalado.</strong> Aplica pasta térmica nueva: clic en la jeringa de pasta.')
+        renderPanelReto()
+        return
+    }
+
+    finalizarInstalacionReto()
+}
+
+// Retira el disipador (fase reparación de CPU, subpaso 'retirar-cooler'):
+// avanza a "toma el CPU nuevo" y revela su disco.
+function retirarCoolerReto() {
+    const M = modoReto
+    LFSound.click()
+    M.subpaso = 'reemplazar-cpu'
+    ocultarMarcador('cooler')
+    const cpuPaso = PASOS.find(p => p.id === 'cpu')
+    if (cpuPaso?.marker) { cpuPaso.marker.visible = true; cpuPaso.marker.userData.intenso = true }
+    appendLog('Disipador retirado para acceder al procesador.', 'success')
+    droneHabla('Disipador retirado. Ahora toma el procesador nuevo de la vitrina.')
+    setHint('<strong>Disipador retirado.</strong> Toma el procesador nuevo de la vitrina (clic) y luego haz clic en su disco.')
+    renderPanelReto()
+}
+
+// onClic de la jeringa de pasta térmica: solo actúa durante el subpaso
+// 'aplicar-pasta' de una reparación de CPU; el resto del tiempo solo explica
+// su uso (igual que el resto de herramientas del taller).
+function clicPastaTermica() {
+    const M = modoReto
+    if (M && M.fase === 'reparacion' && M.reto.componenteFalla === 'cpu' && M.subpaso === 'aplicar-pasta') {
+        LFSound.click()
+        M.subpaso = 'montar-cooler'
+        const cooler = PASOS.find(p => p.id === 'cooler')
+        if (cooler?.marker) { cooler.marker.visible = true; cooler.marker.userData.intenso = true }
+        appendLog('Pasta térmica nueva aplicada sobre el CPU.', 'success')
+        droneHabla('Pasta térmica aplicada. Ahora vuelve a montar el disipador: haz clic en su disco luminoso.')
+        setHint('<strong>Pasta térmica aplicada.</strong> Monta de nuevo el disipador: clic en su disco luminoso.')
+        renderPanelReto()
+        return
+    }
+    droneHabla('Pasta térmica: se aplica una gota del tamaño de un guisante sobre el CPU. Rellena los microporos y conduce el calor al disipador.')
+}
+
+// Vuelve a montar el disipador (fase reparación de CPU, subpaso
+// 'montar-cooler', ya con pasta nueva aplicada) y cierra la reparación.
+function montarCoolerReto() {
+    const M = modoReto
+    ocultarMarcador('cooler')
+    colocarModelo(PASOS.find(p => p.id === 'cooler'), true)
+    M.ocultos.delete('cooler')
+    appendLog('Disipador montado de nuevo.', 'success')
+    finalizarInstalacionReto()
+}
+
+// Cierra la fase de reparación: remonta (con animación de caída) las piezas
+// que se ocultaron para acceder a la falla y programa el encendido final.
+function finalizarInstalacionReto() {
+    const M = modoReto
     M.fase = 'final'
     if (walkControls?.isLocked) walkControls.unlock()
     actualizarOverlayWalk()
-    ocultarMarcador(paso.id)
-    colocarModelo(paso, true)
-    appendLog(`${paso.nombre} reemplazado. Encendiendo la PC…`, 'success')
-    droneHabla('¡Pieza instalada! Encendiendo para verificar… POST correcto. ¡La PC funciona!')
+
+    const deps = M.dependientes || []
+    deps.forEach(dId => {
+        // El disipador de la secuencia CPU ya se remontó a mano (montarCoolerReto).
+        if (M.reto.componenteFalla === 'cpu' && dId === 'cooler') return
+        const dPaso = PASOS.find(p => p.id === dId)
+        if (dPaso) colocarModelo(dPaso, true)
+        M.ocultos.delete(dId)
+    })
+
+    appendLog('Encendiendo la PC…', 'success')
+    droneHabla('¡Todo en su lugar! Encendiendo para verificar… POST correcto. ¡La PC funciona!')
     setTimeout(finalizarReto, 1800)
 }
 
@@ -3941,20 +4166,27 @@ async function finalizarReto() {
 
     const guardado = await guardarResultadoReto(resultado)
     let logrosNuevos = []
-    try {
-        const resultados = guardado ? await obtenerResultadosRetos() : []
+    // Sin guardado no hay nada que otorgar: mostrar insignias "desbloqueadas" que
+    // nunca se persistieron confundiría al estudiante (parecerían ganadas y no lo están).
+    if (guardado) {
+        try {
+            const resultados = await obtenerResultadosRetos()
 
-        const historial = resultados.length ? resultados : [{
-            reto_id: r.id, nota, exito,
-            errores_diagnostico: M.erroresDiag, pistas_usadas: M.pistasUsadas, segundos
-        }]
-        const candidatos = LOGROS_RETO.filter(l => l.condition(historial)).map(l => l.id)
-        if (candidatos.length) {
-            const previos = await obtenerLogrosUsuario()
-            logrosNuevos = candidatos.filter(id => !previos.includes(id))
-            if (logrosNuevos.length && guardado) await otorgarLogros(logrosNuevos, r.id)
-        }
-    } catch (_) {  }
+            // null = el GET falló (aunque el POST ya tuvo éxito): usamos este intento
+            // como mejor estimación. [] = el servidor confirmó que no hay filas; se
+            // respeta tal cual en vez de inventar historial.
+            const historial = resultados === null ? [{
+                reto_id: r.id, nota, exito,
+                errores_diagnostico: M.erroresDiag, pistas_usadas: M.pistasUsadas, segundos
+            }] : resultados
+            const candidatos = LOGROS_RETO.filter(l => l.condition(historial)).map(l => l.id)
+            if (candidatos.length) {
+                const previos = await obtenerLogrosUsuario()
+                logrosNuevos = candidatos.filter(id => !previos.includes(id))
+                if (logrosNuevos.length) await otorgarLogros(logrosNuevos, r.id)
+            }
+        } catch (_) {  }
+    }
 
     mostrarFinalReto(resultado, logrosNuevos, guardado)
 }
@@ -4032,9 +4264,10 @@ async function initGame() {
         if (progreso) instalados = progreso.componentes_instalados || []
     }
 
+    const savedStats = leerStatsLocal()
+
     if (instalados.length >= TOTAL) {
 
-        const savedStats = leerStatsLocal()
         indiceActual     = TOTAL
         sessionStartTime = Date.now()
         labStartTime     = savedStats ? Date.now() - savedStats.tiempoMs : Date.now()
@@ -4043,18 +4276,25 @@ async function initGame() {
         renderChecklist()
         initMotor3D()
         motorListo = true
-        // Sesión ya completada en una visita anterior: se muestra el resumen con la
-        // nota definitiva (la prueba de arranque ya se hizo en su momento).
-        await calcularNotaFinal()
-        mostrarFinal()
+        if (savedStats?.bootDone) {
+            // Sesión ya completada en una visita anterior: se muestra el resumen con
+            // la nota definitiva (la prueba de arranque ya se hizo en su momento).
+            await calcularNotaFinal()
+            mostrarFinal()
+        } else {
+            // Se instaló todo pero la pestaña se cerró/recargó antes de terminar la
+            // prueba de arranque obligatoria (o antes de que existiera lf_stats):
+            // no saltarse el requisito. iniciarPruebaFinal() ya recalcula la nota.
+            iniciarPruebaFinal()
+        }
         return
     }
 
     indiceActual = Math.min(instalados.length, TOTAL)
     sessionStartTime = Date.now()
-    labStartTime = Date.now()
-    erroresSesion = 0
-    demorasSesion = 0
+    labStartTime = savedStats ? Date.now() - savedStats.tiempoMs : Date.now()
+    erroresSesion = savedStats?.errores ?? 0
+    demorasSesion = savedStats?.demoras ?? 0
 
     renderChecklist()
     initMotor3D()
@@ -4139,6 +4379,10 @@ document.getElementById('walk-start-btn')?.addEventListener('click', () => {
 })
 
 window.addEventListener('keydown', (e) => {
+    // Ignora la auto-repetición del SO al mantener una tecla presionada: sin esto,
+    // KeyE dispara interactuarE() muchas veces por segundo mientras se mantiene
+    // pulsada, pudiendo reentrar en una instalación ya en curso.
+    if (e.repeat) return
     switch (e.code) {
         case 'KeyW': case 'ArrowUp':    if (walkMode) teclas.w = true; break
         case 'KeyS': case 'ArrowDown':  if (walkMode) teclas.s = true; break
@@ -4168,7 +4412,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const session = await protegerRuta()
     if (!session) return
     // Requisito pedagógico: el laboratorio 3D (ensamble y retos) exige completar
-    // la Academia con buena calificación. Si no, se envía a estudiar primero.
+    // la Academia con buena calificación. Se baja la nota del servidor primero
+    // para que el requisito valga entre dispositivos; sin red decide lo local.
+    try { await sincronizarAcademia() } catch (e) { /* offline: usamos lo local */ }
     if (!academiaAprobada()) {
         window.location.replace('academia.html?bloqueo=sim')
         return

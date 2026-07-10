@@ -110,7 +110,8 @@ export const BADGES = [
     title: 'Componente estrella',
     description: 'Instalaste todos los componentes del laboratorio.',
     icon: '🌟',
-    condition: (p, s) => (p?.componentes_instalados || []).length >= 8
+    // Debe coincidir con la cantidad de piezas en COMPONENTS (menu.js).
+    condition: (p, s) => (p?.componentes_instalados || []).length >= 11
   },
   {
     id: 'persistente',
@@ -118,6 +119,69 @@ export const BADGES = [
     description: 'Completaste 5 simulaciones.',
     icon: '🔄',
     condition: (p, s) => (p?.simulaciones_completadas || 0) >= 5
+  },
+  {
+    id: 'primer_paso',
+    title: 'Primer tornillo',
+    description: 'Instalaste tu primer componente del PC.',
+    icon: '🔩',
+    condition: (p, s) => (p?.componentes_instalados || []).length >= 1
+  },
+  {
+    id: 'medio_camino',
+    title: 'A mitad de camino',
+    description: 'Instalaste más de la mitad de los componentes del laboratorio.',
+    icon: '🧱',
+    condition: (p, s) => (p?.componentes_instalados || []).length >= 6
+  },
+  {
+    id: 'precision_alta',
+    title: 'Precisión de cirujano',
+    description: 'Alcanzaste 90% de precisión o más en tus ensambles.',
+    icon: '🎯',
+    condition: (p, s) => (s?.aciertos || 0) > 0 && (s?.precision ?? 0) >= 90
+  },
+  {
+    id: 'sin_demoras',
+    title: 'Sin titubeos',
+    description: 'Completaste una simulación sin ninguna demora registrada.',
+    icon: '🚀',
+    condition: (p, s) => (p?.simulaciones_completadas || 0) >= 1 && (s?.demoras || 0) === 0 && (s?.aciertos || 0) > 0
+  },
+  {
+    id: 'veterano',
+    title: 'Veterano del laboratorio',
+    description: 'Completaste 10 simulaciones de ensamblaje.',
+    icon: '🎖️',
+    condition: (p, s) => (p?.simulaciones_completadas || 0) >= 10
+  },
+  {
+    id: 'maratonista',
+    title: 'Maratonista',
+    description: 'Acumulaste más de 1 hora de práctica en el laboratorio 3D.',
+    icon: '⏳',
+    condition: (p, s) => (p?.tiempo_total_segundos || 0) >= 3600
+  },
+  {
+    id: 'comprension_solida',
+    title: 'Mente teórica',
+    description: 'Obtuviste 80% o más en las preguntas de comprensión.',
+    icon: '📚',
+    condition: (p, s) => (p?.comprension_pct || 0) >= 80
+  },
+  {
+    id: 'ensamble_aprobado',
+    title: 'Ensamble aprobado',
+    description: 'Aprobaste el ensamble del laboratorio 3D.',
+    icon: '✅',
+    condition: (p, s) => !!p?.web_aprobado_at
+  },
+  {
+    id: 'certificado_completo',
+    title: 'Certificado LogicFlow',
+    description: 'Completaste el ensamble web y la instalación real guiada en la app móvil.',
+    icon: '📜',
+    condition: (p, s) => !!p?.web_aprobado_at && !!p?.movil_completado_at
   }
 ]
 

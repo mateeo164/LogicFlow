@@ -158,6 +158,15 @@ async function init() {
     const sincronizadas = await sincronizar()
     pintar(sincronizadas)
   } catch (e) { /* sin conexión: nos quedamos con lo local */ }
+
+  // Si otra pestaña (p. ej. leccion.html) completa una lección, localStorage cambia
+  // pero esta página no se enteraba hasta recargar: el progreso/candado quedaban
+  // desactualizados aunque el dato ya estuviera guardado.
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'logicflow_academia_completadas' || e.key === 'logicflow_academia_aciertos') {
+      pintar(leerLocal())
+    }
+  })
 }
 
 if (document.readyState === 'loading') {

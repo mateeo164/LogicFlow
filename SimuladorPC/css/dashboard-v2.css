@@ -162,6 +162,216 @@
   min-width: 170px;
 }
 
+/* --- Recorrido: barra grande Academia → Simulador → Retos → app móvil --- */
+.recorrido-card {
+  grid-column: 1 / -1;
+  background: var(--lf-surface-0);
+  border: 1px solid var(--lf-border-light);
+  border-radius: var(--lf-radius-lg);
+  padding: 24px;
+  box-shadow: var(--lf-shadow-sm);
+}
+
+.recorrido-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.recorrido-card__head h2 {
+  font-family: var(--lf-font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--lf-text-primary);
+}
+
+.recorrido-card__head p {
+  font-size: 13px;
+  color: var(--lf-text-muted);
+  line-height: 1.5;
+}
+
+.recorrido-nota {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 84px;
+  padding: 8px 16px;
+  border-radius: var(--lf-radius-lg);
+  background: var(--lf-primary-100, rgba(58, 71, 121, 0.08));
+}
+
+.recorrido-nota__valor {
+  font-family: var(--lf-font-serif);
+  font-size: 24px;
+  font-weight: 800;
+  /* El pill (fondo --lf-primary-100) no se redefine en oscuro — igual que
+     .pct-badge y .role-tag.estudiante — así que el texto usa el mismo tono
+     oscuro fijo en los dos temas para no quedar claro-sobre-claro. */
+  color: var(--lf-primary-800);
+  line-height: 1.15;
+}
+
+.recorrido-nota__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: var(--lf-text-muted);
+}
+
+/* Barra grande: el doble de alta que .progreso-barra-bg normal, para que se lea
+   de un vistazo como "el indicador principal" del panel. */
+/* Compuesto con .progreso-barra-bg a propósito: misma especificidad que
+   ".progreso-barra-bg" sola perdería el empate de cascada (ambas 0,0,1,0)
+   según el orden en el archivo; el selector combinado la gana siempre. */
+.progreso-barra-bg.recorrido-barra-bg {
+  height: 16px;
+  margin-bottom: 22px;
+}
+
+.recorrido-etapas {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.recorrido-etapa {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--lf-radius-md, 10px);
+  background: var(--lf-paper-2);
+  border: 1px solid var(--lf-border-light);
+  transition: all var(--lf-transition-fast);
+}
+
+/* Conector horizontal entre etapas, como en un stepper de checkout. */
+.recorrido-etapa:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  width: 12px;
+  height: 2px;
+  background: var(--lf-border-light);
+  z-index: 1;
+}
+
+.recorrido-etapa__icon {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  border-radius: 50%;
+  background: var(--lf-surface-200);
+  color: var(--lf-text-muted);
+}
+
+.recorrido-etapa__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.recorrido-etapa__label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--lf-text-primary);
+}
+
+.recorrido-etapa__estado {
+  font-size: 12px;
+  font-family: var(--lf-font-mono);
+  color: var(--lf-text-muted);
+}
+
+.recorrido-etapa.is-current {
+  border-color: var(--lf-primary-700);
+  /* color-mix con transparent (no un token de fondo fijo) para que el tinte se
+     lea bien tanto sobre superficie clara como oscura, sin override por tema. */
+  background: color-mix(in srgb, var(--lf-primary-700) 8%, transparent);
+}
+
+.recorrido-etapa.is-current .recorrido-etapa__icon {
+  background: var(--lf-primary-700);
+  color: #fff;
+}
+
+.recorrido-etapa.is-done {
+  border-color: var(--lf-emerald-500);
+}
+
+.recorrido-etapa.is-done .recorrido-etapa__icon {
+  background: var(--lf-emerald-500);
+  color: #fff;
+}
+
+.recorrido-etapa.is-done .recorrido-etapa__estado {
+  /* Mismo verde fijo que .cert-step--done: --lf-emerald-600 es demasiado oscuro
+     para leerse sobre superficie oscura sin un override de tema aparte. */
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.recorrido-etapa.is-locked {
+  opacity: .6;
+}
+
+.recorrido-movil {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--lf-radius-md, 10px);
+  border: 1px dashed var(--lf-border-light);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lf-text-secondary);
+}
+
+.recorrido-movil__icon {
+  flex: 0 0 auto;
+  font-size: 18px;
+}
+
+.recorrido-movil.is-apto {
+  border-style: solid;
+  border-color: var(--lf-emerald-500);
+  background: rgba(5, 150, 105, 0.08);
+  color: #16a34a;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .recorrido-card__head {
+    flex-direction: column;
+  }
+  .recorrido-nota {
+    align-self: flex-start;
+    flex-direction: row;
+    gap: 8px;
+  }
+  .recorrido-etapas {
+    grid-template-columns: 1fr;
+  }
+  .recorrido-etapa:not(:last-child)::after {
+    display: none;
+  }
+}
+
 .stats-strip {
   grid-column: 1 / -1;
   display: grid;
@@ -1329,6 +1539,7 @@ body.is-tutor .tutor-only { display: block; }
   overflow: hidden;
   animation: lf-notif-in 0.16s ease;
 }
+.lf-notif-panel[hidden] { display: none; }
 @keyframes lf-notif-in {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }

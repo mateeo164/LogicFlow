@@ -8,7 +8,7 @@
 //   • Google Fonts (cross-origin) → cache-first para funcionar offline.
 //   • Resto cross-origin (YouTube, Supabase) → directo a la red.
 
-const CACHE_VERSION = 'v38';
+const CACHE_VERSION = 'v41';
 const CACHE_NAME = `logicflow-${CACHE_VERSION}`;
 
 // App shell precacheado en install para arranque offline.
@@ -61,7 +61,18 @@ function esNavegacion(request) {
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)).catch(() => {})
+    caches.open(CACHE_NAME).then((cache) =>
+      // cache.addAll() es atómico: si UNA sola URL de PRECACHE falla (404, typo,
+      // archivo renombrado), rechaza todo el lote y el .catch(()=>{}) lo tragaba
+      // en silencio — el SW "instalaba" con éxito pero el caché quedaba vacío,
+      // matando el modo offline completo. cache.add() uno por uno + allSettled
+      // deja que una entrada rota no tumbe el resto del precache.
+      Promise.allSettled(PRECACHE.map((url) => cache.add(url))).then((resultados) => {
+        resultados.forEach((r, i) => {
+          if (r.status === 'rejected') console.warn('[SW] No se pudo precachear', PRECACHE[i], r.reason);
+        });
+      })
+    )
   );
   self.skipWaiting();
 });

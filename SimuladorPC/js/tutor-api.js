@@ -1,9 +1,10 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, authStore } from './supabase-config.js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, authStore, refreshSession } from './supabase-config.js'
 
 const TIMEOUT = 12000
 
 async function dataRequest(path, options = {}) {
     const token = authStore.getItem(STORAGE_KEYS.accessToken)
+    if (!token) throw new Error('Sesión no iniciada.')
     const headers = {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,
@@ -21,6 +22,11 @@ async function dataRequest(path, options = {}) {
             body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
             signal: ctrl.signal
         })
+
+        if (res.status === 401 && !options._reintentado && authStore.getItem(STORAGE_KEYS.refreshToken)) {
+            const refrescada = await refreshSession()
+            if (refrescada) return dataRequest(path, { ...options, _reintentado: true })
+        }
 
         if (res.status === 204) return null
         const payload = await res.json().catch(() => null)
@@ -107,6 +113,7 @@ export async function rankingClase(claseId) {
 }
 
 export async function crearTarea({ claseId, titulo, descripcion = null, puntajeMax = 10, venceAt = null }) {
+    const puntajeNum = Number(puntajeMax)
     const data = await dataRequest('/lf_tareas', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
@@ -114,7 +121,7 @@ export async function crearTarea({ claseId, titulo, descripcion = null, puntajeM
             clase_id: claseId,
             titulo,
             descripcion: descripcion || null,
-            puntaje_max: Math.max(1, Math.min(100, Number(puntajeMax) || 10)),
+            puntaje_max: Math.max(1, Math.min(100, Number.isFinite(puntajeNum) ? puntajeNum : 10)),
             vence_at: venceAt || null
         }
     })
@@ -209,7 +216,7 @@ export async function subirArchivoEntrega(tareaId, file) {
             const payload = await res.json().catch(() => null)
             throw new Error(payload?.message || payload?.error || `No se pudo subir el archivo (HTTP ${res.status}).`)
         }
-        return { path, nombre: file.name || nombre }
+        return { path, nombre }
     } catch (err) {
         if (err.name === 'AbortError') throw new Error('La subida tardó demasiado. Revisa tu conexión.')
         throw err
@@ -237,6 +244,7 @@ function obtenerUserId() {
 
 async function storageRequest(path, options = {}) {
     const token = authStore.getItem(STORAGE_KEYS.accessToken)
+    if (!token) throw new Error('Sesión no iniciada.')
     const ctrl = new AbortController()
     const tid = setTimeout(() => ctrl.abort(), TIMEOUT)
     try {
@@ -250,6 +258,12 @@ async function storageRequest(path, options = {}) {
             body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
             signal: ctrl.signal
         })
+
+        if (res.status === 401 && !options._reintentado && authStore.getItem(STORAGE_KEYS.refreshToken)) {
+            const refrescada = await refreshSession()
+            if (refrescada) return storageRequest(path, { ...options, _reintentado: true })
+        }
+
         const payload = await res.json().catch(() => null)
         if (!res.ok) throw new Error(payload?.message || payload?.error || `HTTP ${res.status}`)
         return payload

@@ -191,7 +191,7 @@ export function construirProcedimientoMB(P) {
                             ponerTornillo(G, x, y, 2.6)
                             puestos.add(i); next++
                             if (next >= orden.length) done()
-                            else { refrescar(); P.bloqueado = false; setHint(`<strong>Atornillar en cruz</strong> — quedan ${orden.length - next} tornillo(s).`) }
+                            else { refrescar(); P.bloqueado = false; P.setHint(`<strong>Atornillar en cruz</strong> — quedan ${orden.length - next} tornillo(s).`) }
                         }
                     })
                     refs.push(hs)
@@ -281,7 +281,7 @@ export function construirProcedimientoCooler(P) {
                             hs.userData.proc.accion = 'nada'; hs.userData.ring.visible = false
                             hechos++
                             if (hechos >= 2) done()
-                            else { P.bloqueado = false; setHint('Engancha también el otro clip.') }
+                            else { P.bloqueado = false; P.setHint('Engancha también el otro clip.') }
                         }
                     })
                 })
@@ -393,7 +393,7 @@ export function construirProcedimientoRAM(P) {
                             hs.userData.proc.accion = 'nada'; hs.userData.ring.visible = false
                             abiertos++
                             if (abiertos >= 2) done()
-                            else { P.bloqueado = false; setHint('Abre también el clip del otro extremo.') }
+                            else { P.bloqueado = false; P.setHint('Abre también el clip del otro extremo.') }
                         }
                     })
                 })
@@ -654,7 +654,7 @@ export function construirProcedimientoPSU(P) {
 
     function zoomSock(camOff, lookOff) {
         const ft = P.focusTarget.clone()
-        enfocarCamara(ft.clone().add(camOff), ft.clone().add(lookOff), 0.55)
+        P.enfocarCamara(ft.clone().add(camOff), ft.clone().add(lookOff), 0.55)
     }
 
     return [

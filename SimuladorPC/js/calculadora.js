@@ -11,10 +11,13 @@ function populateSelect(selectId, optionsMap) {
 function updateResult() {
   const cpuId = document.getElementById('cpu-select').value
   const gpuId = document.getElementById('gpu-select').value
-  const ramSticks = parseInt(document.getElementById('ram-input').value, 10) || 0
-  const ssds = parseInt(document.getElementById('ssd-input').value, 10) || 0
-  const hdds = parseInt(document.getElementById('hdd-input').value, 10) || 0
-  const fans = parseInt(document.getElementById('fan-input').value, 10) || 0
+  // Math.max(0, …): los <input type="number" min="0"> no bloquean un valor negativo
+  // tecleado a mano, y un conteo negativo de piezas restaba vatios, pudiendo mostrar
+  // una recomendación de fuente negativa.
+  const ramSticks = Math.max(0, parseInt(document.getElementById('ram-input').value, 10) || 0)
+  const ssds = Math.max(0, parseInt(document.getElementById('ssd-input').value, 10) || 0)
+  const hdds = Math.max(0, parseInt(document.getElementById('hdd-input').value, 10) || 0)
+  const fans = Math.max(0, parseInt(document.getElementById('fan-input').value, 10) || 0)
   const rgb = document.getElementById('rgb-input').checked
 
   const result = calculateWattage({ cpuId, gpuId, ramSticks, ssds, hdds, fans, rgb })

@@ -7,7 +7,8 @@ import { RETOS } from './retos-data.js'
 import { recomendarSiguiente } from './recomendacion.js'
 import { initTutorPanel, initClasesEstudiante } from './tutor.js'
 import { initNotificacionesEstudiante } from './notificaciones.js'
-import { estadoAcademia } from './academia-api.js'
+import { estadoAcademia, sincronizar as sincronizarAcademia } from './academia-api.js'
+import { calcularRecorrido, NOTA_MINIMA_ETAPA } from './recorrido.js'
 
 const COMPONENTS = [
     { id: 'case',    label: 'Gabinete (Case)',              icon: '🗄' },
@@ -24,6 +25,12 @@ const COMPONENTS = [
 ]
 
 const COMP_LABEL = Object.fromEntries(COMPONENTS.map(c => [c.id, c.label]))
+
+function escapeHtml(s = '') {
+    return String(s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ))
+}
 
 const AVATAR_COLORS = [
     '#0f76d8', '#7c3aed', '#059669', '#dc6c2a', '#db2777', '#0891b2'
@@ -96,8 +103,10 @@ function renderPerfil(user) {
         tutorPanel.hidden = !esTutor
     }
 
-    document.getElementById('edit-nombre').value = nombre
-    document.getElementById('edit-institucion').value = institucion
+    const editNombre = document.getElementById('edit-nombre')
+    if (editNombre) editNombre.value = nombre
+    const editInstitucion = document.getElementById('edit-institucion')
+    if (editInstitucion) editInstitucion.value = institucion
 }
 
 function renderProgreso(progreso, retosSuperados = 0) {
@@ -259,13 +268,13 @@ function renderEstadisticas(stats) {
     }
 
     listEl.innerHTML = recientes.map(ev => {
-        const meta = EVENTO_META[ev.tipo] || { label: ev.tipo, cls: 'pending', icon: '•' }
-        const comp = COMP_LABEL[ev.componente] || ev.componente || ''
+        const meta = EVENTO_META[ev.tipo] || { label: escapeHtml(ev.tipo), cls: 'pending', icon: '•' }
+        const comp = COMP_LABEL[ev.componente] || escapeHtml(ev.componente || '')
         let detalle = comp
         if (ev.tipo === 'error_pieza' && ev.componente_esperado) {
-            detalle = `${comp} (se esperaba ${COMP_LABEL[ev.componente_esperado] || ev.componente_esperado})`
+            detalle = `${comp} (se esperaba ${COMP_LABEL[ev.componente_esperado] || escapeHtml(ev.componente_esperado)})`
         } else if (ev.tipo === 'error_ensamble' && ev.detalle) {
-            detalle = `${comp} · ${ev.detalle}`
+            detalle = `${comp} · ${escapeHtml(ev.detalle)}`
         } else if (ev.tipo === 'demora' && ev.segundos) {
             detalle = `${comp} · ${ev.segundos}s`
         }
@@ -335,7 +344,7 @@ function renderAchievements(progreso, stats, logros = []) {
     }
 }
 
-function renderNotasCertificado(progreso, logros = [], resultados = []) {
+function renderNotasCertificado(progreso, logros = [], resultados = [], summary = null) {
     const setEl = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt }
 
     const notaWeb = progreso?.nota_web
@@ -356,9 +365,14 @@ function renderNotasCertificado(progreso, logros = [], resultados = []) {
     setEl('nota-retos-mejor', mejor === null ? '—' : `${mejor.toFixed(1)}/10`)
     setEl('nota-retos-superados', `${superados} de ${RETOS.length} retos superados`)
 
-    const bono = bonoPorLogros(logros.length)
+    // Usa el mismo conteo que la grilla de insignias (getProgressSummary.unlockedCount:
+    // BADGES computadas + logros_usuario), no solo logros.length (que es nada más lo
+    // que hay en la tabla logros_usuario) — así el bono mostrado aquí coincide con
+    // "X de 24 insignias desbloqueadas" que se ve arriba en el mismo dashboard.
+    const cantidadLogros = summary ? summary.unlockedCount : logros.length
+    const bono = summary ? summary.bono : bonoPorLogros(cantidadLogros)
     setEl('nota-bono', `+${bono.toFixed(2)}`)
-    setEl('nota-bono-detalle', `${logros.length} logro${logros.length === 1 ? '' : 's'} desbloqueado${logros.length === 1 ? '' : 's'}`)
+    setEl('nota-bono-detalle', `${cantidadLogros} logro${cantidadLogros === 1 ? '' : 's'} desbloqueado${cantidadLogros === 1 ? '' : 's'}`)
 
     const webOk = !!progreso?.web_aprobado_at
     const appOk = !!progreso?.movil_completado_at
@@ -407,6 +421,55 @@ function limpiarMensajeModal() {
     if (el) el.setAttribute('hidden', '')
 }
 
+// Pinta la barra grande del recorrido: Academia → Simulador → Retos, con el
+// estado, el % y la nota de cada etapa, más la nota final y si ya se puede
+// continuar en la app móvil. Se llama con lo local al instante y de nuevo tras
+// sincronizar con el servidor (por si otro dispositivo aportó más avance).
+function renderRecorrido(progreso, resumenRetos = {}) {
+    const r = calcularRecorrido({ estadoAcademia: estadoAcademia(), progreso: progreso || {}, resumenRetos, retos: RETOS })
+
+    const setEl = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt }
+    setEl('recorrido-nota-valor', r.notaFinal.toFixed(1))
+
+    const fill = document.getElementById('recorrido-fill')
+    if (fill) fill.style.width = `${r.pctGeneral}%`
+
+    const sub = document.getElementById('recorrido-sub')
+    if (sub) {
+        const actual = r.etapaActualIdx >= 0 ? r.etapas[r.etapaActualIdx] : null
+        sub.textContent = r.todoCompleto
+            ? '¡Completaste las 3 etapas del recorrido web!'
+            : `Vas ${r.pctGeneral}% del recorrido${actual ? ` · etapa actual: ${actual.label}` : ''}.`
+    }
+
+    const lista = document.getElementById('recorrido-etapas')
+    if (lista) {
+        lista.innerHTML = r.etapas.map((e, idx) => {
+            const estadoCls = e.completa ? 'is-done' : e.bloqueada ? 'is-locked' : idx === r.etapaActualIdx ? 'is-current' : 'is-pending'
+            const estadoTxt = e.completa ? 'Completada' : e.bloqueada ? 'Bloqueada' : idx === r.etapaActualIdx ? 'En progreso' : 'Pendiente'
+            const iconoMostrado = e.completa ? '✓' : e.bloqueada ? '🔒' : e.icono
+            const notaTxt = (e.pct > 0 || e.completa) ? `${e.nota.toFixed(1)}/10` : '—'
+            return `
+            <li class="recorrido-etapa ${estadoCls}">
+                <div class="recorrido-etapa__icon" aria-hidden="true">${iconoMostrado}</div>
+                <div class="recorrido-etapa__body">
+                    <span class="recorrido-etapa__label">${e.label}</span>
+                    <span class="recorrido-etapa__estado">${estadoTxt} · ${e.pct}% · ${notaTxt}</span>
+                </div>
+            </li>`
+        }).join('')
+    }
+
+    const movil = document.getElementById('recorrido-movil')
+    const movilTexto = document.getElementById('recorrido-movil-texto')
+    if (movil && movilTexto) {
+        movil.classList.toggle('is-apto', r.aptoMovil)
+        movilTexto.textContent = r.aptoMovil
+            ? '✅ Cumples el mínimo del recorrido web. Ya puedes continuar en la app móvil.'
+            : `🔒 Te falta completar el recorrido con nota ≥ ${NOTA_MINIMA_ETAPA.toFixed(1)}/10 para continuar en la app móvil (llevas ${r.notaFinal.toFixed(1)}/10).`
+    }
+}
+
 // Bloquea el botón "Ir al laboratorio 3D" hasta que la Academia esté aprobada
 // (todas las lecciones + buena calificación en los mini-quiz).
 function renderCandadoLaboratorio() {
@@ -444,11 +507,12 @@ async function init() {
 
         initTutorPanel()
     } else {
-        const [progreso, logros, resultadosRetos] = await Promise.all([
+        const [progreso, logros, resultadosRetosCrudos] = await Promise.all([
             obtenerProgreso(),
             obtenerLogrosUsuario(),
             obtenerResultadosRetos()
         ])
+        const resultadosRetos = resultadosRetosCrudos || []   // null = falló la petición, no "sin intentos"
 
         const resumenRetos = resumirResultados(resultadosRetos)
         const retosSuperados = RETOS.filter(r => resumenRetos[r.id]?.exito).length
@@ -456,13 +520,25 @@ async function init() {
         renderProgreso(progreso, retosSuperados)
         renderRetosBanner(retosSuperados)
         renderRecomendacion(progreso, resumenRetos)
+        // Offline-first: pinta con lo local al instante y corrige si el servidor
+        // trae una nota más alta (p. ej. la Academia se hizo en otro dispositivo).
         renderCandadoLaboratorio()
+        renderRecorrido(progreso, resumenRetos)
+        sincronizarAcademia().then(() => {
+            renderCandadoLaboratorio()
+            renderRecorrido(progreso, resumenRetos)
+        }).catch(() => {})
 
         const estadisticas = await obtenerEstadisticas()
         renderEstadisticas(estadisticas)
 
         renderAchievements(progreso, estadisticas, logros)
-        renderNotasCertificado(progreso, logros, resultadosRetos)
+        // Mismo cálculo que usa la grilla de insignias (getProgressSummary): antes
+        // el bono de "Notas y certificado" salía de logros.length (solo lo que hay
+        // en la tabla logros_usuario, ~7 insignias) mientras la grilla de arriba
+        // cuenta hasta 24 (BADGES computadas + logros_usuario) — mismo estudiante,
+        // dos conteos distintos en el mismo dashboard.
+        renderNotasCertificado(progreso, logros, resultadosRetos, getProgressSummary(progreso, estadisticas, logros))
 
         initClasesEstudiante()
         initNotificacionesEstudiante({ progreso, estadisticas, logros })

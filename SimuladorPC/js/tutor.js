@@ -8,6 +8,11 @@ import {
     misNotificaciones, marcarNotifsLeidas,
     subirArchivoEntrega, urlArchivoEntrega
 } from './tutor-api.js'
+import { leccionesEnOrden } from './academia-data.js'
+
+// Total real de lecciones de la Academia (no un número fijo): si se agrega o quita
+// una lección, el panel del docente y el CSV exportado deben reflejarlo solos.
+const TOTAL_LECCIONES_ACADEMIA = leccionesEnOrden().length
 
 function formatTiempo(segundos) {
     if (!segundos || segundos < 60) return `${segundos || 0}s`
@@ -21,6 +26,14 @@ function iniciales(nombre) {
     if (!nombre) return '?'
     const p = nombre.trim().split(/\s+/)
     return (p.length === 1 ? p[0][0] : p[0][0] + p[p.length - 1][0]).toUpperCase()
+}
+
+// Todo lo que viene de un usuario (nombre de perfil, título/descripción de tarea,
+// comentario de calificación, nombre de archivo) pasa por aquí antes de ir a innerHTML.
+function escapeHtml(s = '') {
+    return String(s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ))
 }
 
 function mostrarMsg(id, texto, tipo = 'error') {
@@ -157,7 +170,7 @@ function exportarCSV() {
         f.nombre, f.email, f.nota_web ?? '',
         f.comprension_pct != null ? Math.round(Number(f.comprension_pct)) : '',
         f.ganancia != null ? Math.round(Number(f.ganancia) * 100) + '%' : '',
-        `${Number(f.academia_completadas) || 0}/13`,
+        `${Number(f.academia_completadas) || 0}/${TOTAL_LECCIONES_ACADEMIA}`,
         f.web_aprobado ? 'Si' : 'No', f.movil_completado ? 'Si' : 'No',
         f.mejor_nota_reto ?? '', f.retos_superados, f.logros_total, f.tiempo_total_segundos
     ].map(esc).join(','))
@@ -195,12 +208,12 @@ async function cargarTareas() {
         <li class="tutor-tarea-item" data-id="${t.id}">
             <div class="tutor-tarea-head">
                 <div>
-                    <strong>${t.titulo}</strong>
+                    <strong>${escapeHtml(t.titulo)}</strong>
                     <span class="tutor-tarea-meta">${t.puntaje_max} pts${vence ? ` · vence ${vence}` : ''}</span>
                 </div>
                 <button type="button" class="tutor-tarea-toggle">Ver entregas ▾</button>
             </div>
-            ${t.descripcion ? `<p class="tutor-tarea-desc">${t.descripcion}</p>` : ''}
+            ${t.descripcion ? `<p class="tutor-tarea-desc">${escapeHtml(t.descripcion)}</p>` : ''}
             <div class="tutor-tarea-entregas" hidden></div>
         </li>`
     }).join('')
@@ -233,12 +246,12 @@ async function cargarEntregas(tareaId, cont) {
         <div class="entrega-row" data-est="${f.estudiante_id}">
             <div class="entrega-alumno">
                 <span class="entrega-estado ${f.entregada ? 'on' : ''}">${f.entregada ? '✓ Entregada' : 'Pendiente'}</span>
-                <strong>${f.nombre}</strong>
-                ${f.archivo_path ? `<a href="#" class="entrega-archivo" data-path="${f.archivo_path}">📎 ${f.archivo_nombre || 'archivo'}</a>` : ''}
+                <strong>${escapeHtml(f.nombre)}</strong>
+                ${f.archivo_path ? `<a href="#" class="entrega-archivo" data-path="${escapeHtml(f.archivo_path)}">📎 ${escapeHtml(f.archivo_nombre || 'archivo')}</a>` : ''}
             </div>
             <div class="entrega-calif">
                 <input type="number" class="entrega-nota" min="0" step="0.1" placeholder="Nota" value="${f.nota != null ? f.nota : ''}">
-                <input type="text" class="entrega-coment" placeholder="Comentario" value="${f.comentario ? f.comentario.replace(/"/g, '&quot;') : ''}">
+                <input type="text" class="entrega-coment" placeholder="Comentario" value="${f.comentario ? escapeHtml(f.comentario) : ''}">
                 <button type="button" class="btn btn-secondary btn-sm entrega-guardar">Guardar</button>
             </div>
         </div>`).join('')
@@ -299,10 +312,10 @@ async function cargarClasesTutor() {
     list.innerHTML = clases.map(c => `
         <li class="tutor-clase-item ${claseSeleccionada === c.id ? 'is-active' : ''}" data-id="${c.id}" data-nombre="${encodeURIComponent(c.nombre)}" data-codigo="${c.codigo}">
             <div class="tutor-clase-main">
-                <strong>${c.nombre}</strong>
+                <strong>${escapeHtml(c.nombre)}</strong>
                 <span>${c.estudiantes} estudiante${c.estudiantes === 1 ? '' : 's'}</span>
             </div>
-            <span class="tutor-codigo-chip" title="Código para compartir">${c.codigo}</span>
+            <span class="tutor-codigo-chip" title="Código para compartir">${escapeHtml(c.codigo)}</span>
         </li>`).join('')
 
     list.querySelectorAll('.tutor-clase-item').forEach(li => {
@@ -373,7 +386,7 @@ async function seleccionarClase(id, nombre, codigo) {
         const ganTxt = f.ganancia != null ? `<span class="tutor-gan" title="Ganancia de aprendizaje (pre→post)">${Number(f.ganancia) >= 0 ? '▲' : '▼'} ${Math.round(Number(f.ganancia) * 100)}%</span>` : ''
         const compCell = compVal == null ? '—' : `<span class="tutor-nota ${compCls}">${compVal}%</span>${ganTxt}`
         const acad = Number(f.academia_completadas) || 0
-        const acadCell = `<span class="tutor-nota ${acad >= 10 ? 'ok' : acad > 0 ? 'medio' : ''}">${acad}/13</span>`
+        const acadCell = `<span class="tutor-nota ${acad >= TOTAL_LECCIONES_ACADEMIA ? 'ok' : acad > 0 ? 'medio' : ''}">${acad}/${TOTAL_LECCIONES_ACADEMIA}</span>`
         const cert = `<span class="cert-mini ${f.web_aprobado ? 'on' : ''}">Web</span><span class="cert-mini ${f.movil_completado ? 'on' : ''}">App</span>`
         return `
         <tr data-est="${f.estudiante_id}" data-nombre="${encodeURIComponent(f.nombre)}">
@@ -381,8 +394,8 @@ async function seleccionarClase(id, nombre, codigo) {
                 <div class="tutor-alumno">
                     <span class="tutor-alumno__ava">${iniciales(f.nombre)}</span>
                     <div>
-                        <strong>${f.nombre}</strong>
-                        <span>${f.email || ''}</span>
+                        <strong>${escapeHtml(f.nombre)}</strong>
+                        <span>${escapeHtml(f.email || '')}</span>
                     </div>
                 </div>
             </td>
@@ -522,8 +535,8 @@ export async function initNotificaciones() {
             <li class="notif-item ${n.leida ? '' : 'no-leida'}">
                 <span class="notif-ic">${NOTIF_ICON[n.tipo] || '🔔'}</span>
                 <div class="notif-body">
-                    <strong>${n.titulo}</strong>
-                    ${n.cuerpo ? `<span class="notif-cuerpo">${n.cuerpo}</span>` : ''}
+                    <strong>${escapeHtml(n.titulo)}</strong>
+                    ${n.cuerpo ? `<span class="notif-cuerpo">${escapeHtml(n.cuerpo)}</span>` : ''}
                     <span class="notif-fecha">${fechaRelativa(n.created_at)}</span>
                 </div>
             </li>`).join('')
@@ -598,14 +611,14 @@ async function cargarMisTareas() {
         <li class="mi-tarea-item" data-id="${t.tarea_id}">
             <div class="mi-tarea-head">
                 <div>
-                    <strong>${t.titulo}</strong>
-                    <span class="mi-tarea-clase">${t.clase_nombre}${vence ? ` · vence ${vence}` : ''}</span>
+                    <strong>${escapeHtml(t.titulo)}</strong>
+                    <span class="mi-tarea-clase">${escapeHtml(t.clase_nombre)}${vence ? ` · vence ${vence}` : ''}</span>
                 </div>
                 <span class="mi-tarea-estado ${cls}">${estado}</span>
             </div>
-            ${t.descripcion ? `<p class="mi-tarea-desc">${t.descripcion}</p>` : ''}
-            ${t.comentario ? `<p class="mi-tarea-coment">💬 ${t.comentario}</p>` : ''}
-            ${t.archivo_path ? `<p class="mi-tarea-archivo">📎 <a href="#" class="mi-tarea-ver" data-path="${t.archivo_path}">${t.archivo_nombre || 'Ver archivo entregado'}</a></p>` : ''}
+            ${t.descripcion ? `<p class="mi-tarea-desc">${escapeHtml(t.descripcion)}</p>` : ''}
+            ${t.comentario ? `<p class="mi-tarea-coment">💬 ${escapeHtml(t.comentario)}</p>` : ''}
+            ${t.archivo_path ? `<p class="mi-tarea-archivo">📎 <a href="#" class="mi-tarea-ver" data-path="${escapeHtml(t.archivo_path)}">${escapeHtml(t.archivo_nombre || 'Ver archivo entregado')}</a></p>` : ''}
             ${vencida && !t.entregada ? `<p class="mi-tarea-vencida-aviso">La fecha límite pasó. Ya no puedes entregar esta tarea.</p>` : ''}
             ${puedeEntregar ? `
             <div class="mi-tarea-entrega">
@@ -684,8 +697,8 @@ async function cargarMisClases() {
     list.innerHTML = clases.map(c => `
         <li class="mis-clase-item">
             <span class="mis-clase-dot"></span>
-            <strong>${c.nombre}</strong>
-            <span class="tutor-codigo-chip tutor-codigo-chip--sm">${c.codigo}</span>
+            <strong>${escapeHtml(c.nombre)}</strong>
+            <span class="tutor-codigo-chip tutor-codigo-chip--sm">${escapeHtml(c.codigo)}</span>
             <button type="button" class="ranking-toggle" data-id="${c.id}" aria-expanded="false" aria-controls="ranking-${c.id}">🏆 Ranking</button>
         </li>
         <li class="ranking-panel" id="ranking-${c.id}" hidden></li>`).join('')
@@ -711,7 +724,7 @@ function renderRankingHTML(filas) {
         return `
         <li class="${clases.join(' ')}">
             <span class="ranking-pos">${medallaPos(f.posicion)}</span>
-            <span class="ranking-nombre">${f.nombre}${f.es_tu ? ' <span class="ranking-tu-badge">tú</span>' : ''}</span>
+            <span class="ranking-nombre">${escapeHtml(f.nombre)}${f.es_tu ? ' <span class="ranking-tu-badge">tú</span>' : ''}</span>
             <span class="ranking-detalle" title="Retos superados · Logros">${f.retos_superados}🔧 · ${f.logros_total}🏅</span>
             <span class="ranking-pts">${f.puntos}<small>pts</small></span>
         </li>`

@@ -45,6 +45,28 @@ app.use(helmet({
 // Compresión gzip/brotli para HTML/CSS/JS (no afecta a .bin/.png ya comprimidos).
 app.use(compression())
 
+// express.static sirve TODO __dirname si no se filtra antes: sin este bloqueo,
+// cualquier visitante puede descargar este mismo servidor (server.cjs), el
+// código fuente completo de node_modules/, el esquema y las políticas RLS de
+// supabase/*.sql, los tests y la documentación interna con un simple GET.
+// Los dotfiles (.env, .git, etc.) ya los protege express.static por defecto.
+// req.path llega tal cual en la URL (sin decodificar %2f, %2e, etc.), pero
+// express.static sí decodifica antes de resolver el archivo — sin decodificar
+// y normalizar aquí primero, "/supabase%2ftutor-setup.sql" esquiva el regex
+// y express.static igual sirve el archivo real.
+const RUTA_PRIVADA = /^\/(node_modules|supabase|scripts|test|docs)(\/|$)|^\/(server\.cjs|package(-lock)?\.json|README\.md|SUPABASE\.md|DEBUG\.md|Procfile)$/i
+app.use((req, res, next) => {
+    let rutaDecodificada
+    try {
+        rutaDecodificada = decodeURIComponent(req.path)
+    } catch {
+        return res.status(400).end()
+    }
+    const rutaNormalizada = path.posix.normalize(rutaDecodificada)
+    if (RUTA_PRIVADA.test(rutaNormalizada) || RUTA_PRIVADA.test(req.path)) return res.status(404).end()
+    next()
+})
+
 app.use(express.static(__dirname, {
     extensions: ['html'],
     setHeaders: (res, filePath) => {
