@@ -82,20 +82,97 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 32px 24px 80px;
-  display: grid;
-  grid-template-columns: 1fr 340px;
+  display: flex;
+  flex-direction: column;
   gap: 28px;
 }
 
-.panel-column {
+/* --- Sistema de pestañas del panel: separa el contenido en secciones
+   enfocadas en vez de apilar todo en una sola columna interminable. --- */
+.panel-tabset {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.panel-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--lf-border-light);
+}
+.panel-tabs::-webkit-scrollbar { display: none; }
+
+.panel-tab {
+  flex: 0 0 auto;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 12px 16px 13px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lf-text-muted);
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  transition: color var(--lf-transition-fast);
+}
+.panel-tab:hover { color: var(--lf-text-primary); }
+.panel-tab::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  background: transparent;
+  border-radius: 2px 2px 0 0;
+  transition: background var(--lf-transition-fast);
+}
+.panel-tab.is-active { color: var(--lf-primary-800); }
+[data-theme="dark"] .panel-tab.is-active { color: var(--lf-text-primary); }
+.panel-tab.is-active::after { background: var(--lf-primary-700); }
+
+.panel-tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: lf-tabIn 0.2s ease both;
+}
+.panel-tabpanel[hidden] { display: none; }
+
+@keyframes lf-tabIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.panel-tabpanel--split {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.panel-tabpanel__col {
   display: flex;
   flex-direction: column;
   gap: 24px;
   min-width: 0;
 }
 
-.panel-column--main { grid-column: 1; }
-.panel-column--side { grid-column: 2; }
+@media (max-width: 1024px) {
+  .panel-tabpanel--split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .panel-tab {
+    padding: 10px 12px 11px;
+    font-size: 13px;
+  }
+}
 
 .perfil-card {
   grid-column: 1 / -1;
@@ -616,7 +693,7 @@
 
 .badges-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px;
 }
 
@@ -691,7 +768,7 @@
 
 .tools-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 10px;
 }
 
@@ -855,13 +932,6 @@
 }
 
 @media (max-width: 1024px) {
-  .panel-main {
-    grid-template-columns: 1fr;
-  }
-  .panel-column--main,
-  .panel-column--side {
-    grid-column: 1;
-  }
   .perfil-card {
     flex-direction: column;
     align-items: flex-start;
@@ -936,7 +1006,7 @@
 
 .notas-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin-bottom: 22px;
 }

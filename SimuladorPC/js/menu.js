@@ -493,6 +493,24 @@ function renderCandadoLaboratorio() {
     }
 }
 
+function initTabs() {
+    const tabs = document.querySelectorAll('.panel-tab')
+    const panels = document.querySelectorAll('.panel-tabpanel')
+    if (!tabs.length) return
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const target = tab.dataset.tab
+            tabs.forEach(t => {
+                const active = t === tab
+                t.classList.toggle('is-active', active)
+                t.setAttribute('aria-selected', active ? 'true' : 'false')
+            })
+            panels.forEach(p => { p.hidden = p.dataset.panel !== target })
+        })
+    })
+}
+
 async function init() {
     const session = await protegerRuta()
     if (!session) return
@@ -543,6 +561,8 @@ async function init() {
         initClasesEstudiante()
         initNotificacionesEstudiante({ progreso, estadisticas, logros })
     }
+
+    initTabs()
 
     document.getElementById('btn-cerrar-sesion')?.addEventListener('click', () => cerrarSesion())
 

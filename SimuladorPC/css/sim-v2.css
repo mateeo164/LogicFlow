@@ -798,3 +798,125 @@
   display: flex;
   justify-content: flex-end;
 }
+
+/* ── Tutor IA conversacional (widget flotante) ────────────────── */
+.ia-tutor-fab {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1px solid var(--lf-border-light);
+  background: var(--lf-primary-700);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--lf-shadow-lg);
+  z-index: 60;
+  transition: transform 0.15s ease;
+}
+.ia-tutor-fab:hover { transform: scale(1.06); }
+.ia-tutor-fab.is-active { background: var(--lf-accent-500); }
+
+.ia-tutor-panel {
+  position: fixed;
+  right: 22px;
+  bottom: 88px;
+  width: min(340px, calc(100vw - 44px));
+  max-height: min(460px, calc(100vh - 140px));
+  display: flex;
+  flex-direction: column;
+  background: var(--lf-surface-0);
+  border: 1px solid var(--lf-border-light);
+  border-radius: var(--lf-radius-lg);
+  box-shadow: var(--lf-shadow-lg);
+  overflow: hidden;
+  z-index: 60;
+}
+
+.ia-tutor-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--lf-primary-700);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}
+.ia-tutor-panel__close {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.85;
+}
+.ia-tutor-panel__close:hover { opacity: 1; }
+
+.ia-tutor-panel__msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 160px;
+}
+
+.ia-tutor-msg {
+  max-width: 88%;
+  padding: 8px 12px;
+  border-radius: var(--lf-radius-md);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.ia-tutor-msg--bot {
+  align-self: flex-start;
+  background: var(--lf-surface-200);
+  color: var(--lf-text-primary);
+}
+.ia-tutor-msg--user {
+  align-self: flex-end;
+  background: var(--lf-primary-700);
+  color: #fff;
+}
+.ia-tutor-msg--pensando { opacity: 0.6; font-style: italic; }
+
+.ia-tutor-panel__form {
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  border-top: 1px solid var(--lf-border-light);
+}
+.ia-tutor-panel__form input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--lf-radius-md);
+  border: 1px solid var(--lf-border-light);
+  background: var(--lf-surface-100);
+  color: var(--lf-text-primary);
+  font-size: 13px;
+}
+.ia-tutor-panel__form button {
+  padding: 8px 14px;
+  border-radius: var(--lf-radius-md);
+  border: none;
+  background: var(--lf-accent-500);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ia-tutor-panel__form button:disabled { opacity: 0.6; cursor: default; }
+
+@media (max-width: 640px) {
+  .ia-tutor-panel { right: 12px; left: 12px; width: auto; bottom: 78px; }
+  .ia-tutor-fab { right: 14px; bottom: 14px; }
+}

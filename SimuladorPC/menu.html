@@ -209,259 +209,276 @@
             </div>
         </section>
 
-        <div class="stats-strip student-only">
-            <div class="stats-strip__item">
-                <strong id="stat-componentes">—</strong>
-                <span>Componentes instalados</span>
-            </div>
-            <div class="stats-strip__item">
-                <strong id="stat-simulaciones">—</strong>
-                <span>Simulaciones completadas</span>
-            </div>
-            <div class="stats-strip__item">
-                <strong id="stat-tiempo">—</strong>
-                <span>Tiempo en laboratorio</span>
-            </div>
-            <div class="stats-strip__item">
-                <strong id="stat-porcentaje">—</strong>
-                <span>Progreso general</span>
-            </div>
-        </div>
+        <div class="panel-tabset student-only">
+            <nav class="panel-tabs" role="tablist" aria-label="Secciones de tu panel">
+                <button type="button" class="panel-tab is-active" id="tab-btn-resumen" data-tab="resumen" role="tab" aria-selected="true" aria-controls="tab-resumen">Resumen</button>
+                <button type="button" class="panel-tab" id="tab-btn-ensamble" data-tab="ensamble" role="tab" aria-selected="false" aria-controls="tab-ensamble">Ensamble 3D</button>
+                <button type="button" class="panel-tab" id="tab-btn-notas" data-tab="notas" role="tab" aria-selected="false" aria-controls="tab-notas">Notas y certificado</button>
+                <button type="button" class="panel-tab" id="tab-btn-logros" data-tab="logros" role="tab" aria-selected="false" aria-controls="tab-logros">Logros</button>
+                <button type="button" class="panel-tab" id="tab-btn-clases" data-tab="clases" role="tab" aria-selected="false" aria-controls="tab-clases">Clases y tareas</button>
+                <button type="button" class="panel-tab" id="tab-btn-herramientas" data-tab="herramientas" role="tab" aria-selected="false" aria-controls="tab-herramientas">Herramientas</button>
+            </nav>
 
-        <section class="retos-banner reco-card student-only" id="recomendacion-card" aria-label="Tu siguiente paso recomendado" hidden>
-            <div class="retos-banner__icon" aria-hidden="true" id="reco-icono">✨</div>
-            <div class="retos-banner__body">
-                <div class="retos-banner__top">
-                    <h2 class="retos-banner__title" id="reco-titulo">Tu siguiente paso</h2>
-                    <span class="retos-banner__badge">Recomendado para ti</span>
-                </div>
-                <p class="retos-banner__sub" id="reco-razon">Calculando tu recomendación…</p>
-            </div>
-            <a class="btn retos-banner__btn" id="reco-accion" href="#">Ver</a>
-        </section>
-
-        <section class="retos-banner student-only" aria-label="Retos de reparación">
-            <div class="retos-banner__icon" aria-hidden="true">🔧</div>
-            <div class="retos-banner__body">
-                <div class="retos-banner__top">
-                    <h2 class="retos-banner__title">Retos de reparación</h2>
-                    <span class="retos-banner__badge" id="retos-banner-count">0 / 8</span>
-                </div>
-                <p class="retos-banner__sub" id="retos-banner-sub">Diagnostica y repara PCs con fallas reales.</p>
-                <div class="retos-banner__bar"><div class="retos-banner__fill" id="retos-banner-fill" style="width:0%"></div></div>
-            </div>
-            <a href="retos.html" class="btn retos-banner__btn" id="retos-banner-btn">🔧 Empezar retos</a>
-        </section>
-
-        <div class="panel-column student-only panel-column--main">
-
-            <section class="progreso-card" id="notificaciones-card" hidden>
-                <div class="progreso-card__header" style="margin-bottom: 14px;">
-                    <div>
-                        <h2>🔔 Notificaciones</h2>
-                        <p id="notif-sub">Avisos de tus tutores.</p>
-                    </div>
-                    <button type="button" class="btn btn-secondary btn-sm" id="btn-notif-leidas">Marcar todas leídas</button>
-                </div>
-                <ul class="notif-list" id="notif-list"></ul>
-            </section>
-
-            <section class="progreso-card">
-                <div class="progreso-card__header">
-                    <div>
-                        <h2>Avance en el laboratorio 3D</h2>
-                        <p id="progreso-subtitulo">Cargando progreso…</p>
-                    </div>
-                    <span class="pct-badge" id="pct-badge">0%</span>
-                </div>
-
-                <div class="progreso-barra-bg">
-                    <div class="progreso-barra-fill" id="progreso-fill" style="width:0%"></div>
-                </div>
-
-                <ul class="comp-check-list" id="comp-check-list">
-
-                </ul>
-
-                <div class="progreso-footer">
-                    <span>Última actividad: <strong id="ultima-actividad">—</strong></span>
-                </div>
-            </section>
-
-            <section class="progreso-card">
-                <div class="progreso-card__header">
-                    <div>
-                        <h2>Estadísticas de desempeño</h2>
-                        <p id="desempeno-subtitulo">Aciertos, errores y demoras en el ensamblaje.</p>
-                    </div>
-                </div>
-
-                <div class="stats-strip" style="margin-bottom: 24px;">
+            <div class="panel-tabpanel" id="tab-resumen" data-panel="resumen" role="tabpanel" aria-labelledby="tab-btn-resumen">
+                <div class="stats-strip">
                     <div class="stats-strip__item">
-                        <strong id="stat-aciertos">—</strong>
-                        <span>Ensamblajes correctos</span>
+                        <strong id="stat-componentes">—</strong>
+                        <span>Componentes instalados</span>
                     </div>
                     <div class="stats-strip__item">
-                        <strong id="stat-errores">—</strong>
-                        <span>Errores de pieza</span>
+                        <strong id="stat-simulaciones">—</strong>
+                        <span>Simulaciones completadas</span>
                     </div>
                     <div class="stats-strip__item">
-                        <strong id="stat-demoras">—</strong>
-                        <span>Demoras (&gt; 45 s)</span>
+                        <strong id="stat-tiempo">—</strong>
+                        <span>Tiempo en laboratorio</span>
                     </div>
                     <div class="stats-strip__item">
-                        <strong id="stat-precision">—</strong>
-                        <span>Precisión</span>
+                        <strong id="stat-porcentaje">—</strong>
+                        <span>Progreso general</span>
                     </div>
                 </div>
 
-                <div class="progreso-footer">
-                    <span>Tiempo promedio por componente: <strong id="stat-tiempo-prom">—</strong></span>
-                </div>
+                <section class="retos-banner reco-card" id="recomendacion-card" aria-label="Tu siguiente paso recomendado" hidden>
+                    <div class="retos-banner__icon" aria-hidden="true" id="reco-icono">✨</div>
+                    <div class="retos-banner__body">
+                        <div class="retos-banner__top">
+                            <h2 class="retos-banner__title" id="reco-titulo">Tu siguiente paso</h2>
+                            <span class="retos-banner__badge">Recomendado para ti</span>
+                        </div>
+                        <p class="retos-banner__sub" id="reco-razon">Calculando tu recomendación…</p>
+                    </div>
+                    <a class="btn retos-banner__btn" id="reco-accion" href="#">Ver</a>
+                </section>
 
-                <ul class="comp-check-list" id="eventos-recientes" style="margin-top: 20px;">
+                <section class="retos-banner" aria-label="Retos de reparación">
+                    <div class="retos-banner__icon" aria-hidden="true">🔧</div>
+                    <div class="retos-banner__body">
+                        <div class="retos-banner__top">
+                            <h2 class="retos-banner__title">Retos de reparación</h2>
+                            <span class="retos-banner__badge" id="retos-banner-count">0 / 8</span>
+                        </div>
+                        <p class="retos-banner__sub" id="retos-banner-sub">Diagnostica y repara PCs con fallas reales.</p>
+                        <div class="retos-banner__bar"><div class="retos-banner__fill" id="retos-banner-fill" style="width:0%"></div></div>
+                    </div>
+                    <a href="retos.html" class="btn retos-banner__btn" id="retos-banner-btn">🔧 Empezar retos</a>
+                </section>
+            </div>
 
-                </ul>
-            </section>
+            <div class="panel-tabpanel" id="tab-ensamble" data-panel="ensamble" role="tabpanel" aria-labelledby="tab-btn-ensamble" hidden>
+                <section class="progreso-card">
+                    <div class="progreso-card__header">
+                        <div>
+                            <h2>Avance en el laboratorio 3D</h2>
+                            <p id="progreso-subtitulo">Cargando progreso…</p>
+                        </div>
+                        <span class="pct-badge" id="pct-badge">0%</span>
+                    </div>
 
-            <section class="progreso-card" id="notas-card">
-                <div class="progreso-card__header" style="margin-bottom: 18px;">
-                    <div>
-                        <h2>Notas y certificado</h2>
-                        <p>Tus calificaciones y el camino al certificado.</p>
-                    </div>
-                </div>
-
-                <div class="notas-grid">
-                    <div class="nota-box">
-                        <span class="nota-box__valor" id="nota-ensamble">—</span>
-                        <span class="nota-box__label">Ensamble 3D</span>
-                        <span class="nota-box__detalle" id="nota-ensamble-detalle">Sin registrar aún</span>
-                    </div>
-                    <div class="nota-box">
-                        <span class="nota-box__valor" id="nota-comprension">—</span>
-                        <span class="nota-box__label">Comprensión</span>
-                        <span class="nota-box__detalle" id="nota-comprension-detalle">Sin registrar aún</span>
-                    </div>
-                    <div class="nota-box">
-                        <span class="nota-box__valor" id="nota-retos-mejor">—</span>
-                        <span class="nota-box__label">Mejor reto</span>
-                        <span class="nota-box__detalle" id="nota-retos-superados">0 retos superados</span>
-                    </div>
-                    <div class="nota-box">
-                        <span class="nota-box__valor" id="nota-bono">+0.00</span>
-                        <span class="nota-box__label">Bono por logros</span>
-                        <span class="nota-box__detalle" id="nota-bono-detalle">0 logros</span>
-                    </div>
-                </div>
-
-                <div class="cert-track">
-                    <div class="cert-track__head">
-                        <strong>Progreso del certificado</strong>
-                        <span id="cert-pct">0%</span>
-                    </div>
                     <div class="progreso-barra-bg">
-                        <div class="progreso-barra-fill" id="cert-progress-fill" style="width:0%"></div>
+                        <div class="progreso-barra-fill" id="progreso-fill" style="width:0%"></div>
                     </div>
-                    <div class="cert-track__steps">
-                        <span class="cert-step" id="cert-web"><span class="cert-step__dot"></span> Ensamble web aprobado</span>
-                        <span class="cert-step" id="cert-app"><span class="cert-step__dot"></span> Instalación real (app móvil)</span>
+
+                    <ul class="comp-check-list" id="comp-check-list">
+
+                    </ul>
+
+                    <div class="progreso-footer">
+                        <span>Última actividad: <strong id="ultima-actividad">—</strong></span>
                     </div>
-                    <p class="cert-track__hint" id="cert-hint">Completa el ensamble web y la instalación real en la app móvil para emitir tu certificado.</p>
-                </div>
-            </section>
+                </section>
 
-            <section class="progreso-card" id="mis-tareas-card" hidden>
-                <div class="progreso-card__header" style="margin-bottom: 14px;">
-                    <div>
-                        <h2>Mis tareas</h2>
-                        <p>Tareas asignadas por tus tutores.</p>
+                <section class="progreso-card">
+                    <div class="progreso-card__header">
+                        <div>
+                            <h2>Estadísticas de desempeño</h2>
+                            <p id="desempeno-subtitulo">Aciertos, errores y demoras en el ensamblaje.</p>
+                        </div>
                     </div>
-                </div>
-                <ul class="mis-tareas-list" id="mis-tareas-list"></ul>
-            </section>
-        </div>
 
-        <div class="panel-column student-only panel-column--side">
-
-            <section class="level-widget">
-                <div class="level-widget__header">
-                    <h2 class="level-widget__title">Tu nivel</h2>
-                    <span class="level-badge" id="level-badge">Novato</span>
-                </div>
-                <div class="level-progress">
-                    <div class="level-progress__bar">
-                        <div class="level-progress__fill" id="level-progress-fill" style="width:0%"></div>
+                    <div class="stats-strip" style="margin-bottom: 24px;">
+                        <div class="stats-strip__item">
+                            <strong id="stat-aciertos">—</strong>
+                            <span>Ensamblajes correctos</span>
+                        </div>
+                        <div class="stats-strip__item">
+                            <strong id="stat-errores">—</strong>
+                            <span>Errores de pieza</span>
+                        </div>
+                        <div class="stats-strip__item">
+                            <strong id="stat-demoras">—</strong>
+                            <span>Demoras (&gt; 45 s)</span>
+                        </div>
+                        <div class="stats-strip__item">
+                            <strong id="stat-precision">—</strong>
+                            <span>Precisión</span>
+                        </div>
                     </div>
-                    <div class="level-progress__meta">
-                        <span id="level-current-xp">0 XP</span>
-                        <span id="level-next-xp">100 XP para Aprendiz</span>
+
+                    <div class="progreso-footer">
+                        <span>Tiempo promedio por componente: <strong id="stat-tiempo-prom">—</strong></span>
                     </div>
-                </div>
-                <div class="recent-badges" id="recent-badges"></div>
-            </section>
 
-            <section class="progreso-card">
-                <div class="progreso-card__header" style="margin-bottom: 18px;">
-                    <div>
-                        <h2>Insignias</h2>
-                        <p id="badges-subtitulo">Tus logros desbloqueados.</p>
+                    <ul class="comp-check-list" id="eventos-recientes" style="margin-top: 20px;">
+
+                    </ul>
+                </section>
+            </div>
+
+            <div class="panel-tabpanel" id="tab-notas" data-panel="notas" role="tabpanel" aria-labelledby="tab-btn-notas" hidden>
+                <section class="progreso-card" id="notas-card">
+                    <div class="progreso-card__header" style="margin-bottom: 18px;">
+                        <div>
+                            <h2>Notas y certificado</h2>
+                            <p>Tus calificaciones y el camino al certificado.</p>
+                        </div>
                     </div>
-                </div>
-                <div class="badges-grid" id="badges-grid">
 
-                </div>
-            </section>
-
-            <section class="progreso-card">
-                <div class="progreso-card__header" style="margin-bottom: 14px;">
-                    <div>
-                        <h2>Mi clase</h2>
-                        <p id="mi-clase-sub">Únete con el código de tu tutor.</p>
+                    <div class="notas-grid">
+                        <div class="nota-box">
+                            <span class="nota-box__valor" id="nota-ensamble">—</span>
+                            <span class="nota-box__label">Ensamble 3D</span>
+                            <span class="nota-box__detalle" id="nota-ensamble-detalle">Sin registrar aún</span>
+                        </div>
+                        <div class="nota-box">
+                            <span class="nota-box__valor" id="nota-comprension">—</span>
+                            <span class="nota-box__label">Comprensión</span>
+                            <span class="nota-box__detalle" id="nota-comprension-detalle">Sin registrar aún</span>
+                        </div>
+                        <div class="nota-box">
+                            <span class="nota-box__valor" id="nota-retos-mejor">—</span>
+                            <span class="nota-box__label">Mejor reto</span>
+                            <span class="nota-box__detalle" id="nota-retos-superados">0 retos superados</span>
+                        </div>
+                        <div class="nota-box">
+                            <span class="nota-box__valor" id="nota-bono">+0.00</span>
+                            <span class="nota-box__label">Bono por logros</span>
+                            <span class="nota-box__detalle" id="nota-bono-detalle">0 logros</span>
+                        </div>
                     </div>
-                </div>
-                <form id="form-unirse-clase" class="tutor-crear" novalidate>
-                    <input type="text" id="input-codigo-clase" placeholder="Código de clase (ej. ABC123)" maxlength="8" style="text-transform:uppercase" required>
-                    <button type="submit" class="btn btn-primary" id="btn-unirse-clase">Unirme</button>
-                </form>
-                <div id="unirse-msg" class="tutor-msg" hidden></div>
-                <ul class="mis-clases-list" id="mis-clases-list"></ul>
-            </section>
 
-            <section class="progreso-card">
-                <div class="progreso-card__header" style="margin-bottom: 18px;">
-                    <div>
-                        <h2>Herramientas</h2>
+                    <div class="cert-track">
+                        <div class="cert-track__head">
+                            <strong>Progreso del certificado</strong>
+                            <span id="cert-pct">0%</span>
+                        </div>
+                        <div class="progreso-barra-bg">
+                            <div class="progreso-barra-fill" id="cert-progress-fill" style="width:0%"></div>
+                        </div>
+                        <div class="cert-track__steps">
+                            <span class="cert-step" id="cert-web"><span class="cert-step__dot"></span> Ensamble web aprobado</span>
+                            <span class="cert-step" id="cert-app"><span class="cert-step__dot"></span> Instalación real (app móvil)</span>
+                        </div>
+                        <p class="cert-track__hint" id="cert-hint">Completa el ensamble web y la instalación real en la app móvil para emitir tu certificado.</p>
                     </div>
-                </div>
-                <div class="tools-grid">
-                    <a href="academia.html" class="tool-card">
-                        <div class="tool-card__icon">🎓</div>
-                        <span class="tool-card__title">Academia</span>
-                        <span class="tool-card__desc">Lecciones y mini-quiz por componente.</span>
-                    </a>
-                    <a href="retos.html" class="tool-card">
-                        <div class="tool-card__icon">🔧</div>
-                        <span class="tool-card__title">Retos de reparación</span>
-                        <span class="tool-card__desc">Diagnostica y repara PCs con fallas.</span>
-                    </a>
-                    <a href="calculadora.html" class="tool-card">
-                        <div class="tool-card__icon">⚡</div>
-                        <span class="tool-card__title">Calculadora PSU</span>
-                        <span class="tool-card__desc">Estima el consumo de tu build.</span>
-                    </a>
-                    <a href="glosario.html" class="tool-card">
-                        <div class="tool-card__icon">📚</div>
-                        <span class="tool-card__title">Glosario</span>
-                        <span class="tool-card__desc">Términos clave de hardware.</span>
-                    </a>
-                </div>
-            </section>
+                </section>
+            </div>
 
-            <section class="tutor-panel" id="tutor-panel" hidden>
-                <h3>👨‍🏫 Panel de tutor</h3>
-                <a href="glosario.html" class="btn btn-secondary" style="width:100%;">Ver recursos didácticos</a>
-            </section>
+            <div class="panel-tabpanel" id="tab-logros" data-panel="logros" role="tabpanel" aria-labelledby="tab-btn-logros" hidden>
+                <section class="level-widget">
+                    <div class="level-widget__header">
+                        <h2 class="level-widget__title">Tu nivel</h2>
+                        <span class="level-badge" id="level-badge">Novato</span>
+                    </div>
+                    <div class="level-progress">
+                        <div class="level-progress__bar">
+                            <div class="level-progress__fill" id="level-progress-fill" style="width:0%"></div>
+                        </div>
+                        <div class="level-progress__meta">
+                            <span id="level-current-xp">0 XP</span>
+                            <span id="level-next-xp">100 XP para Aprendiz</span>
+                        </div>
+                    </div>
+                    <div class="recent-badges" id="recent-badges"></div>
+                </section>
+
+                <section class="progreso-card">
+                    <div class="progreso-card__header" style="margin-bottom: 18px;">
+                        <div>
+                            <h2>Insignias</h2>
+                            <p id="badges-subtitulo">Tus logros desbloqueados.</p>
+                        </div>
+                    </div>
+                    <div class="badges-grid" id="badges-grid">
+
+                    </div>
+                </section>
+            </div>
+
+            <div class="panel-tabpanel panel-tabpanel--split" id="tab-clases" data-panel="clases" role="tabpanel" aria-labelledby="tab-btn-clases" hidden>
+                <div class="panel-tabpanel__col">
+                    <section class="progreso-card" id="notificaciones-card" hidden>
+                        <div class="progreso-card__header" style="margin-bottom: 14px;">
+                            <div>
+                                <h2>🔔 Notificaciones</h2>
+                                <p id="notif-sub">Avisos de tus tutores.</p>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-notif-leidas">Marcar todas leídas</button>
+                        </div>
+                        <ul class="notif-list" id="notif-list"></ul>
+                    </section>
+
+                    <section class="progreso-card" id="mis-tareas-card" hidden>
+                        <div class="progreso-card__header" style="margin-bottom: 14px;">
+                            <div>
+                                <h2>Mis tareas</h2>
+                                <p>Tareas asignadas por tus tutores.</p>
+                            </div>
+                        </div>
+                        <ul class="mis-tareas-list" id="mis-tareas-list"></ul>
+                    </section>
+                </div>
+
+                <div class="panel-tabpanel__col">
+                    <section class="progreso-card">
+                        <div class="progreso-card__header" style="margin-bottom: 14px;">
+                            <div>
+                                <h2>Mi clase</h2>
+                                <p id="mi-clase-sub">Únete con el código de tu tutor.</p>
+                            </div>
+                        </div>
+                        <form id="form-unirse-clase" class="tutor-crear" novalidate>
+                            <input type="text" id="input-codigo-clase" placeholder="Código de clase (ej. ABC123)" maxlength="8" style="text-transform:uppercase" required>
+                            <button type="submit" class="btn btn-primary" id="btn-unirse-clase">Unirme</button>
+                        </form>
+                        <div id="unirse-msg" class="tutor-msg" hidden></div>
+                        <ul class="mis-clases-list" id="mis-clases-list"></ul>
+                    </section>
+                </div>
+            </div>
+
+            <div class="panel-tabpanel" id="tab-herramientas" data-panel="herramientas" role="tabpanel" aria-labelledby="tab-btn-herramientas" hidden>
+                <section class="progreso-card">
+                    <div class="progreso-card__header" style="margin-bottom: 18px;">
+                        <div>
+                            <h2>Herramientas</h2>
+                            <p>Accesos rápidos a los demás módulos de LogicFlow.</p>
+                        </div>
+                    </div>
+                    <div class="tools-grid">
+                        <a href="academia.html" class="tool-card">
+                            <div class="tool-card__icon">🎓</div>
+                            <span class="tool-card__title">Academia</span>
+                            <span class="tool-card__desc">Lecciones y mini-quiz por componente.</span>
+                        </a>
+                        <a href="retos.html" class="tool-card">
+                            <div class="tool-card__icon">🔧</div>
+                            <span class="tool-card__title">Retos de reparación</span>
+                            <span class="tool-card__desc">Diagnostica y repara PCs con fallas.</span>
+                        </a>
+                        <a href="calculadora.html" class="tool-card">
+                            <div class="tool-card__icon">⚡</div>
+                            <span class="tool-card__title">Calculadora PSU</span>
+                            <span class="tool-card__desc">Estima el consumo de tu build.</span>
+                        </a>
+                        <a href="glosario.html" class="tool-card">
+                            <div class="tool-card__icon">📚</div>
+                            <span class="tool-card__title">Glosario</span>
+                            <span class="tool-card__desc">Términos clave de hardware.</span>
+                        </a>
+                    </div>
+                </section>
+            </div>
         </div>
 
     </main>
@@ -506,6 +523,7 @@
 
     <script src="js/theme.js"></script>
     <script src="js/ui-effects.js"></script>
+    <script src="js/nav-history.js"></script>
     <script type="module" src="js/menu.js"></script>
     <script src="js/sw-register.js"></script>
 </body>

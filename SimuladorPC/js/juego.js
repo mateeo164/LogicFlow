@@ -98,6 +98,9 @@ const EQUIPO_MODESTO = ES_TACTIL
     || (navigator.hardwareConcurrency || 8) <= 4
     || (navigator.deviceMemory || 8) <= 4
 
+// Tope por modelo en precargarModelos(): ver comentario junto a su uso.
+const MODEL_LOAD_TIMEOUT_MS = 20000
+
 let walkControls = null
 let walkMode = false
 let distCaminata = 0
@@ -3251,9 +3254,37 @@ function precargarModelos() {
     const siguiente = () => {
         if (idx >= PASOS.length) return
         const paso = PASOS[idx++]
+
+        // GLTFLoader/fetch no traen timeout propio: en una red que "cuelga" la
+        // conexión sin cerrarla (wifi de laboratorio saturado, proxy que retiene
+        // la petición) ni onLoad ni onError se disparan nunca, y como siguiente()
+        // solo se re-invoca desde esos callbacks, TODOS los modelos restantes se
+        // quedan sin cargar para siempre — la pantalla del reto/laboratorio parece
+        // "colgada" cargando el simulador 3D. Igual que refreshSession() en
+        // supabase-config.js, acotamos cada modelo con su propio timeout y caemos
+        // al placeholder existente si se cumple, para que la cadena no se trabe.
+        let resuelto = false
+        const usarPlaceholder = () => {
+            if (resuelto) return
+            resuelto = true
+            const ph = crearPlaceholder(paso)
+            ph.visible = false
+            scene.add(ph)
+            modelos3D[paso.id] = ph
+            appendLog(`Usando representación básica de ${paso.nombre}.`, 'system')
+            if (PASOS.indexOf(paso) < indiceActual && !debeOcultarsePorReto(paso.id)) colocarModelo(paso, false)
+            marcarCargado()
+            siguiente()
+        }
+        const timeoutId = setTimeout(usarPlaceholder, MODEL_LOAD_TIMEOUT_MS)
+
         loader.load(
             paso.ruta,
             (gltf) => {
+                if (resuelto) return
+                resuelto = true
+                clearTimeout(timeoutId)
+
                 const obj = normalizar(gltf.scene, paso.size)
                 optimizarMateriales(obj)
                 const grupo = new THREE.Group()
@@ -3272,17 +3303,7 @@ function precargarModelos() {
                 siguiente()
             },
             undefined,
-            () => {
-
-                const ph = crearPlaceholder(paso)
-                ph.visible = false
-                scene.add(ph)
-                modelos3D[paso.id] = ph
-                appendLog(`Usando representación básica de ${paso.nombre}.`, 'system')
-                if (PASOS.indexOf(paso) < indiceActual && !debeOcultarsePorReto(paso.id)) colocarModelo(paso, false)
-                marcarCargado()
-                siguiente()
-            }
+            () => { clearTimeout(timeoutId); usarPlaceholder() }
         )
     }
     siguiente()

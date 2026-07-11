@@ -664,6 +664,47 @@ code, pre, kbd {
   border-radius: var(--lf-radius-md);
 }
 
+/* ── Barra flotante de navegación (atrás / adelante / inicio) ─────
+ * Presente en todas las páginas (ver js/nav-history.js) para no depender
+ * de los botones del navegador — clave en la PWA instalada, sin chrome. */
+.lf-navhist {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  background: var(--lf-surface-0);
+  border: 1px solid var(--lf-border-light);
+  border-radius: var(--lf-radius-full);
+  box-shadow: var(--lf-shadow-lg);
+}
+
+.lf-navhist__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--lf-text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.lf-navhist__btn:hover:not(:disabled) { background: var(--lf-surface-200); }
+.lf-navhist__btn:disabled { opacity: 0.32; cursor: default; }
+.lf-navhist__btn svg { width: 18px; height: 18px; }
+.lf-navhist__btn--inicio { color: var(--lf-accent-500); }
+
+@media (max-width: 640px) {
+  .lf-navhist { left: 10px; bottom: 10px; }
+  .lf-navhist__btn { width: 32px; height: 32px; }
+}
+
 @media (max-width: 768px) {
   :root { --lf-header-height: 64px; }
   .lf-section { padding: var(--lf-space-8) var(--lf-space-4); }
