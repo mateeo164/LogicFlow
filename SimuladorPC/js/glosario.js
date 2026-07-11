@@ -7,11 +7,11 @@ function renderTerminos(terminos) {
 
   if (terminos.length === 0) {
     grid.innerHTML = ''
-    empty.hidden = false
+    if (empty) empty.hidden = false
     return
   }
 
-  empty.hidden = true
+  if (empty) empty.hidden = true
   grid.innerHTML = terminos.map(item => `
     <article class="glosario-card">
       <div class="glosario-card__header">

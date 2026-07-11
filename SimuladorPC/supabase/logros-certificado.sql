@@ -83,6 +83,43 @@ create policy "cert_update_propios"
     using (auth.uid() = user_id)
     with check (auth.uid() = user_id);
 
+-- Las políticas de arriba solo comprueban auth.uid() = user_id: cualquier usuario
+-- autenticado podía insertar/actualizar su propia fila con nota_web, logros_total
+-- y tiempo_total_segundos INVENTADOS (p. ej. insert({user_id: yo, nota_web: 10,
+-- logros_total: 999}) desde la consola), a diferencia de lf_entregas/lf_tareas
+-- (tutor-setup.sql) donde todo escritura pasa por una función security definer
+-- que valida las reglas de negocio. Este trigger recalcula esos 3 campos a
+-- partir de progreso_usuario/logros_usuario (las fuentes de verdad reales) y
+-- exige que la etapa web ya esté aprobada, así el cliente ya no puede fijarlos.
+create or replace function public.lf_calcular_certificado()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_progreso public.progreso_usuario%rowtype;
+begin
+    select * into v_progreso from public.progreso_usuario where user_id = new.user_id;
+
+    if v_progreso.web_aprobado_at is null then
+        raise exception 'No se puede emitir el certificado: la etapa del simulador web aún no está aprobada.';
+    end if;
+
+    new.nota_web              := coalesce(v_progreso.nota_web, 0);
+    new.tiempo_total_segundos := greatest(0, coalesce(v_progreso.tiempo_total_segundos, 0));
+    new.logros_total          := (select count(*)::integer from public.logros_usuario where user_id = new.user_id);
+
+    return new;
+end;
+$$;
+
+drop trigger if exists lf_certificados_calcular on public.certificados;
+create trigger lf_certificados_calcular
+    before insert or update on public.certificados
+    for each row
+    execute function public.lf_calcular_certificado();
+
 
 -- ---------- 4) Storage: bucket privado "ensambles" ----------
 -- Cada usuario guarda sus fotos bajo el prefijo {auth.uid()}/...

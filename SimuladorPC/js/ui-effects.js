@@ -164,7 +164,12 @@
       anchor.addEventListener('click', function (e) {
         const targetId = this.getAttribute('href');
         if (targetId === '#') return;
-        const target = document.querySelector(targetId);
+        let target;
+        try {
+          target = document.querySelector(targetId);
+        } catch (err) {
+          return;
+        }
         if (target) {
           e.preventDefault();
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -33,6 +33,22 @@ end;
 $$;
 
 
+-- ---------- 2b) HELPER: ¿sigue vigente la fecha límite de la tarea? ----------
+-- lf_entregar_tarea() ya rechaza la entrega si vence_at pasó, pero la política
+-- de Storage "lf_entregas_subir" solo validaba inscripción: un estudiante podía
+-- seguir subiendo/reemplazando el archivo después del vencimiento aunque no
+-- pudiera marcar entregada=true. SECURITY DEFINER para saltar RLS.
+create or replace function public.lf_tarea_vigente(p_tarea_id uuid)
+returns boolean language plpgsql security definer stable set search_path = public as $$
+begin
+    return exists (
+        select 1 from public.lf_tareas t
+        where t.id = p_tarea_id and (t.vence_at is null or now() <= t.vence_at)
+    );
+end;
+$$;
+
+
 -- ---------- 3) RPC: entregar (con archivo opcional) ----------
 -- Se cambia la firma, así que hay que borrar la versión anterior primero.
 drop function if exists public.lf_entregar_tarea(uuid) cascade;
@@ -161,6 +177,7 @@ create policy "lf_entregas_subir" on storage.objects
         bucket_id = 'entregas'
         and (storage.foldername(name))[2] = auth.uid()::text
         and public.lf_puede_entregar_tarea(((storage.foldername(name))[1])::uuid)
+        and public.lf_tarea_vigente(((storage.foldername(name))[1])::uuid)
     );
 
 -- Reemplazar (upsert) su propio archivo.
@@ -173,6 +190,7 @@ create policy "lf_entregas_actualizar" on storage.objects
     with check (
         bucket_id = 'entregas'
         and (storage.foldername(name))[2] = auth.uid()::text
+        and public.lf_tarea_vigente(((storage.foldername(name))[1])::uuid)
     );
 
 -- LEER: el dueño (estudiante) o el tutor de la tarea.
@@ -197,6 +215,7 @@ create policy "lf_entregas_borrar" on storage.objects
 
 -- ---------- 6) PERMISOS ----------
 grant execute on function public.lf_puede_entregar_tarea(uuid)          to authenticated;
+grant execute on function public.lf_tarea_vigente(uuid)                 to authenticated;
 grant execute on function public.lf_entregar_tarea(uuid, text, text)    to authenticated;
 grant execute on function public.lf_resumen_tarea(uuid)                 to authenticated;
 grant execute on function public.lf_mis_tareas()                        to authenticated;

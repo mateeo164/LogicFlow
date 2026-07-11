@@ -26,6 +26,7 @@ begin
     new.errores_diagnostico := greatest(0, coalesce(new.errores_diagnostico, 0));
     new.pistas_usadas       := greatest(0, coalesce(new.pistas_usadas, 0));
     new.segundos            := greatest(0, coalesce(new.segundos, 0));
+    new.inspecciones        := greatest(0, coalesce(new.inspecciones, 0));
 
     new.nota := greatest(0, least(10,
         10

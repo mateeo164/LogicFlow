@@ -3111,6 +3111,17 @@ function crearMarcadores() {
         disco.userData = { id: paso.id }
         disco.renderOrder = 998
         grupo.add(disco)
+        // slotDiscs guarda el disco (no el grupo) para el raycasting de clics/E;
+        // toda la visibilidad del marcador se controla vía grupo.visible en otros
+        // ~15 sitios del archivo, así que replicamos ese valor aquí en vez de
+        // exponer disco.visible como una propiedad independiente que podría
+        // quedar en `true` mientras el marcador está oculto (raycaster.intersectObjects
+        // consulta object.visible directamente sobre los elementos del array, sin
+        // subir a comprobar la visibilidad de los ancestros).
+        Object.defineProperty(disco, 'visible', {
+            get: () => grupo.visible,
+            set: v => { grupo.visible = v }
+        })
         slotDiscs.push(disco)
 
         const anillo = new THREE.Mesh(

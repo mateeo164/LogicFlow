@@ -36,7 +36,7 @@ function etapaSimulador(progreso, academiaCompleta) {
         id: 'simulador',
         label: 'Simulador',
         icono: '🖥️',
-        pct: webAprobado ? 100 : Math.round((Math.min(nota, 10) / 10) * 100),
+        pct: webAprobado ? 100 : Math.round((Math.min(Math.max(nota, 0), 10) / 10) * 100),
         nota,
         completa: webAprobado,
         bloqueada: !academiaCompleta // gate real: js/juego.js exige Academia aprobada.
