@@ -1,27 +1,3 @@
--- ============================================================
--- LogicFlow · Ranking entre pares (leaderboard por clase)
--- Ejecutar en Supabase → SQL Editor (una sola vez; es idempotente).
---
--- Añade la capa SOCIAL de la gamificación: cada estudiante puede ver
--- cómo se ubica frente a sus COMPAÑEROS DE CLASE (sus pares reales).
---
--- Privacidad y seguridad:
---   · SECURITY DEFINER para poder leer datos de otros usuarios saltando
---     el RLS, igual que lf_tutor_resumen_clase.
---   · Solo puede llamarlo alguien que PERTENECE a la clase: el tutor
---     (lf_es_tutor_de) o un estudiante inscrito (lf_esta_inscrito).
---   · A los pares NO se les expone el correo (a diferencia del panel
---     docente): solo el nombre visible. La comparación es entre iguales.
---
--- Fórmula de puntos (documentada y transparente en la UI):
---     puntos = retos_superados * 100
---            + logros_total     * 25
---            + mejor_nota_reto  * 10   (0–100)
---            + componentes      * 10
--- Premia el aprendizaje basado en retos (peso mayor) sin ignorar la
--- práctica del laboratorio ni las insignias.
--- ============================================================
-
 create or replace function public.lf_ranking_clase(p_clase_id uuid)
 returns table (
     posicion        integer,
@@ -36,7 +12,6 @@ returns table (
     puntos          integer
 ) language plpgsql security definer set search_path = public as $$
 begin
-    -- Solo miembros de la clase (tutor o estudiante inscrito).
     if not (public.lf_es_tutor_de(p_clase_id) or public.lf_esta_inscrito(p_clase_id)) then
         raise exception 'No autorizado para ver el ranking de esta clase';
     end if;
@@ -95,5 +70,4 @@ $$;
 
 grant execute on function public.lf_ranking_clase(uuid) to authenticated;
 
--- Refrescar la caché de la API de PostgREST.
 notify pgrst, 'reload schema';

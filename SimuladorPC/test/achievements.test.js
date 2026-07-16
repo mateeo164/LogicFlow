@@ -26,14 +26,13 @@ test('getNextLevel es null en el nivel máximo', () => {
 
 test('getXpToNextLevel calcula lo que falta', () => {
     const info = getXpToNextLevel(50)
-    assert.equal(info.remaining, 50) // faltan 50 para llegar a 100
+    assert.equal(info.remaining, 50)
     assert.equal(getXpToNextLevel(9999).remaining, 0)
 })
 
 test('calculateTotalXp suma componentes y simulaciones', () => {
     const progreso = { componentes_instalados: ['case', 'mb', 'cpu'], simulaciones_completadas: 1 }
     const stats = { aciertos: 3, errores_pieza: 0, tiempo_promedio: 60 }
-    // 3*100 + 1*200 + PERFECT_RUN(100 por 0 errores) = 600
     assert.equal(calculateTotalXp(progreso, stats), 600)
 })
 
@@ -48,7 +47,7 @@ test('un run sin errores otorga la insignia "Mano firme"', () => {
 test('el bono por logros está acotado', () => {
     assert.equal(bonoPorLogros(0), 0)
     assert.ok(Math.abs(bonoPorLogros(3) - 0.15) < 1e-9)
-    assert.equal(bonoPorLogros(999), LOGRO_BONO_MAX) // nunca supera el máximo
+    assert.equal(bonoPorLogros(999), LOGRO_BONO_MAX)
 })
 
 test('notaConBono nunca pasa de 10', () => {

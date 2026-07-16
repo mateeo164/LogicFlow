@@ -1,32 +1,6 @@
--- ============================================================
--- LogicFlow · Logros granulares, notas y certificado
--- Ejecutar en Supabase → SQL Editor (una sola vez).
---
--- Amplía el ecosistema de progreso para que:
---   • Los errores del ensamble fino (cables, alineación, dual-channel)
---     se registren en la BD con su detalle.
---   • Los logros se persistan de forma unificada (web + móvil + retos)
---     en la tabla logros_usuario ya existente.
---   • Se distinga la finalización WEB de la MÓVIL (comparten fila).
---   • Exista un certificado final con foto del simulador + foto real.
---
--- NOTA: además de este SQL hay que crear el bucket de Storage
--- "ensambles" (privado). Al final del archivo se incluye el bloque
--- para crearlo por SQL; si prefieres, créalo desde el panel
--- Storage → New bucket → nombre "ensambles", NO público.
--- ============================================================
-
-
--- ---------- 1) eventos_simulacion: detalle + nuevos tipos ----------
--- Se añade una columna "detalle" para describir el sub-paso concreto
--- (p. ej. "Conectar cable EPS 8-pin"). Y se amplían los tipos válidos
--- con error_ensamble / acierto_ensamble para el ensamble fino.
-
 alter table public.eventos_simulacion
     add column if not exists detalle text;
 
--- El CHECK original (si existe) solo permitía acierto/error_pieza/demora.
--- Lo soltamos de forma defensiva y lo recreamos con el set completo.
 alter table public.eventos_simulacion
     drop constraint if exists eventos_simulacion_tipo_check;
 
@@ -40,20 +14,11 @@ alter table public.eventos_simulacion
         'acierto_ensamble'
     ));
 
-
--- ---------- 2) progreso_usuario: nota web, foto y marcas de fin ----------
--- Web y móvil escriben sobre la MISMA fila de progreso_usuario. Para el
--- certificado necesitamos saber por separado si completó la web y el móvil.
-
 alter table public.progreso_usuario
     add column if not exists nota_web            numeric(4,1),
     add column if not exists foto_simulador_path text,
     add column if not exists web_aprobado_at     timestamptz,
     add column if not exists movil_completado_at timestamptz;
-
-
--- ---------- 3) certificados ----------
--- Una fila por usuario: registra la emisión del certificado final.
 
 create table if not exists public.certificados (
     user_id               uuid primary key references auth.users(id) on delete cascade,
@@ -83,14 +48,6 @@ create policy "cert_update_propios"
     using (auth.uid() = user_id)
     with check (auth.uid() = user_id);
 
--- Las políticas de arriba solo comprueban auth.uid() = user_id: cualquier usuario
--- autenticado podía insertar/actualizar su propia fila con nota_web, logros_total
--- y tiempo_total_segundos INVENTADOS (p. ej. insert({user_id: yo, nota_web: 10,
--- logros_total: 999}) desde la consola), a diferencia de lf_entregas/lf_tareas
--- (tutor-setup.sql) donde todo escritura pasa por una función security definer
--- que valida las reglas de negocio. Este trigger recalcula esos 3 campos a
--- partir de progreso_usuario/logros_usuario (las fuentes de verdad reales) y
--- exige que la etapa web ya esté aprobada, así el cliente ya no puede fijarlos.
 create or replace function public.lf_calcular_certificado()
 returns trigger
 language plpgsql
@@ -120,17 +77,9 @@ create trigger lf_certificados_calcular
     for each row
     execute function public.lf_calcular_certificado();
 
-
--- ---------- 4) Storage: bucket privado "ensambles" ----------
--- Cada usuario guarda sus fotos bajo el prefijo {auth.uid()}/...
--- (p. ej. "<uid>/simulador.png", "<uid>/real.jpg").
-
 insert into storage.buckets (id, name, public)
 values ('ensambles', 'ensambles', false)
 on conflict (id) do nothing;
-
--- Políticas: el usuario solo lee/escribe dentro de su propia carpeta.
--- La carpeta es el primer segmento del path (storage.foldername(name)[1]).
 
 drop policy if exists "ensambles_select_propios" on storage.objects;
 create policy "ensambles_select_propios"

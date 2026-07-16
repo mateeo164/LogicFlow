@@ -17,8 +17,6 @@
     <link rel="stylesheet" href="css/dashboard-v2.css">
     <script>
         (function() {
-            // La sesión vive en sessionStorage (se cierra al cerrar la pestaña).
-            // Barremos restos de sesiones antiguas guardadas en localStorage.
             try {
                 ['logicflow_access_token','logicflow_refresh_token','logicflow_user','logicflow_expires_at']
                     .forEach(function(k){ localStorage.removeItem(k); });

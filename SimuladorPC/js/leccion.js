@@ -1,4 +1,3 @@
-// leccion.js — Renderiza una lección individual (?id=), su mini-quiz y la navegación.
 import { LECCIONES, leccionesEnOrden } from './academia-data.js'
 import { elegirPreguntaComponente } from './quiz-data.js'
 import { leerLocal, completar, sincronizar, registrarQuiz } from './academia-api.js'
@@ -9,7 +8,6 @@ function escapeHtml(str) {
   ))
 }
 
-// --- Renderizado de bloques de contenido ---------------------------------
 function renderBloque(b) {
   switch (b.t) {
     case 'p':
@@ -32,11 +30,7 @@ function renderBloque(b) {
   }
 }
 
-// --- Mini-quiz ------------------------------------------------------------
 function renderQuiz(quizKey) {
-  // El banco de cada componente es un ARREGLO de preguntas; se elige UNA al azar.
-  // (Usarlo como objeto único dejaba q.opciones undefined y rompía el render de
-  // toda la lección, dejándola en "Cargando…".)
   const q = elegirPreguntaComponente(quizKey)
   if (!q) return ''
   const opciones = q.opciones.map((op, i) => `
@@ -71,8 +65,6 @@ function bindQuiz(id, onResuelto) {
       const idx = parseInt(btn.dataset.idx, 10)
       const acierto = idx === correcta
 
-      // Anota la calificación de la Academia (acierto suma; fallo resta). De esto
-      // depende el requisito de "buena calificación" para entrar al laboratorio 3D.
       registrarQuiz(id, acierto)
 
       opts.forEach(o => {
@@ -92,7 +84,6 @@ function bindQuiz(id, onResuelto) {
   })
 }
 
-// --- Navegación anterior/siguiente ---------------------------------------
 function renderNav(orden, idx) {
   const prev = idx > 0 ? orden[idx - 1] : null
   const next = idx < orden.length - 1 ? orden[idx + 1] : null
@@ -208,12 +199,10 @@ function init() {
 
   function onCompletar() {
     marcarUICompletada()
-    // Guarda local al instante y sincroniza con Supabase en segundo plano.
-    completar(id).catch(() => { /* sin red: queda guardado local */ })
+    completar(id).catch(() => {})
   }
 
   if (lec.quiz && !yaHecha) {
-    // Con quiz: el botón se habilita al responder (haya acierto o no; lo importante es intentarlo).
     if (btn) btn.disabled = true
     bindQuiz(id, () => {
       if (btn) {
@@ -223,14 +212,11 @@ function init() {
     })
     if (btn) btn.addEventListener('click', onCompletar)
   } else if (lec.quiz && yaHecha) {
-    // Ya completada: el quiz sigue activo para poder subir la calificación.
     bindQuiz(id, () => {})
   } else if (btn) {
     btn.addEventListener('click', onCompletar)
   }
 
-  // Sincroniza en segundo plano: si otro dispositivo ya completó esta lección,
-  // refleja el estado "completada" sin recargar.
   if (!yaHecha) {
     sincronizar().then(lista => {
       if (lista.includes(id)) marcarUICompletada()

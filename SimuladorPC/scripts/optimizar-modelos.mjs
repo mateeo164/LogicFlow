@@ -1,12 +1,3 @@
-// Optimiza los modelos 3D del laboratorio: geometría Draco + texturas WebP (máx 2048px).
-// Genera un `scene.opt.glb` autocontenido junto a cada `scene.gltf` original.
-//
-//   npm run optimize:models
-//
-// Requiere el decodificador Draco vendorizado en /vendor/ (ya wireado en juego.js)
-// y `blob:`/`data:` en la CSP de connect-src (server.cjs) para que las texturas
-// embebidas carguen.
-
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +6,6 @@ import { dirname, join, basename } from 'node:path';
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MODELOS_DIR = join(raiz, 'assets', '3d_models');
 
-// Carpetas de modelos (cada una con su scene.gltf) → scene.opt.glb.
 const MODELOS = [
   'computer_case_based_off_of_nzxt_510b',
   'rog_strix_x370-f_motherboard',
@@ -28,10 +18,6 @@ const MODELOS = [
   'computer_desk'
 ];
 
-// Modelos del taller entregados como .glb sueltos → <nombre>.opt.glb.
-// Se optimizan con `--simplify false` para NO alterar la geometría: varios
-// tienen animaciones (fans, SSD, monitor) y submallas nombradas que deben
-// sobrevivir intactas (el SSD se desarma en SSD_Case_1/Board/Screws/Case_2).
 const MODELOS_GLB = [
   'workbench_low-poly',
   'bar_stool',

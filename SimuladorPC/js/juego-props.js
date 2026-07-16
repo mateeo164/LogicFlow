@@ -1,11 +1,7 @@
-// Fábricas de props procedurales del taller: lámpara de brazo, caja de
-// herramientas, destornillador, taza y bobina de cable. Son funciones PURAS —
-// solo dependen de THREE y entre sí; no leen ni escriben ningún estado del
-// módulo juego.js (nada de scene/renderer/camera/propsTaller). Por eso pueden
-// vivir en su propio módulo y `juego.js` las importa para decorar el taller.
+
 import * as THREE from 'three'
 
-// Cilindro orientado entre dos puntos (usado para los brazos de la lámpara).
+
 export function meshEntre(p1, p2, radio, mat) {
     const dir = new THREE.Vector3().subVectors(p2, p1)
     const len = dir.length()

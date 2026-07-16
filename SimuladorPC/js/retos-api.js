@@ -72,9 +72,6 @@ export async function guardarResultadoReto({ retoId, nota, exito, erroresDiagnos
     }
 }
 
-// Devuelve [] cuando la consulta funcionó y de verdad no hay filas, o null cuando la
-// petición en sí falló (red/timeout/sesión). Distinguirlo importa: un guardado que
-// acaba de tener éxito pero cuyo GET posterior falla NO debe leerse como "sin historial".
 export async function obtenerResultadosRetos() {
     try {
         const data = await dataRequest(

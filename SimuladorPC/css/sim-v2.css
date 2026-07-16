@@ -527,14 +527,6 @@
   background: radial-gradient(circle at center, var(--lf-surface-100), var(--lf-surface-0));
 }
 
-/* ------------------------------------------------------------------ *
- * Legibilidad sobre superficies SIEMPRE oscuras (overlays y player).
- * Estas zonas usan fondo oscuro fijo en ambos temas, así que su
- * contenido necesita texto claro sin depender del tema. Antes heredaban
- * colores de texto oscuros pensados para fondo claro (ilegibles).
- * ------------------------------------------------------------------ */
-
-/* Botones secundarios dentro de los overlays oscuros */
 .lab-overlay .btn-secondary {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.18);
@@ -546,7 +538,6 @@
   color: #fff;
 }
 
-/* Píldoras de pasos en la bienvenida */
 .lab-overlay .bv-step-pill {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.14);
@@ -563,7 +554,6 @@
   color: #6ee7b7;
 }
 
-/* Tarjeta de material educativo (fallback sin video) sobre player negro */
 .vf-player-area .vf-info-card__header h3 { color: #fff; }
 .vf-player-area .vf-info-card__header p { color: rgba(255, 255, 255, 0.7); }
 .vf-player-area .vf-spec-item {
@@ -676,7 +666,6 @@
   }
 }
 
-/* ── Evaluación formativa (quiz de comprensión) ───────────────── */
 .quiz-layout {
   min-height: 100%;
   display: flex;
@@ -799,7 +788,6 @@
   justify-content: flex-end;
 }
 
-/* ── Tutor IA conversacional (widget flotante) ────────────────── */
 .ia-tutor-fab {
   position: fixed;
   right: 22px;
@@ -838,6 +826,7 @@
   overflow: hidden;
   z-index: 60;
 }
+.ia-tutor-panel[hidden] { display: none; }
 
 .ia-tutor-panel__head {
   display: flex;

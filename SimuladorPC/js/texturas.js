@@ -1,6 +1,4 @@
-// texturas.js
-// Generadores de texturas procedurales (canvas 2D -> THREE.CanvasTexture) usados por
-// el laboratorio 3D. Funciones puras y autocontenidas: no dependen del estado del motor.
+
 import * as THREE from "three"
 
 export function crearTexturaRadial(stops, size = 512) {

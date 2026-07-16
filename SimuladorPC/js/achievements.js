@@ -110,7 +110,6 @@ export const BADGES = [
     title: 'Componente estrella',
     description: 'Instalaste todos los componentes del laboratorio.',
     icon: '🌟',
-    // Debe coincidir con la cantidad de piezas en COMPONENTS (menu.js).
     condition: (p, s) => (p?.componentes_instalados || []).length >= 11
   },
   {

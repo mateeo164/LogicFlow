@@ -87,8 +87,6 @@
   gap: 28px;
 }
 
-/* --- Sistema de pestañas del panel: separa el contenido en secciones
-   enfocadas en vez de apilar todo en una sola columna interminable. --- */
 .panel-tabset {
   display: flex;
   flex-direction: column;
@@ -239,7 +237,6 @@
   min-width: 170px;
 }
 
-/* --- Recorrido: barra grande Academia → Simulador → Retos → app móvil --- */
 .recorrido-card {
   grid-column: 1 / -1;
   background: var(--lf-surface-0);
@@ -286,9 +283,6 @@
   font-family: var(--lf-font-serif);
   font-size: 24px;
   font-weight: 800;
-  /* El pill (fondo --lf-primary-100) no se redefine en oscuro — igual que
-     .pct-badge y .role-tag.estudiante — así que el texto usa el mismo tono
-     oscuro fijo en los dos temas para no quedar claro-sobre-claro. */
   color: var(--lf-primary-800);
   line-height: 1.15;
 }
@@ -301,11 +295,6 @@
   color: var(--lf-text-muted);
 }
 
-/* Barra grande: el doble de alta que .progreso-barra-bg normal, para que se lea
-   de un vistazo como "el indicador principal" del panel. */
-/* Compuesto con .progreso-barra-bg a propósito: misma especificidad que
-   ".progreso-barra-bg" sola perdería el empate de cascada (ambas 0,0,1,0)
-   según el orden en el archivo; el selector combinado la gana siempre. */
 .progreso-barra-bg.recorrido-barra-bg {
   height: 16px;
   margin-bottom: 22px;
@@ -332,7 +321,6 @@
   transition: all var(--lf-transition-fast);
 }
 
-/* Conector horizontal entre etapas, como en un stepper de checkout. */
 .recorrido-etapa:not(:last-child)::after {
   content: "";
   position: absolute;
@@ -377,8 +365,6 @@
 
 .recorrido-etapa.is-current {
   border-color: var(--lf-primary-700);
-  /* color-mix con transparent (no un token de fondo fijo) para que el tinte se
-     lea bien tanto sobre superficie clara como oscura, sin override por tema. */
   background: color-mix(in srgb, var(--lf-primary-700) 8%, transparent);
 }
 
@@ -397,8 +383,6 @@
 }
 
 .recorrido-etapa.is-done .recorrido-etapa__estado {
-  /* Mismo verde fijo que .cert-step--done: --lf-emerald-600 es demasiado oscuro
-     para leerse sobre superficie oscura sin un override de tema aparte. */
   color: #16a34a;
   font-weight: 600;
 }
@@ -1205,7 +1189,6 @@ body.is-tutor .tutor-only { display: block; }
 
 .tutor-gan { margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--lf-text-muted, #7a8699); }
 
-/* Conceptos que más le cuestan a la clase (analítica accionable para el docente) */
 .tutor-conceptos {
     margin-top: 18px;
     padding: 18px 20px;
@@ -1245,7 +1228,6 @@ body.is-tutor .tutor-only { display: block; }
 .mis-clase-dot { width: 8px; height: 8px; border-radius: 50%; background: #6366f1; flex-shrink: 0; }
 .mis-clase-item strong { flex: 1; font-weight: 600; }
 
-/* --- Ranking entre pares (leaderboard por clase) --- */
 .ranking-toggle {
   border: 1px solid var(--lf-border-light);
   background: transparent;
@@ -1364,7 +1346,6 @@ body.is-tutor .tutor-only { display: block; }
 [data-theme="dark"] .entrega-nota,
 [data-theme="dark"] .entrega-coment { background: rgba(255,255,255,0.04); }
 
-/* --- Panel docente mejorado --- */
 .tutor-kpis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1419,7 +1400,6 @@ body.is-tutor .tutor-only { display: block; }
 }
 .tutor-quitar:hover { background: rgba(220,38,38,0.1); color: #dc2626; }
 
-/* --- Banner destacado de Retos de reparación --- */
 .retos-banner {
   grid-column: 1 / -1;
   display: flex;
@@ -1529,7 +1509,6 @@ body.is-tutor .tutor-only { display: block; }
   .tutor-resumen { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* --- Notificaciones --- */
 .lf-notif-bell {
   position: relative;
   display: inline-flex;
@@ -1583,9 +1562,6 @@ body.is-tutor .tutor-only { display: block; }
 [data-theme="dark"] .notif-item { background: rgba(255,255,255,0.03); }
 [data-theme="dark"] .notif-item.no-leida { background: rgba(99,102,241,0.12); }
 
-/* ============================================================
-   Panel desplegable de notificaciones (anclado al timbre)
-   ============================================================ */
 .lf-notif-badge--alta {
   background: #dc2626;
   animation: lf-notif-pulse 1.8s ease-in-out infinite;
@@ -1702,7 +1678,6 @@ body.is-tutor .tutor-only { display: block; }
   .lf-notif-panel { width: calc(100vw - 16px); right: 8px !important; }
 }
 
-/* Botón "Ir al laboratorio 3D" bloqueado hasta aprobar la Academia */
 .btn.is-locked {
   opacity: .6;
   filter: grayscale(.35);

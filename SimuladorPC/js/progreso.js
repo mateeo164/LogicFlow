@@ -60,10 +60,6 @@ export async function guardarProgreso({ componenteId, segundos = 0, total = 6 })
     const userId = getUserId()
     if (!userId) return false
 
-    // Camino ATÓMICO (preferido): el servidor hace array_append con lock de fila,
-    // así usar la web y el móvil a la vez en la misma corrida no pierde componentes.
-    // Si la RPC no está desplegada (supabase/progreso-merge.sql) o falla, se cae al
-    // camino clásico de abajo — la app funciona igual con o sin ese SQL.
     try {
         await dataRequest('/rpc/lf_instalar_componente', {
             method: 'POST',
@@ -75,7 +71,6 @@ export async function guardarProgreso({ componenteId, segundos = 0, total = 6 })
         })
         return true
     } catch {
-        // Silencioso a propósito: seguimos con el read-modify-write clásico.
     }
 
     try {
@@ -226,9 +221,6 @@ export async function marcarAprobacionWeb({ nota, fotoPath = null }) {
     }
 }
 
-// Guarda el resumen de comprensión conceptual del estudiante (dimensión pedagógica
-// que el docente necesita para evaluar si ENTENDIÓ, no solo si ensambló).
-// Se guarda siempre al terminar el laboratorio, apruebe o no.
 export async function guardarComprension({ comprensionPct = null, preTest = null, postTest = null, evalTotal = null, ganancia = null }) {
     const userId = getUserId()
     if (!userId) return false
@@ -253,9 +245,6 @@ export async function guardarComprension({ comprensionPct = null, preTest = null
     }
 }
 
-// Registra que el estudiante llevó la PC al banco de pruebas y la encendió
-// (primer arranque / POST). Guarda la marca de tiempo y si el arranque fue
-// exitoso, para que el docente vea quién cerró el ciclo montaje→prueba.
 export async function marcarPruebaArranque({ exito = false }) {
     const userId = getUserId()
     if (!userId) return false

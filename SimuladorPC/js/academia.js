@@ -1,4 +1,3 @@
-// academia.js — Renderiza el hub de la Academia: módulos, lecciones y progreso.
 import { MODULOS, LECCIONES, leccionesEnOrden } from './academia-data.js'
 import { leerLocal, leerAciertos, sincronizar, estadoAcademia } from './academia-api.js'
 
@@ -64,7 +63,6 @@ function renderProgreso(completadas) {
   if (elTotal) elTotal.textContent = total
   if (elFill) elFill.style.width = pct + '%'
 
-  // El botón "continuar" apunta a la primera lección no completada (o a la primera si todo está hecho).
   const btn = document.getElementById('btn-continuar')
   if (btn) {
     const siguiente = orden.find(l => !setHechas.has(l.id)) || orden[0]
@@ -75,7 +73,6 @@ function renderProgreso(completadas) {
   }
 }
 
-// Bloquea o libera un enlace al laboratorio 3D según la aprobación de la Academia.
 function fijarCandadoLab(el, aprobada) {
   if (!el) return
   if (aprobada) {
@@ -86,13 +83,11 @@ function fijarCandadoLab(el, aprobada) {
   } else {
     el.classList.add('is-locked')
     el.setAttribute('aria-disabled', 'true')
-    // Apunta a la propia Academia con el aviso, en vez de rebotar desde el sim.
     el.setAttribute('href', 'academia.html?bloqueo=sim')
     el.title = 'Completa la Academia con buena calificación para desbloquearlo'
   }
 }
 
-// Renderiza la tarjeta de "desbloqueo del laboratorio 3D" y bloquea los CTA.
 function renderGate(completadas) {
   const est = estadoAcademia(completadas, leerAciertos())
 
@@ -131,10 +126,8 @@ function renderGate(completadas) {
     }
   }
 
-  // Bloquea/libera los CTA que llevan al laboratorio.
   fijarCandadoLab(document.getElementById('siguiente-lab-btn'), est.aprobada)
 
-  // Muestra el aviso si el usuario llegó rebotado desde el simulador.
   const params = new URLSearchParams(window.location.search)
   if (params.get('bloqueo') === 'sim') {
     const aviso = document.getElementById('academia-bloqueo')
@@ -151,17 +144,12 @@ function pintar(completadas) {
 }
 
 async function init() {
-  // Render instantáneo desde el caché local (funciona sin sesión / sin red).
   pintar(leerLocal())
-  // Luego fusiona con el servidor y vuelve a pintar si hubo cambios.
   try {
     const sincronizadas = await sincronizar()
     pintar(sincronizadas)
-  } catch (e) { /* sin conexión: nos quedamos con lo local */ }
+  } catch (e) {}
 
-  // Si otra pestaña (p. ej. leccion.html) completa una lección, localStorage cambia
-  // pero esta página no se enteraba hasta recargar: el progreso/candado quedaban
-  // desactualizados aunque el dato ya estuviera guardado.
   window.addEventListener('storage', (e) => {
     if (e.key === 'logicflow_academia_completadas' || e.key === 'logicflow_academia_aciertos') {
       pintar(leerLocal())

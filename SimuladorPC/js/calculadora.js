@@ -11,9 +11,6 @@ function populateSelect(selectId, optionsMap) {
 function updateResult() {
   const cpuId = document.getElementById('cpu-select').value
   const gpuId = document.getElementById('gpu-select').value
-  // Math.max(0, …): los <input type="number" min="0"> no bloquean un valor negativo
-  // tecleado a mano, y un conteo negativo de piezas restaba vatios, pudiendo mostrar
-  // una recomendación de fuente negativa.
   const ramSticks = Math.max(0, parseInt(document.getElementById('ram-input').value, 10) || 0)
   const ssds = Math.max(0, parseInt(document.getElementById('ssd-input').value, 10) || 0)
   const hdds = Math.max(0, parseInt(document.getElementById('hdd-input').value, 10) || 0)
@@ -39,7 +36,6 @@ function updateResult() {
   eff('eff-gold', result.efficiency.gold)
   eff('eff-platinum', result.efficiency.platinum)
 
-  // Costo eléctrico mensual estimado, tomando una fuente Gold como referencia.
   const costoEl = document.getElementById('result-costo')
   if (costoEl) {
     const costo = estimarCostoMensual(result.efficiency.gold.pared)

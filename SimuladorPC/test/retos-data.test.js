@@ -8,14 +8,11 @@ import {
     obtenerReto
 } from '../js/retos-data.js'
 
-// Los 8 componentes que el estudiante puede inspeccionar en cada reto.
 const COMPONENTES = ['case', 'mb', 'cpu', 'cooler', 'ram', 'storage', 'gpu', 'power']
-
-// --- calcularNotaReto: la fórmula que califica una reparación ---
 
 test('calcularNotaReto: diagnóstico impecable saca 10', () => {
     assert.equal(calcularNotaReto({ erroresDiagnostico: 0, pistasUsadas: 0, segundos: 60 }), 10)
-    assert.equal(calcularNotaReto({}), 10) // sin datos → 10 (valores por defecto)
+    assert.equal(calcularNotaReto({}), 10)
 })
 
 test('calcularNotaReto: cada error de diagnóstico penaliza 2 puntos', () => {
@@ -29,20 +26,17 @@ test('calcularNotaReto: cada pista usada penaliza 1 punto', () => {
 })
 
 test('calcularNotaReto: pasar de 6 minutos penaliza 1 punto (y el límite es exacto)', () => {
-    assert.equal(calcularNotaReto({ segundos: 360 }), 10) // 360 justo NO penaliza
-    assert.equal(calcularNotaReto({ segundos: 361 }), 9)  // pasarse sí
+    assert.equal(calcularNotaReto({ segundos: 360 }), 10)
+    assert.equal(calcularNotaReto({ segundos: 361 }), 9)
 })
 
 test('calcularNotaReto: penalizaciones combinadas', () => {
-    // 10 − (2 errores × 2) − (1 pista × 1) − (lento) = 10 − 4 − 1 − 1 = 4
     assert.equal(calcularNotaReto({ erroresDiagnostico: 2, pistasUsadas: 1, segundos: 400 }), 4)
 })
 
 test('calcularNotaReto: nunca baja de 0', () => {
     assert.equal(calcularNotaReto({ erroresDiagnostico: 99, pistasUsadas: 99, segundos: 9999 }), 0)
 })
-
-// --- LOGROS_RETO: cada logro se dispara con el resultado correcto ---
 
 const logro = (id) => LOGROS_RETO.find(l => l.id === id)
 
@@ -55,7 +49,7 @@ test('ojo_clinico requiere éxito sin errores de diagnóstico', () => {
     const c = logro('ojo_clinico').condition
     assert.equal(c([{ exito: true, errores_diagnostico: 1 }]), false)
     assert.equal(c([{ exito: true, errores_diagnostico: 0 }]), true)
-    assert.equal(c([{ exito: false, errores_diagnostico: 0 }]), false) // sin éxito no cuenta
+    assert.equal(c([{ exito: false, errores_diagnostico: 0 }]), false)
 })
 
 test('sin_ayuda requiere éxito sin usar pistas', () => {
@@ -68,15 +62,14 @@ test('contrarreloj requiere reparar en menos de 3 minutos', () => {
     const c = logro('contrarreloj').condition
     assert.equal(c([{ exito: true, segundos: 200 }]), false)
     assert.equal(c([{ exito: true, segundos: 179 }]), true)
-    assert.equal(c([{ exito: true, segundos: 0 }]), false)   // 0s no es válido (guarda contra tiempos vacíos)
+    assert.equal(c([{ exito: true, segundos: 0 }]), false)
 })
 
 test('tecnico_de_taller requiere superar TODOS los retos', () => {
     const c = logro('tecnico_de_taller').condition
     const todos = RETOS.map(r => ({ exito: true, reto_id: r.id }))
     assert.equal(c(todos), true)
-    assert.equal(c(todos.slice(0, RETOS.length - 1)), false) // falta uno → no
-    // superar el mismo reto varias veces no basta
+    assert.equal(c(todos.slice(0, RETOS.length - 1)), false)
     assert.equal(c([{ exito: true, reto_id: RETOS[0].id }]), false)
 })
 
@@ -84,19 +77,13 @@ test('nota_perfecta requiere un 10 en un reto', () => {
     const c = logro('nota_perfecta').condition
     assert.equal(c([{ exito: true, nota: 9 }]), false)
     assert.equal(c([{ exito: true, nota: 10 }]), true)
-    assert.equal(c([{ exito: true, nota: '10' }]), true) // tolera nota como string (viene de la BD)
+    assert.equal(c([{ exito: true, nota: '10' }]), true)
 })
-
-// --- obtenerReto ---
 
 test('obtenerReto devuelve el reto por id, o null si no existe', () => {
     assert.equal(obtenerReto('no-enciende').id, 'no-enciende')
     assert.equal(obtenerReto('inexistente'), null)
 })
-
-// --- Integridad de los datos de los retos ---
-// Un bug aquí (falla sin inspección anómala, o dos anómalas) haría imposible o
-// ambiguo el diagnóstico y calificaría mal a un estudiante real.
 
 test('cada reto tiene EXACTAMENTE una inspección anómala y coincide con componenteFalla', () => {
     for (const r of RETOS) {

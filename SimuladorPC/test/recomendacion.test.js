@@ -2,7 +2,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { recomendarSiguiente, UMBRAL_COMPRENSION } from '../js/recomendacion.js'
 
-// Componentes de ejemplo (subconjunto ordenado como en el panel).
 const COMPS = [
     { id: 'case', label: 'Gabinete' },
     { id: 'mb', label: 'Placa base' },
@@ -30,7 +29,7 @@ test('ensamble a medias → continuar en el laboratorio y nombrar la pieza sigui
     assert.equal(r.id, 'continuar-ensamble')
     assert.equal(r.accion.href, 'juego.html')
     assert.match(r.razon, /2 de 4/)
-    assert.match(r.razon, /Procesador/)   // el siguiente no instalado
+    assert.match(r.razon, /Procesador/)
 })
 
 test('aprobó el ensamble pero comprensión baja → reforzar teoría', () => {
@@ -46,17 +45,17 @@ test('aprobó el ensamble pero comprensión baja → reforzar teoría', () => {
 test('el umbral de comprensión es un límite exacto (justo en el umbral NO se refuerza)', () => {
     const base = { web_aprobado_at: '2026-01-01', comprension_pct: UMBRAL_COMPRENSION }
     const r = recomendarSiguiente({ progreso: base, resumenRetos: {}, retos: RETOS, componentes: COMPS })
-    assert.notEqual(r.id, 'reforzar-teoria')   // 70% ya es suficiente
+    assert.notEqual(r.id, 'reforzar-teoria')
 })
 
 test('aprobó y entendió, con retos pendientes → sugiere el reto MÁS FÁCIL sin superar', () => {
     const r = recomendarSiguiente({
         progreso: { web_aprobado_at: '2026-01-01', comprension_pct: 90 },
-        resumenRetos: { 'r-facil': { exito: true } },   // el fácil ya está
+        resumenRetos: { 'r-facil': { exito: true } },
         retos: RETOS, componentes: COMPS
     })
     assert.equal(r.id, 'hacer-reto')
-    assert.equal(r.accion.href, 'juego.html?reto=r-medio')  // el más fácil de los pendientes
+    assert.equal(r.accion.href, 'juego.html?reto=r-medio')
     assert.match(r.razon, /2 retos/)
 })
 

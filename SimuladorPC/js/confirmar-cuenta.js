@@ -9,13 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tipo = obtenerTipoDesdeHash()
 
-    // El correo de confirmación normalmente incluye la sesión en el hash.
-    // La guardamos para dejar al usuario ya autenticado tras confirmar.
     const habiaHash = establecerSesionDesdeHash()
     const session = obtenerSesionGuardada()
     const autenticado = !!session?.access_token
 
-    // Enlace inválido: ni tokens en el hash ni tipo de confirmación.
     if (!habiaHash && !autenticado && tipo !== 'signup') {
         if (icono) icono.classList.add('confirmar-icono--error')
         if (titulo) titulo.textContent = 'Enlace no válido o expirado'

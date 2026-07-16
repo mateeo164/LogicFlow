@@ -64,14 +64,11 @@ export async function resumenClase(claseId) {
     return Array.isArray(data) ? data : []
 }
 
-// Conceptos con más dificultad en la clase (agrega las respuestas conceptuales).
-// Devuelve [{ componente, aciertos, errores, total, pct_error }] ordenado por dificultad.
 export async function conceptosDificilesClase(claseId) {
     const data = await rpc('lf_conceptos_dificiles_clase', { p_clase_id: claseId })
     return Array.isArray(data) ? data : []
 }
 
-// Tutor: renombra una clase.
 export async function renombrarClase(claseId, nombre) {
     await dataRequest(`/lf_clases?id=eq.${claseId}`, {
         method: 'PATCH',
@@ -81,13 +78,11 @@ export async function renombrarClase(claseId, nombre) {
     return true
 }
 
-// Tutor: elimina una clase (en cascada borra inscripciones/tareas).
 export async function eliminarClase(claseId) {
     await dataRequest(`/lf_clases?id=eq.${claseId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
     return true
 }
 
-// Tutor: quita a un estudiante de una clase.
 export async function quitarEstudiante(claseId, estudianteId) {
     await dataRequest(`/lf_inscripciones?clase_id=eq.${claseId}&estudiante_id=eq.${estudianteId}`, {
         method: 'DELETE', headers: { Prefer: 'return=minimal' }
@@ -104,9 +99,6 @@ export async function misClasesEstudiante() {
     return Array.isArray(data) ? data : []
 }
 
-// Ranking entre pares de una clase. Lo puede pedir cualquier miembro de la
-// clase (tutor o estudiante inscrito); la RPC valida la pertenencia y no
-// expone correos, solo el nombre visible. Ver supabase/ranking.sql.
 export async function rankingClase(claseId) {
     const data = await rpc('lf_ranking_clase', { p_clase_id: claseId })
     return Array.isArray(data) ? data : []
@@ -160,10 +152,8 @@ export async function entregarTarea(tareaId, { archivoPath = null, archivoNombre
     })
 }
 
-// --- Archivos de entrega (Supabase Storage · bucket privado "entregas") ---
-
 const ENTREGAS_BUCKET = 'entregas'
-const MAX_ARCHIVO_BYTES = 10 * 1024 * 1024 // 10 MB
+const MAX_ARCHIVO_BYTES = 10 * 1024 * 1024
 const TIPOS_PERMITIDOS = [
     'application/pdf',
     'application/msword',
@@ -175,15 +165,13 @@ const TIPOS_PERMITIDOS = [
 function nombreSeguro(nombre) {
     const punto = nombre.lastIndexOf('.')
     const base = (punto > 0 ? nombre.slice(0, punto) : nombre)
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')   // quita acentos
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
         .replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'archivo'
     const ext = (punto > 0 ? nombre.slice(punto).toLowerCase() : '')
         .replace(/[^a-z0-9.]/g, '')
     return `${base.slice(0, 60)}${ext}`
 }
 
-// Sube el archivo de la entrega y devuelve { path, nombre }.
-// Lanza Error con mensaje claro si el tipo/tamaño no es válido.
 export async function subirArchivoEntrega(tareaId, file) {
     if (!file) throw new Error('No se seleccionó ningún archivo.')
     if (file.size > MAX_ARCHIVO_BYTES) throw new Error('El archivo supera el límite de 10 MB.')
@@ -199,7 +187,7 @@ export async function subirArchivoEntrega(tareaId, file) {
     const path = `${tareaId}/${userId}/${nombre}`
 
     const ctrl = new AbortController()
-    const tid = setTimeout(() => ctrl.abort(), 60000) // subidas: hasta 60 s
+    const tid = setTimeout(() => ctrl.abort(), 60000)
     try {
         const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${ENTREGAS_BUCKET}/${encodeURI(path)}`, {
             method: 'POST',
@@ -225,7 +213,6 @@ export async function subirArchivoEntrega(tareaId, file) {
     }
 }
 
-// Genera una URL firmada temporal para descargar/ver un archivo de entrega.
 export async function urlArchivoEntrega(path, expiraSeg = 3600) {
     const data = await storageRequest(`/object/sign/${ENTREGAS_BUCKET}/${encodeURI(path)}`, {
         method: 'POST',
@@ -280,15 +267,11 @@ export async function misTareas() {
     return Array.isArray(data) ? data : []
 }
 
-// --- Notificaciones ---
-
-// Notificaciones del usuario (más recientes primero).
 export async function misNotificaciones(limite = 50) {
     const data = await dataRequest(`/lf_notificaciones?select=id,tipo,titulo,cuerpo,leida,created_at&order=created_at.desc&limit=${limite}`)
     return Array.isArray(data) ? data : []
 }
 
-// Marca como leídas todas las notificaciones sin leer.
 export async function marcarNotifsLeidas() {
     await dataRequest('/lf_notificaciones?leida=eq.false', {
         method: 'PATCH',

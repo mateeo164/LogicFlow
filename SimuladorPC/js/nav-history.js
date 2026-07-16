@@ -1,7 +1,3 @@
-// Barra flotante de navegación (atrás / adelante / inicio), presente en
-// todas las páginas para no depender de los botones del navegador — clave
-// en la PWA instalada, donde no hay chrome de navegador visible.
-// Standalone: no depende de ningún otro script de la página.
 (function () {
     function icono(pathInterno) {
         return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${pathInterno}</svg>`
@@ -27,9 +23,6 @@
         const btnAdelante = barra.querySelector('#lf-nav-adelante')
         const btnInicio = barra.querySelector('#lf-nav-inicio')
 
-        // No existe una API estándar para saber si hay historial "adelante";
-        // solo deshabilitamos "atrás" cuando el largo total de la sesión
-        // indica que esta pestaña arrancó en esta misma página.
         if (window.history.length <= 1) btnAtras.disabled = true
 
         const paginaActual = location.pathname.split('/').pop() || 'index.html'

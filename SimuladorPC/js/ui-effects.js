@@ -74,8 +74,6 @@
       observer.observe(el);
     });
 
-    // Failsafe: si el observer no llega a disparar (pestaña en segundo plano al
-    // cargar, contenido muy largo, etc.) nunca dejar el contenido invisible.
     setTimeout(() => {
       revealables.forEach(el => el.classList.add('lf-is-visible'));
     }, 2500);
@@ -178,8 +176,6 @@
     });
   }
 
-  // Reemplaza una foto de equipo rota (aún sin subir) por sus iniciales.
-  // Va aquí y no en un onerror inline porque la CSP bloquea los handlers inline.
   function replaceWithInitials(img) {
     const span = document.createElement('span');
     span.className = 'academic-footer-team-photo academic-footer-team-photo--fallback';
@@ -191,7 +187,7 @@
     document.querySelectorAll(selector).forEach(img => {
       if (img.tagName !== 'IMG') return;
       if (img.complete && img.naturalWidth === 0) {
-        replaceWithInitials(img); // ya falló antes de que corriera este script
+        replaceWithInitials(img);
       } else {
         img.addEventListener('error', () => replaceWithInitials(img), { once: true });
       }

@@ -57,10 +57,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             mostrarMensajeGlobal(mensajeGlobal, resultado.mensaje || '✓ Sesión iniciada correctamente.', 'success')
             form.reset()
-            // El botón queda deshabilitado a propósito: ya vamos camino a menu.html.
-            // Reactivarlo aquí permitía un doble submit en la ventana de 600ms, que con
-            // el formulario ya reseteado mostraba un error de validación justo antes
-            // de que la redirección (ya en curso) se completara.
             window.setTimeout(() => {
                 window.location.href = 'menu.html'
             }, 600)

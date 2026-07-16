@@ -1,25 +1,10 @@
--- pedagogia-coherencia.sql
--- Cierra el hueco pedagógico: la comprensión conceptual del estudiante (micro-preguntas
--- por componente + pre/post-test + ganancia de aprendizaje) ahora se PERSISTE y llega al
--- panel del docente, para que pueda evaluar si el alumno ENTENDIÓ, no solo si ensambló.
---
--- Idempotente. Ejecútalo en el SQL Editor de Supabase.
--- Requiere que ya existan tutor-setup.sql y logros-certificado.sql.
-
--- =========================================================
--- 1) progreso_usuario: métricas de comprensión (resumen por estudiante)
--- =========================================================
 alter table public.progreso_usuario
-    add column if not exists comprension_pct numeric(5,2),   -- % de micro-preguntas conceptuales acertadas
-    add column if not exists pre_test        integer,        -- aciertos en el test diagnóstico
-    add column if not exists post_test       integer,        -- aciertos en el test final
-    add column if not exists eval_total      integer,        -- nº de preguntas del pre/post-test
-    add column if not exists ganancia        numeric(4,3);   -- ganancia de aprendizaje (Hake) 0..1
+    add column if not exists comprension_pct numeric(5,2),
+    add column if not exists pre_test        integer,
+    add column if not exists post_test       integer,
+    add column if not exists eval_total      integer,
+    add column if not exists ganancia        numeric(4,3);
 
--- =========================================================
--- 2) eventos_simulacion: nuevos tipos para respuestas conceptuales
---    (permite al docente ver QUÉ concepto le cuesta a la clase)
--- =========================================================
 alter table public.eventos_simulacion
     drop constraint if exists eventos_simulacion_tipo_check;
 
@@ -31,14 +16,10 @@ alter table public.eventos_simulacion
         'demora',
         'error_ensamble',
         'acierto_ensamble',
-        'quiz_acierto',      -- respondió bien la micro-pregunta del componente
-        'quiz_error'         -- respondió mal la micro-pregunta del componente
+        'quiz_acierto',
+        'quiz_error'
     ));
 
--- =========================================================
--- 3) Resumen de clase: se añaden Comprensión y Ganancia
---    (reemplaza la función de tutor-setup.sql con 2 columnas nuevas al final)
--- =========================================================
 drop function if exists public.lf_tutor_resumen_clase(uuid) cascade;
 
 create or replace function public.lf_tutor_resumen_clase(p_clase_id uuid)
@@ -89,11 +70,6 @@ $$;
 
 grant execute on function public.lf_tutor_resumen_clase(uuid) to authenticated;
 
--- =========================================================
--- 4) Conceptos con más dificultad en la clase (accionable: qué re-enseñar)
---    Agrega las respuestas conceptuales (quiz_acierto/quiz_error) de los
---    estudiantes inscritos, por componente.
--- =========================================================
 drop function if exists public.lf_conceptos_dificiles_clase(uuid) cascade;
 
 create or replace function public.lf_conceptos_dificiles_clase(p_clase_id uuid)

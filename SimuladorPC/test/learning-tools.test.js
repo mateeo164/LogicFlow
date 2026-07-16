@@ -11,11 +11,7 @@ import {
     filterGlosario
 } from '../js/learning-tools.js'
 
-// --- calculateWattage --------------------------------------------------------
-
 test('calculateWattage suma correctamente una configuración conocida', () => {
-    // i5-12600K (125) + RTX 4070 (200) + placa (50) + 2 RAM (10) + 1 SSD (7)
-    // + 3 fans (15) + RGB (10) = 417 W de consumo.
     const r = calculateWattage({
         cpuId: 'cpu-intel-i5', gpuId: 'gpu-rtx4070',
         ramSticks: 2, ssds: 1, hdds: 0, fans: 3, rgb: true
@@ -33,7 +29,6 @@ test('la fuente recomendada es un múltiplo de 50 con ~20% de headroom', () => {
 
 test('un id de CPU/GPU desconocido cae al valor por defecto sin romper', () => {
     const r = calculateWattage({ cpuId: 'no-existe', gpuId: 'tampoco' })
-    // CPU fallback 65 + GPU fallback 0 + placa 50 + defaults (2 RAM, 1 SSD, 3 fans, RGB)
     assert.equal(r.total, 65 + 0 + BASE_WATTAGE.motherboard + 2 * 5 + 7 + 3 * 5 + 10)
     assert.ok(Number.isFinite(r.recommended))
 })
@@ -42,7 +37,6 @@ test('una fuente menos eficiente toma más energía de la pared', () => {
     const { efficiency } = calculateWattage({ cpuId: 'cpu-amd-ryzen7', gpuId: 'gpu-rtx4080' })
     assert.ok(efficiency.bronze.pared > efficiency.gold.pared)
     assert.ok(efficiency.gold.pared > efficiency.platinum.pared)
-    // La pérdida en calor es la diferencia entre lo que toma y lo que entrega.
     assert.ok(efficiency.bronze.perdida > efficiency.platinum.perdida)
 })
 
@@ -60,10 +54,7 @@ test('más componentes nunca reducen el consumo total', () => {
     assert.ok(cargado.total > base.total)
 })
 
-// --- estimarCostoMensual -----------------------------------------------------
-
 test('estimarCostoMensual calcula kWh y costo a partir de la potencia de pared', () => {
-    // 500 W · 4 h/día · 30 días = 60 kWh/mes · 0,10 USD = 6,00 USD
     const c = estimarCostoMensual(500)
     assert.equal(c.kwhMes, 60)
     assert.equal(c.costo, 6)
@@ -74,17 +65,14 @@ test('estimarCostoMensual calcula kWh y costo a partir de la potencia de pared',
 test('el costo escala linealmente con horas de uso y precio del kWh', () => {
     const barato = estimarCostoMensual(500, 4, 0.10)
     const caro = estimarCostoMensual(500, 8, 0.20)
-    // Doble de horas y doble de precio => 4x el costo.
     assert.ok(Math.abs(caro.costo - barato.costo * 4) < 0.01)
 })
 
-// --- getEfficiencyRating -----------------------------------------------------
-
 test('getEfficiencyRating clasifica por rango de vatios recomendados', () => {
     assert.equal(getEfficiencyRating(400).label, 'Bronze 80 Plus')
-    assert.equal(getEfficiencyRating(450).label, 'Bronze 80 Plus') // borde inferior inclusive
+    assert.equal(getEfficiencyRating(450).label, 'Bronze 80 Plus')
     assert.equal(getEfficiencyRating(550).label, 'Gold 80 Plus')
-    assert.equal(getEfficiencyRating(650).label, 'Gold 80 Plus')   // borde superior inclusive
+    assert.equal(getEfficiencyRating(650).label, 'Gold 80 Plus')
     assert.equal(getEfficiencyRating(750).label, 'Platinum 80 Plus')
 })
 
@@ -93,8 +81,6 @@ test('cada certificación trae un color asociado', () => {
         assert.match(getEfficiencyRating(w).color, /^#[0-9a-f]{6}$/i)
     }
 })
-
-// --- catálogos ---------------------------------------------------------------
 
 test('todos los CPU y GPU del catálogo tienen TDP numérico positivo', () => {
     for (const [id, cpu] of Object.entries(CPU_WATTAGE)) {
@@ -106,8 +92,6 @@ test('todos los CPU y GPU del catálogo tienen TDP numérico positivo', () => {
     }
 })
 
-// --- filterGlosario ----------------------------------------------------------
-
 test('filterGlosario sin consulta devuelve el glosario completo', () => {
     assert.equal(filterGlosario('').length, GLOSARIO.length)
     assert.equal(filterGlosario('   ').length, GLOSARIO.length)
@@ -115,9 +99,9 @@ test('filterGlosario sin consulta devuelve el glosario completo', () => {
 
 test('filterGlosario busca en término, título, descripción y tags, sin distinguir mayúsculas', () => {
     assert.ok(filterGlosario('CPU').some(x => x.term === 'CPU'))
-    assert.ok(filterGlosario('nvme').some(x => x.term === 'NVMe'))          // término, minúsculas
-    assert.ok(filterGlosario('cerebro').some(x => x.term === 'CPU'))        // descripción
-    assert.ok(filterGlosario('almacenamiento').length >= 2)                // tag compartido
+    assert.ok(filterGlosario('nvme').some(x => x.term === 'NVMe'))
+    assert.ok(filterGlosario('cerebro').some(x => x.term === 'CPU'))
+    assert.ok(filterGlosario('almacenamiento').length >= 2)
 })
 
 test('filterGlosario devuelve vacío cuando nada coincide', () => {

@@ -171,8 +171,6 @@
     line-height: 1.5;
 }
 
-/* Tema oscuro: los azules oscuros de marca (--blue-600) no contrastan
-   sobre el fondo oscuro; se aclaran a tonos legibles. */
 [data-theme="dark"] .lab-eyebrow {
     color: var(--lf-primary-200);
 }

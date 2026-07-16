@@ -33,9 +33,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const password = document.getElementById('password')?.value || ''
         return validarConfirmacion(password, valor)
     })
-    // Si el usuario ya escribió la confirmación y vuelve a editar la contraseña,
-    // revalida la confirmación en vez de dejarla "sin error" aunque ya no coincidan
-    // (antes solo se revalidaba al tocar confirm_password, no al tocar password).
     document.getElementById('password')?.addEventListener('input', () => {
         const confirmInput = document.getElementById('confirm_password')
         if (confirmInput?.value) confirmInput.dispatchEvent(new Event('blur'))
@@ -82,10 +79,6 @@ document.addEventListener('DOMContentLoaded', function() {
             mostrarMensajeGlobal(mensajeGlobal, resultado.mensaje || '✓ Cuenta creada correctamente.', 'success')
             form.reset()
 
-            // Si el proyecto de Supabase tiene la confirmación por correo desactivada,
-            // registrarUsuario() ya guardó una sesión activa (requiereConfirmacion es
-            // falso): sin este redirect el estudiante quedaba autenticado pero varado
-            // en el formulario de registro vacío, sin ningún CTA para continuar.
             if (!resultado.requiereConfirmacion) {
                 window.setTimeout(() => { window.location.href = 'menu.html' }, 600)
             } else {

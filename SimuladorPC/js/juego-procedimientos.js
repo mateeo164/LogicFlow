@@ -1,10 +1,4 @@
-// juego-procedimientos.js
-// Constructores de los procedimientos finos de ensamblaje (CPU, placa base,
-// disipador, RAM, GPU y fuente). Cada uno recibe el paso `P` del laboratorio,
-// arma su micro-escena 3D sobre `P.grupo` y devuelve la lista de sub-pasos
-// (cada uno con su `activar(P)`). Extraídos de juego.js para adelgazar el motor:
-// solo dependen de THREE, de PASOS y de las primitivas de juego-proc-helpers.js;
-// NO tocan el estado global del laboratorio (scene/camera/renderer/sesión).
+
 import * as THREE from 'three'
 import { PASOS } from './pasos-data.js'
 import { tweenProc, crearHotspot, crearNumeroLabel, crearTextoLabel, crearTrianguloProc, ponerTornillo, conectarCable } from './juego-proc-helpers.js'

@@ -5,13 +5,10 @@ import {
     crearTarea, eliminarTarea, tareasDeClase, resumenTarea,
     calificarEntrega, entregarTarea, misTareas,
     renombrarClase, eliminarClase, quitarEstudiante,
-    misNotificaciones, marcarNotifsLeidas,
     subirArchivoEntrega, urlArchivoEntrega
 } from './tutor-api.js'
 import { leccionesEnOrden } from './academia-data.js'
 
-// Total real de lecciones de la Academia (no un número fijo): si se agrega o quita
-// una lección, el panel del docente y el CSV exportado deben reflejarlo solos.
 const TOTAL_LECCIONES_ACADEMIA = leccionesEnOrden().length
 
 function formatTiempo(segundos) {
@@ -28,8 +25,6 @@ function iniciales(nombre) {
     return (p.length === 1 ? p[0][0] : p[0][0] + p[p.length - 1][0]).toUpperCase()
 }
 
-// Todo lo que viene de un usuario (nombre de perfil, título/descripción de tarea,
-// comentario de calificación, nombre de archivo) pasa por aquí antes de ir a innerHTML.
 function escapeHtml(s = '') {
     return String(s).replace(/[&<>"']/g, c => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -45,7 +40,7 @@ function mostrarMsg(id, texto, tipo = 'error') {
 }
 
 let claseSeleccionada = null
-let claseActual = null  // { id, nombre, codigo, filas }
+let claseActual = null
 
 function toast(msg) {
     let el = document.getElementById('tutor-toast')
@@ -118,7 +113,6 @@ export async function initTutorPanel() {
         }
     })
 
-    // Acciones sobre la clase seleccionada.
     document.getElementById('btn-copiar-codigo')?.addEventListener('click', async () => {
         if (!claseActual?.codigo) return
         try { await navigator.clipboard.writeText(claseActual.codigo); toast(`Código ${claseActual.codigo} copiado`) }
@@ -447,14 +441,12 @@ function renderResumenClase(filas) {
     setKpiClase(filas)
 }
 
-// Etiquetas legibles de los componentes (coherentes con PASOS del laboratorio).
 const CONCEPTO_LABEL = {
     case: 'Gabinete', fans: 'Ventiladores', mb: 'Placa base', cpu: 'Procesador (CPU)', cooler: 'Disipador',
     ram: 'Memoria RAM', storage: 'Almacenamiento', hdd: 'Disco duro (HDD)', sata: 'Cable SATA',
     gpu: 'Tarjeta gráfica', power: 'Fuente de poder'
 }
 
-// Widget "conceptos que más le cuestan a la clase": accionable para el docente.
 async function renderConceptosDificiles(claseId) {
     const cont = document.getElementById('tutor-conceptos')
     const list = document.getElementById('tutor-conceptos-list')
@@ -491,70 +483,6 @@ function setKpiClase(filas) {
     const completos = filas.filter(f => f.web_aprobado && f.movil_completado).length
     set('kpi-promedio', prom == null ? '—' : `${prom.toFixed(1)}/10`)
     set('kpi-certificados', `${completos}/${filas.length}`)
-}
-
-function fechaRelativa(iso) {
-    if (!iso) return ''
-    const d = new Date(iso), ahora = new Date()
-    const seg = Math.round((ahora - d) / 1000)
-    if (seg < 60) return 'ahora'
-    if (seg < 3600) return `hace ${Math.floor(seg / 60)} min`
-    if (seg < 86400) return `hace ${Math.floor(seg / 3600)} h`
-    if (seg < 604800) return `hace ${Math.floor(seg / 86400)} d`
-    return d.toLocaleDateString('es-EC', { day: 'numeric', month: 'short' })
-}
-
-const NOTIF_ICON = { tarea_nueva: '📝', tarea_calificada: '✅' }
-
-export async function initNotificaciones() {
-    const bell = document.getElementById('notif-bell')
-    const card = document.getElementById('notificaciones-card')
-    const badge = document.getElementById('notif-badge')
-    const list = document.getElementById('notif-list')
-
-    async function cargar() {
-        let notis = []
-        try { notis = await misNotificaciones() } catch { notis = [] }
-
-        const noLeidas = notis.filter(n => !n.leida).length
-        if (bell) bell.hidden = false
-        if (badge) {
-            if (noLeidas > 0) { badge.textContent = noLeidas > 9 ? '9+' : String(noLeidas); badge.hidden = false }
-            else badge.hidden = true
-        }
-
-        if (!notis.length) {
-            if (card) card.hidden = true
-            return
-        }
-        if (card) card.hidden = false
-        const sub = document.getElementById('notif-sub')
-        if (sub) sub.textContent = noLeidas > 0 ? `${noLeidas} sin leer` : 'Estás al día.'
-
-        if (list) list.innerHTML = notis.slice(0, 15).map(n => `
-            <li class="notif-item ${n.leida ? '' : 'no-leida'}">
-                <span class="notif-ic">${NOTIF_ICON[n.tipo] || '🔔'}</span>
-                <div class="notif-body">
-                    <strong>${escapeHtml(n.titulo)}</strong>
-                    ${n.cuerpo ? `<span class="notif-cuerpo">${escapeHtml(n.cuerpo)}</span>` : ''}
-                    <span class="notif-fecha">${fechaRelativa(n.created_at)}</span>
-                </div>
-            </li>`).join('')
-    }
-
-    bell?.addEventListener('click', () => {
-        card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        card?.classList.add('destacar')
-        setTimeout(() => card?.classList.remove('destacar'), 1400)
-    })
-
-    document.getElementById('btn-notif-leidas')?.addEventListener('click', async () => {
-        try { await marcarNotifsLeidas(); await cargar() } catch (_) {}
-    })
-
-    await cargar()
-    // Refresco ligero cada 60 s para avisos en vivo.
-    setInterval(cargar, 60000)
 }
 
 export async function initClasesEstudiante() {
@@ -605,7 +533,6 @@ async function cargarMisTareas() {
         else if (vencida) { estado = `No entregada · 0/${Number(t.puntaje_max).toFixed(0)}`; cls = 'vencida' }
         else { estado = 'Pendiente'; cls = 'pendiente' }
         const btnLabel = t.entregada ? 'Reemplazar archivo' : 'Entregar'
-        // Solo se puede (re)entregar si no está calificada y no venció.
         const puedeEntregar = !t.calificada && !vencida
         return `
         <li class="mi-tarea-item" data-id="${t.tarea_id}">
@@ -643,11 +570,10 @@ async function cargarMisTareas() {
         input?.addEventListener('change', () => {
             const file = input.files?.[0]
             fname.textContent = file?.name || 'Ningún archivo seleccionado'
-            if (btn) btn.disabled = !file   // archivo obligatorio
+            if (btn) btn.disabled = !file
             if (msg) msg.textContent = ''
         })
 
-        // Ver / descargar el archivo ya entregado (URL firmada temporal).
         li.querySelector('.mi-tarea-ver')?.addEventListener('click', async (e) => {
             e.preventDefault()
             const a = e.currentTarget
@@ -665,7 +591,7 @@ async function cargarMisTareas() {
 
         btn?.addEventListener('click', async () => {
             const file = input?.files?.[0] || null
-            if (!file) {   // archivo obligatorio
+            if (!file) {
                 if (msg) { msg.className = 'mi-tarea-msg error'; msg.textContent = 'Debes adjuntar un archivo para entregar.' }
                 return
             }

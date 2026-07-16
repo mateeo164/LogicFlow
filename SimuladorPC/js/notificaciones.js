@@ -1,21 +1,10 @@
-// notificaciones.js — Sistema de notificaciones del estudiante.
-//
-// Las notificaciones se DERIVAN del estado actual (tareas, insignias, progreso)
-// más las notificaciones del servidor. Así, conseguir una insignia, completar
-// una simulación o recibir una tarea genera un aviso automáticamente, sin
-// depender de que un trigger de la base de datos haya corrido.
-//
-// El estado "leída" se guarda por id en localStorage, de modo que un aviso
-// nuevo (id que no se había visto) aparece como no leído y suma al contador.
 import { misTareas, misNotificaciones, marcarNotifsLeidas } from './tutor-api.js'
 import { getProgressSummary } from './achievements.js'
 
 const LEIDAS_KEY = 'logicflow_notifs_leidas'
 
-// Menor número = mayor prioridad (solo para el color/estilo del aviso).
 export const PRIORIDAD = { ALTA: 0, MEDIA: 1, BAJA: 2 }
 
-// ---------------------------------------------------------------- estado leído
 function leerLeidas() {
     try {
         const r = JSON.parse(localStorage.getItem(LEIDAS_KEY) || '[]')
@@ -27,16 +16,10 @@ function leerLeidas() {
 
 function guardarLeidas(set) {
     try {
-        // Acotamos para no crecer sin límite. slice(-N) se queda con los N insertados
-        // más recientemente (el Set preserva orden de inserción); un tope bajo hacía
-        // que ids marcados "leídos" hace tiempo (sin volver a tocarse) se cayeran de
-        // la ventana y la notificación reapareciera como no leída tras mucha actividad.
-        // 2000 cubre holgadamente un semestre de tareas + insignias + avisos de servidor.
         localStorage.setItem(LEIDAS_KEY, JSON.stringify([...set].slice(-2000)))
-    } catch (e) { /* almacenamiento no disponible */ }
+    } catch (e) {}
 }
 
-// ------------------------------------------------------------------- utilidades
 function escapeHtml(s = '') {
     return String(s).replace(/[&<>"']/g, c => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -63,9 +46,6 @@ function fmtFecha(iso) {
     }
 }
 
-// ---------------------------------------------------------------- derivaciones
-// `rank` define el ORDEN en la lista (0 = arriba). Las tareas pendientes son lo
-// más importante, por eso van primero. `prioridad` solo controla el color.
 function derivarDeTareas(tareas) {
     const ahora = Date.now()
     const out = []
@@ -124,7 +104,6 @@ function derivarDeInsignias(summary) {
 }
 
 function derivarDeServidor(notifs) {
-    // Las de tarea ya se derivan de misTareas(); evitamos duplicar.
     return (notifs || [])
         .filter(n => !['tarea_nueva', 'tarea_calificada'].includes(n.tipo))
         .map(n => ({
@@ -140,12 +119,10 @@ function derivarDeServidor(notifs) {
 function comparar(a, b) {
     if (a.rank !== b.rank) return a.rank - b.rank
     if (a.leida !== b.leida) return a.leida ? 1 : -1
-    // Dentro de las pendientes, la fecha límite más próxima primero.
     if (a.rank === 0) return (a.venceTs || Infinity) - (b.venceTs || Infinity)
     return (b.ts || 0) - (a.ts || 0)
 }
 
-// Recolecta y ordena todas las notificaciones del estudiante.
 export async function recolectar({ progreso, estadisticas, logros } = {}) {
     const [tareas, servidor] = await Promise.all([
         misTareas().catch(() => []),
@@ -165,7 +142,6 @@ export async function recolectar({ progreso, estadisticas, logros } = {}) {
     return items
 }
 
-// -------------------------------------------------------------------- campana UI
 function initCampana({ recargar, intervalo = 60000 }) {
     const bell = document.getElementById('notif-bell')
     const badge = document.getElementById('notif-badge')
@@ -279,7 +255,7 @@ function initCampana({ recargar, intervalo = 60000 }) {
         const set = leerLeidas()
         itemsCache.forEach(n => set.add(n.id))
         guardarLeidas(set)
-        try { await marcarNotifsLeidas() } catch (e) { /* sin conexión: al menos queda local */ }
+        try { await marcarNotifsLeidas() } catch (e) {}
         itemsCache = itemsCache.map(n => ({ ...n, leida: true }))
         render(itemsCache)
     })
@@ -288,7 +264,6 @@ function initCampana({ recargar, intervalo = 60000 }) {
     if (intervalo) setInterval(cargar, intervalo)
 }
 
-// Punto de entrada usado por el panel del estudiante (menu.js).
 export function initNotificacionesEstudiante({ progreso, estadisticas, logros } = {}) {
     initCampana({ recargar: () => recolectar({ progreso, estadisticas, logros }) })
 }

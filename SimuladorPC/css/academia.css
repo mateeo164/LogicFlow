@@ -1,12 +1,7 @@
-/* academia.css — Estilos de la Academia (hub de lecciones) y del lector de lección.
-   Reutiliza los tokens --lf-* y hereda de tools-v2.css (body.tools-body, .tools-header). */
-
-/* ============================ HUB ============================ */
 .academia-main {
   max-width: 1000px;
 }
 
-/* Barra de progreso global */
 .academia-progreso {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -69,7 +64,6 @@
   grid-column: 2;
 }
 
-/* Módulos */
 .academia-cargando {
   text-align: center;
   color: var(--lf-text-muted);
@@ -135,7 +129,6 @@
   padding: 4px 12px;
 }
 
-/* Tarjetas de lección */
 .leccion-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -250,7 +243,6 @@
   height: 15px;
 }
 
-/* Bloque "a practicar" */
 .academia-siguiente {
   margin-top: 8px;
 }
@@ -303,7 +295,6 @@
   border-color: rgba(255, 255, 255, .28);
 }
 
-/* ============================ LECCIÓN ============================ */
 .leccion-main {
   max-width: 760px;
   margin: 0 auto;
@@ -389,7 +380,6 @@
 
 .lec-done-tag.is-hidden { display: none; }
 
-/* Cuerpo */
 .lec-body { font-size: 16px; }
 
 .lec-p {
@@ -436,7 +426,6 @@
   background: var(--lf-accent-500);
 }
 
-/* Callouts */
 .lec-callout {
   display: flex;
   gap: 12px;
@@ -461,7 +450,6 @@
   border: 1px solid color-mix(in srgb, var(--lf-amber-500) 26%, transparent);
 }
 
-/* Ficha técnica */
 .lec-specs {
   margin: 26px 0;
   padding: 20px 22px;
@@ -493,7 +481,6 @@
 .lec-spec span { color: var(--lf-text-muted); }
 .lec-spec strong { color: var(--lf-text-primary); font-family: var(--lf-font-mono); font-size: 13.5px; text-align: right; }
 
-/* Términos */
 .lec-terminos {
   margin: 28px 0 4px;
   padding-top: 22px;
@@ -531,7 +518,6 @@
 
 [data-theme="dark"] .lec-term-chip { color: var(--lf-primary-300); }
 
-/* Mini-quiz */
 .lec-quiz {
   margin: 36px 0;
   padding: 26px;
@@ -643,7 +629,6 @@
 
 .quiz-feedback strong { color: var(--lf-text-primary); }
 
-/* Acciones + CTA */
 .lec-actions {
   display: flex;
   flex-direction: column;
@@ -676,7 +661,6 @@
 .lec-cta__label { font-weight: 600; color: var(--lf-text-primary); flex: 1; }
 .lec-cta__arrow { color: var(--lf-primary-500); font-size: 18px; font-weight: 700; }
 
-/* Navegación prev/next */
 .lec-nav {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -713,12 +697,10 @@
   color: var(--lf-text-primary);
 }
 
-/* 404 */
 .leccion-404 { text-align: center; padding: 60px 20px; }
 .leccion-404 h1 { font-family: var(--lf-font-serif); color: var(--lf-text-primary); margin-bottom: 10px; }
 .leccion-404 p { color: var(--lf-text-secondary); margin-bottom: 24px; }
 
-/* ============================ RESPONSIVE ============================ */
 @media (max-width: 820px) {
   .leccion-grid { grid-template-columns: 1fr; }
   .academia-siguiente__card {
@@ -747,9 +729,6 @@
   .leccion-main { padding: 28px 16px 60px; }
 }
 
-/* ============= Candado del laboratorio 3D (requisito Academia) ============= */
-
-/* Aviso al ser rebotado desde el simulador (?bloqueo=sim) */
 .academia-bloqueo {
   display: flex;
   align-items: center;
@@ -764,7 +743,6 @@
 .academia-bloqueo__icon { font-size: 22px; flex-shrink: 0; }
 .academia-bloqueo__texto { font-size: 14.5px; line-height: 1.5; margin: 0; }
 
-/* Tarjeta de estado de desbloqueo */
 .academia-gate {
   display: flex;
   align-items: center;
@@ -800,7 +778,6 @@
 .academia-gate.is-unlocked .academia-gate__stat strong { color: var(--lf-emerald-600); }
 .academia-gate__btn { flex-shrink: 0; }
 
-/* Enlaces al laboratorio bloqueados */
 .btn.is-locked {
   opacity: .55;
   filter: grayscale(.4);

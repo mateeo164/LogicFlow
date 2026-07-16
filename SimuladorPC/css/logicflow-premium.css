@@ -1,16 +1,5 @@
-/* ============================================================
-   LogicFlow · Design System v4 — "Aula"
-   Psicología del color educativa: azul índigo sobrio (confianza,
-   concentración) + verdeazulado/teal (calma, equilibrio, crecimiento).
-   Se evitan los neones (cian eléctrico) y saturados agresivos (naranja).
-   Este archivo es la FUENTE DE VERDAD de tokens: carga después
-   de estilos.css y remapea los nombres legacy a --lf-*.
-   Las fuentes se cargan por <link> en el <head> de cada página.
-   ============================================================ */
-
 :root {
 
-  /* Primaria — índigo-azul sobrio (confianza, foco, serenidad) */
   --lf-primary-50:  #eef1fa;
   --lf-primary-100: #dde3f4;
   --lf-primary-200: #c1cbe9;
@@ -22,13 +11,11 @@
   --lf-primary-800: #313c63;
   --lf-primary-900: #2a3353;
 
-  /* Acento — violeta apagado (sabiduría, uso puntual) */
   --lf-accent-300: #bcb8e2;
   --lf-accent-400: #9f9ad2;
   --lf-accent-500: #817bbf;
   --lf-accent-600: #655fa3;
 
-  /* Teal — calma, equilibrio, aprendizaje (sustituye al cian neón) */
   --lf-cyan-300: #8fd1c8;
   --lf-cyan-400: #4fb3a6;
   --lf-cyan-500: #2f9d90;
@@ -42,7 +29,6 @@
 
   --lf-red-500: #dc2626;
 
-  /* Neutros fríos */
   --lf-paper:     #f4f6fc;
   --lf-paper-2:   #ebeffa;
   --lf-paper-3:   #e0e6f5;
@@ -62,7 +48,6 @@
   --lf-border-medium: rgba(20, 25, 60, 0.14);
   --lf-border-strong: rgba(20, 25, 60, 0.24);
 
-  /* Sombras con tinte índigo */
   --lf-shadow-sm:  0 1px 2px rgba(20, 25, 60, 0.05);
   --lf-shadow-md:  0 4px 12px rgba(35, 32, 100, 0.08), 0 2px 4px rgba(35, 32, 100, 0.04);
   --lf-shadow-lg:  0 12px 28px rgba(35, 32, 100, 0.11), 0 4px 10px rgba(35, 32, 100, 0.05);
@@ -70,7 +55,6 @@
   --lf-glow-primary: 0 8px 24px rgba(86, 106, 179, 0.22);
   --lf-glow-cyan:    0 8px 24px rgba(47, 157, 144, 0.20);
 
-  /* Gradientes de marca — transiciones suaves, sin saltos de saturación */
   --lf-grad-primary: linear-gradient(135deg, #566ab3, #7169b8);
   --lf-grad-primary-strong: linear-gradient(135deg, #465595, #5f59a0);
   --lf-grad-accent: linear-gradient(135deg, #3aa89a, #1f8074);
@@ -84,7 +68,6 @@
   --lf-radius-2xl: 28px;
   --lf-radius-full: 9999px;
 
-  /* "serif" se conserva como nombre legacy: ahora es la display sans */
   --lf-font-serif: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
   --lf-font-sans:  'Inter', 'Segoe UI', system-ui, sans-serif;
   --lf-font-mono:  'JetBrains Mono', 'Consolas', monospace;
@@ -107,7 +90,6 @@
   --lf-transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --lf-transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* ---- Remapeo de nombres legacy (estilos.css y CSS v2) ---- */
   --surface-0: var(--lf-surface-0);
   --surface-1: var(--lf-surface-50);
   --surface-2: var(--lf-surface-100);
@@ -116,7 +98,6 @@
   --text-700: var(--lf-text-secondary);
   --text-500: var(--lf-text-muted);
   --text-300: var(--lf-surface-400);
-  /* Alias theme-aware para nombres cortos usados en otros CSS. */
   --lf-text: var(--lf-text-primary);
   --lf-surface: var(--lf-surface-0);
   --blue-600: var(--lf-primary-600);
@@ -196,7 +177,6 @@ body {
   background: var(--lf-paper);
 }
 
-/* Fondo "aurora" del sitio (no aplica al laboratorio 3D) */
 .academic-body::before,
 .auth-body::before,
 .dashboard-body::before,
@@ -267,8 +247,6 @@ p {
 code, pre, kbd {
   font-family: var(--lf-font-mono);
 }
-
-/* ============ Botones ============ */
 
 .btn {
   position: relative;
@@ -376,8 +354,6 @@ code, pre, kbd {
   box-shadow: none !important;
 }
 
-/* ============ Tarjetas ============ */
-
 .lf-card {
   background: var(--lf-surface-0);
   border: 1px solid var(--lf-border-light);
@@ -428,8 +404,6 @@ code, pre, kbd {
   color: var(--lf-primary-600);
   font-weight: 600;
 }
-
-/* ============ Headers ============ */
 
 .lf-header,
 .dashboard-header,
@@ -485,8 +459,6 @@ code, pre, kbd {
   color: var(--lf-primary-300);
 }
 
-/* ============ Badges ============ */
-
 .lf-badge {
   display: inline-flex;
   align-items: center;
@@ -509,14 +481,11 @@ code, pre, kbd {
 [data-theme="dark"] .lf-badge--danger  { color: #f87171; }
 [data-theme="dark"] .lf-badge--info    { color: var(--lf-cyan-400); }
 
-/* Barras de progreso: gradiente de marca */
 .progress-bar-fill,
 .progreso-barra-fill,
 #progress-fill {
   background: var(--lf-grad-bar);
 }
-
-/* ============ Animaciones ============ */
 
 @keyframes lf-fadeIn {
   from { opacity: 0; }
@@ -557,9 +526,6 @@ code, pre, kbd {
 .lf-animate-fadeUp { animation: lf-fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .lf-animate-scaleIn { animation: lf-scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-/* Scroll reveal (js/ui-effects.js initScrollReveal).
-   El JS pone opacity:0 inline y añade .lf-is-visible al entrar en viewport;
-   esta regla es la que realmente revela (con !important para ganar al inline). */
 .lf-is-visible {
   opacity: 1 !important;
   transform: none !important;
@@ -579,8 +545,6 @@ code, pre, kbd {
     transition-duration: 0.01ms !important;
   }
 }
-
-/* ============ Utilidades ============ */
 
 .lf-container {
   width: 100%;
@@ -664,9 +628,6 @@ code, pre, kbd {
   border-radius: var(--lf-radius-md);
 }
 
-/* ── Barra flotante de navegación (atrás / adelante / inicio) ─────
- * Presente en todas las páginas (ver js/nav-history.js) para no depender
- * de los botones del navegador — clave en la PWA instalada, sin chrome. */
 .lf-navhist {
   position: fixed;
   left: 18px;

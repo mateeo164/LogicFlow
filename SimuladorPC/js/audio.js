@@ -69,9 +69,6 @@ export function error() {
     tone({ freq: 220, type: 'sawtooth', duration: 0.25, peak: 0.16, freqEnd: 140, filterFreq: 800 })
 }
 
-// Pitido del altavoz interno de la PC durante el POST (arranque en el banco de
-// pruebas). Un beep = POST correcto; se puede llamar varias veces para el
-// patrón de error.
 export function beep() {
     tone({ freq: 1180, type: 'square', duration: 0.14, peak: 0.14, attack: 0.002 })
 }
@@ -106,31 +103,76 @@ export function footstep() {
     noise.start(now)
 }
 
+
+const MUSIC_CHORDS = [
+    [220.00, 261.63, 329.63, 392.00],
+    [174.61, 220.00, 261.63, 329.63],
+    [130.81, 164.81, 196.00, 246.94],
+    [196.00, 246.94, 293.66, 349.23],
+]
+const MUSIC_CHORD_DURATION = 4.5
+let musicTimer = null
+
+function playPadChord(freqs, time, dur) {
+    const attack = 1.2, release = 1.6
+    const chordGain = ctx.createGain()
+    chordGain.gain.setValueAtTime(0, time)
+    chordGain.gain.linearRampToValueAtTime(0.045, time + attack)
+    chordGain.gain.setValueAtTime(0.045, time + dur - release)
+    chordGain.gain.linearRampToValueAtTime(0, time + dur)
+
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 900
+    chordGain.connect(filter)
+    filter.connect(masterGain)
+
+    freqs.forEach((f, i) => {
+        const osc = ctx.createOscillator()
+        osc.type = i === 0 ? 'sine' : 'triangle'
+        osc.frequency.value = f
+        osc.connect(chordGain)
+        osc.start(time)
+        osc.stop(time + dur + 0.1)
+    })
+}
+
+function playArpeggio(freqs, time, dur) {
+    const noteDur = dur / freqs.length
+    freqs.forEach((f, i) => {
+        const noteTime = time + i * noteDur + noteDur * 0.15
+        const osc = ctx.createOscillator()
+        osc.type = 'sine'
+        osc.frequency.value = f * 2
+        const filter = ctx.createBiquadFilter()
+        filter.type = 'lowpass'
+        filter.frequency.value = 2200
+        const gain = ctx.createGain()
+        gain.gain.setValueAtTime(0, noteTime)
+        gain.gain.linearRampToValueAtTime(0.03, noteTime + 0.05)
+        gain.gain.exponentialRampToValueAtTime(0.001, noteTime + noteDur * 0.8)
+        osc.connect(filter); filter.connect(gain); gain.connect(masterGain)
+        osc.start(noteTime)
+        osc.stop(noteTime + noteDur)
+    })
+}
+
+function scheduleMusicLoop(startTime) {
+    if (!ctx) return
+    let t = startTime
+    MUSIC_CHORDS.forEach(chord => {
+        playPadChord(chord, t, MUSIC_CHORD_DURATION)
+        playArpeggio(chord, t, MUSIC_CHORD_DURATION)
+        t += MUSIC_CHORD_DURATION
+    })
+    const loopDuration = MUSIC_CHORD_DURATION * MUSIC_CHORDS.length
+    const nextStart = startTime + loopDuration
+    const delay = Math.max((nextStart - ctx.currentTime) * 1000 - 300, 100)
+    musicTimer = setTimeout(() => scheduleMusicLoop(nextStart), delay)
+}
+
 function startAmbient() {
-    const now = ctx.currentTime
-
-    const osc1 = ctx.createOscillator(); osc1.type = 'sine'; osc1.frequency.value = 55
-    const osc2 = ctx.createOscillator(); osc2.type = 'sine'; osc2.frequency.value = 55.6
-    const droneFilter = ctx.createBiquadFilter(); droneFilter.type = 'lowpass'; droneFilter.frequency.value = 220
-    const droneGain = ctx.createGain(); droneGain.gain.value = 0.045
-    osc1.connect(droneFilter); osc2.connect(droneFilter); droneFilter.connect(droneGain); droneGain.connect(masterGain)
-    osc1.start(now); osc2.start(now)
-
-    const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate)
-    const noiseData = noiseBuffer.getChannelData(0)
-    for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1
-    const noiseSource = ctx.createBufferSource()
-    noiseSource.buffer = noiseBuffer
-    noiseSource.loop = true
-    const noiseFilter = ctx.createBiquadFilter(); noiseFilter.type = 'bandpass'; noiseFilter.frequency.value = 700; noiseFilter.Q.value = 0.6
-    const noiseGain = ctx.createGain(); noiseGain.gain.value = 0.02
-    noiseSource.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(masterGain)
-    noiseSource.start(now)
-
-    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07
-    const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.015
-    lfo.connect(lfoGain); lfoGain.connect(droneGain.gain)
-    lfo.start(now)
+    scheduleMusicLoop(ctx.currentTime + 0.1)
 }
 
 export function isMuted() {

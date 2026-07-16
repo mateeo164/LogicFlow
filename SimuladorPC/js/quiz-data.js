@@ -1,16 +1,3 @@
-// quiz-data.js
-// Evaluación formativa del laboratorio 3D y de la Academia.
-//
-// - PREGUNTAS_COMPONENTE: un BANCO de micro-preguntas por componente (varias cada
-//   uno). Se elige UNA al azar cuando se necesita —tras instalar la pieza en el
-//   laboratorio, o en el mini-quiz de la lección— para que el estudiante no
-//   memorice una única respuesta por repetición. Cada pregunta explica el PORQUÉ.
-// - EVALUACION: banco del pre-test / post-test. Por sesión se toma un subconjunto
-//   AL AZAR que se usa IGUAL antes y después, para medir la ganancia de aprendizaje.
-//
-// Datos puros + funciones puras (la aleatoriedad usa un rng inyectable), así que
-// todo se puede probar sin navegador.
-
 export const PREGUNTAS_COMPONENTE = {
     case: [
         {
@@ -399,10 +386,6 @@ export const PREGUNTAS_COMPONENTE = {
     ]
 }
 
-// Banco para pre-test / post-test. Por sesión se elige un subconjunto al azar
-// (ver elegirEvaluacion) que se usa IGUAL antes y después del laboratorio, para
-// medir cuánto aprendió el estudiante (ganancia de aprendizaje). Son preguntas de
-// MEDICIÓN: sin retroalimentación (no llevan "explica").
 export const EVALUACION = [
     {
         pregunta: '¿Cuál de estos componentes es "el cerebro" que ejecuta las instrucciones de los programas?',
@@ -491,22 +474,16 @@ export const EVALUACION = [
     }
 ]
 
-// --- Selección aleatoria del banco (pura y testeable con rng inyectable) ---
-
-// Índice válido dentro de [0, len). Acota por si el rng inyectado devuelve 1.
 function indiceAzar(len, rng) {
     if (len <= 0) return -1
     return Math.min(len - 1, Math.max(0, Math.floor(rng() * len)))
 }
 
-// Devuelve un elemento al azar del arreglo (o null si está vacío).
 export function elegirAlAzar(arr, rng = Math.random) {
     if (!Array.isArray(arr) || arr.length === 0) return null
     return arr[indiceAzar(arr.length, rng)]
 }
 
-// Devuelve una MUESTRA de n elementos DISTINTOS, en orden aleatorio (Fisher-Yates
-// parcial). Si n ≥ arr.length, devuelve todo el arreglo barajado.
 export function muestraAlAzar(arr, n, rng = Math.random) {
     const copia = Array.isArray(arr) ? arr.slice() : []
     const total = Math.max(0, Math.min(n, copia.length))
@@ -517,40 +494,26 @@ export function muestraAlAzar(arr, n, rng = Math.random) {
     return copia.slice(0, total)
 }
 
-// Escoge una pregunta al azar del banco de un componente (o null si no existe).
 export function elegirPreguntaComponente(componenteId, rng = Math.random) {
     return elegirAlAzar(PREGUNTAS_COMPONENTE[componenteId], rng)
 }
 
-// Cuántas preguntas del banco EVALUACION se usan por sesión de laboratorio.
 export const EVAL_POR_SESION = 6
 
-// Escoge el subconjunto del pre/post-test para una sesión. Debe llamarse UNA vez
-// por sesión y reusar el resultado en el pre-test y el post-test (mismas preguntas).
 export function elegirEvaluacion(n = EVAL_POR_SESION, rng = Math.random) {
     return muestraAlAzar(EVALUACION, n, rng)
 }
 
-// --- Lógica de calificación (pura, testeable) ---
-
-// Nota conceptual 0..10 según preguntas acertadas.
 export function notaConceptual(aciertos = 0, total = 0) {
     if (total <= 0) return 0
     const r = (Math.max(0, aciertos) / total) * 10
     return Math.max(0, Math.min(10, r))
 }
 
-// Nota de destreza 0..10 del ensamblaje: parte de 10 y penaliza cada error de
-// pieza (−1) y cada demora (−0.5). Es la dimensión "hacer" del laboratorio.
-// Antes vivía embebida en juego.js (calcularNota); se extrajo aquí para poder
-// probarla sin navegador.
 export function notaDestreza(errores = 0, demoras = 0) {
     return Math.max(0, Math.min(10, 10 - errores * 1.0 - demoras * 0.5))
 }
 
-// Combina la nota de destreza (ensamblaje) con la de comprensión (preguntas).
-// Por defecto 60% destreza + 40% comprensión: el ensamble sigue pesando más,
-// pero ahora la nota refleja si el estudiante ENTENDIÓ, no solo si hizo clic bien.
 export const PESO_CONCEPTUAL = 0.4
 
 export function combinarNota(notaDestreza = 0, notaComprension = 0, pesoConceptual = PESO_CONCEPTUAL) {
@@ -559,8 +522,6 @@ export function combinarNota(notaDestreza = 0, notaComprension = 0, pesoConceptu
     return Math.max(0, Math.min(10, r))
 }
 
-// Ganancia de aprendizaje normalizada (Hake's gain): cuánto del margen que le
-// faltaba recuperó el estudiante entre el pre y el post-test. Rango típico 0..1.
 export function gananciaAprendizaje(preAciertos, postAciertos, total) {
     if (total <= 0) return 0
     const pre = Math.max(0, Math.min(total, preAciertos)) / total

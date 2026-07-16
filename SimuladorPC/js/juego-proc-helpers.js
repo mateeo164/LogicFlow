@@ -1,13 +1,6 @@
-// Helpers de los procedimientos de ensamblaje del laboratorio: un tween basado
-// en requestAnimationFrame y las primitivas visuales (hotspots, etiquetas,
-// triángulos, tornillos y cables). Todo aquí es autocontenido — depende solo de
-// THREE, del DOM (canvas para las etiquetas) y de estas mismas funciones entre
-// sí; NO toca el estado del módulo juego.js (scene/camera/renderer/etc.). Los
-// constructores construirProcedimientoX en juego.js las importan.
+
 import * as THREE from 'three'
 
-// Interpola `from`→`to` en `ms` con suavizado smoothstep, aplicando cada frame
-// vía `applyFn`. Llama `done()` al terminar. No conserva estado global.
 export function tweenProc(applyFn, from, to, ms, done) {
     const t0 = performance.now()
     function step(now) {

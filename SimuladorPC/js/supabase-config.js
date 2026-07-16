@@ -15,21 +15,12 @@ const ERROR_CODES = {
     timeout: 'TIMEOUT_ERROR'
 }
 
-// La sesión vive en sessionStorage: se limpia automáticamente cuando el usuario
-// cierra la pestaña, de modo que no queda una sesión "abierta" de forma
-// permanente. Las preferencias (tema, progreso local, etc.) siguen en
-// localStorage porque no dependen de la sesión.
 const authStore = window.sessionStorage
 
-// Limpieza de sesiones heredadas: en versiones anteriores el token se guardaba
-// en localStorage y quedaba abierto indefinidamente, lo que provocaba estados
-// inconsistentes (p. ej. la landing mostrando "Iniciar sesión" con la sesión
-// abierta). Borramos esas claves para que no reaparezcan.
 function purgarSesionLegacy() {
     try {
         Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key))
     } catch (error) {
-        // localStorage puede no estar disponible (modo privado estricto).
     }
 }
 
@@ -118,10 +109,6 @@ export async function refreshSession() {
     const refreshToken = authStore.getItem(STORAGE_KEYS.refreshToken)
     if (!refreshToken) return false
 
-    // A diferencia de supabaseAuthRequest, este fetch no tenía AbortController: en
-    // una red que "cuelga" la conexión sin cerrarla, protegerRuta() (que llama a
-    // refreshSession antes de mostrar cualquier página) podía quedar esperando
-    // indefinidamente en vez de fallar y mostrar el error de red esperado.
     const controlador = new AbortController()
     const timeoutId = setTimeout(() => controlador.abort(), REQUEST_TIMEOUT)
 
@@ -176,7 +163,6 @@ export function limpiarSesion() {
     Object.values(STORAGE_KEYS).forEach(key => {
         authStore.removeItem(key)
     })
-    // Barremos también posibles restos en localStorage (sesiones heredadas).
     purgarSesionLegacy()
 }
 
@@ -225,9 +211,6 @@ export function tokenExpirado() {
     const token = authStore.getItem(STORAGE_KEYS.accessToken)
     if (!token) return true
 
-    // Sin expiresAt guardado y con un token que no se puede decodificar (o sin
-    // "exp"), no hay forma de saber si sigue vigente: se trata como expirado
-    // (falla cerrado) en vez de como sesión válida indefinida.
     const payload = decodificarJwt(token)
     if (!payload?.exp) return true
     return payload.exp - margen <= ahora

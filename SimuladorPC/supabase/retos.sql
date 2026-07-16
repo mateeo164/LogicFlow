@@ -1,11 +1,3 @@
--- ============================================================
--- LogicFlow · Modo Retos (diagnóstico y reparación)
--- Ejecutar en Supabase → SQL Editor (una sola vez).
--- Crea las tablas de resultados de retos y logros del usuario,
--- con Row Level Security para que cada usuario solo vea lo suyo.
--- ============================================================
-
--- ---------- Resultados de retos (calificaciones) ----------
 create table if not exists public.retos_resultados (
     id                   bigint generated always as identity primary key,
     user_id              uuid not null references auth.users(id) on delete cascade,
@@ -34,7 +26,6 @@ create policy "retos_insert_propios"
     on public.retos_resultados for insert
     with check (auth.uid() = user_id);
 
--- ---------- Logros del usuario ----------
 create table if not exists public.logros_usuario (
     user_id    uuid not null references auth.users(id) on delete cascade,
     logro_id   text not null,

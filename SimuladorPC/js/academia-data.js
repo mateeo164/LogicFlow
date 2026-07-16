@@ -1,14 +1,3 @@
-// academia-data.js
-// Contenido educativo de la Academia LogicFlow: la capa de TEORÍA que acompaña
-// al laboratorio 3D. Datos puros (sin dependencias) para poder renderizarlos en
-// cualquier página y probarlos sin navegador.
-//
-// Estructura:
-//   MODULOS   → agrupan lecciones en un recorrido con sentido pedagógico.
-//   LECCIONES → cada lección tiene bloques de contenido tipados que leccion.js
-//               convierte en HTML. Las claves de `quiz` apuntan a
-//               PREGUNTAS_COMPONENTE (quiz-data.js) para reutilizar el banco del lab.
-
 export const MODULOS = [
   {
     id: 'fundamentos',
@@ -31,7 +20,6 @@ export const MODULOS = [
 ]
 
 export const LECCIONES = {
-  // ---------------------------------------------------------------- FUNDAMENTOS
   'que-es-una-pc': {
     icono: '💡',
     titulo: '¿Qué es una computadora y cómo trabaja?',
@@ -101,7 +89,6 @@ export const LECCIONES = {
     cta: 'lab'
   },
 
-  // --------------------------------------------------------------- COMPONENTES
   case: {
     icono: '🗄️',
     titulo: 'Gabinete',
@@ -288,7 +275,6 @@ export const LECCIONES = {
     cta: 'calculadora'
   },
 
-  // -------------------------------------------------------------------- CIERRE
   'orden-de-montaje': {
     icono: '🔩',
     titulo: 'El orden correcto de montaje',
@@ -337,7 +323,6 @@ export const LECCIONES = {
   }
 }
 
-// Devuelve un índice plano [{id, moduloId, moduloNombre, ...leccion}] en orden de recorrido.
 export function leccionesEnOrden() {
   const lista = []
   for (const modulo of MODULOS) {

@@ -1,5 +1,3 @@
-// Widget flotante del tutor IA conversacional (Claude) para el laboratorio 3D.
-// Standalone: no depende de juego.js, lee el contexto visible del DOM.
 (function () {
     const MAX_HISTORIAL_ENVIADO = 6
     const MAX_PREGUNTA = 500

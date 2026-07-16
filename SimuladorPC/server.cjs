@@ -7,8 +7,6 @@ const path = require('path')
 const fs = require('fs')
 const { GoogleGenAI } = require('@google/genai')
 
-// Cargador mínimo de .env (sin dependencia): solo para desarrollo local, y
-// nunca pisa variables que la plataforma de hosting ya haya inyectado.
 try {
     const envPath = path.join(__dirname, '.env')
     if (fs.existsSync(envPath)) {
@@ -23,21 +21,15 @@ try {
             if (!(clave in process.env)) process.env[clave] = valor
         })
     }
-} catch { /* sin .env — se usan las variables de entorno del sistema */ }
+} catch { }
 
 const app = express()
 const PORT = process.env.PORT || 3000
 
-// La mayoría de plataformas de hosting (Render, Railway, Fly, etc.) ponen la
-// app detrás de un proxy TLS. Confiar en el primer proxy hace que Express lea
-// bien el protocolo/IP reales (X-Forwarded-*).
 app.set('trust proxy', 1)
 
 const SUPABASE_HOST = 'https://kgyhbimpwwtnkiozymyr.supabase.co'
 
-// Cabeceras de seguridad. La CSP permite inline scripts/styles porque el
-// proyecto usa mucho <script> y style="" embebidos; wasm-unsafe-eval es
-// necesario para el decodificador Draco (WebAssembly) del laboratorio 3D.
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -46,8 +38,6 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
             fontSrc: ["'self'", 'https://fonts.gstatic.com'],
             imgSrc: ["'self'", 'data:', 'blob:'],
-            // blob:/data: son necesarios para que GLTFLoader lea las texturas
-            // embebidas de los modelos (las carga con fetch de una blob URL).
             connectSrc: ["'self'", 'blob:', 'data:', SUPABASE_HOST],
             frameSrc: ['https://www.youtube.com', 'https://www.youtube-nocookie.com'],
             workerSrc: ["'self'", 'blob:'],
@@ -56,24 +46,12 @@ app.use(helmet({
             formAction: ["'self'"]
         }
     },
-    // No bloquear la carga de recursos propios desde otras páginas ni romper
-    // los iframes de YouTube.
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' }
 }))
 
-// Compresión gzip/brotli para HTML/CSS/JS (no afecta a .bin/.png ya comprimidos).
 app.use(compression())
 
-// express.static sirve TODO __dirname si no se filtra antes: sin este bloqueo,
-// cualquier visitante puede descargar este mismo servidor (server.cjs), el
-// código fuente completo de node_modules/, el esquema y las políticas RLS de
-// supabase/*.sql, los tests y la documentación interna con un simple GET.
-// Los dotfiles (.env, .git, etc.) ya los protege express.static por defecto.
-// req.path llega tal cual en la URL (sin decodificar %2f, %2e, etc.), pero
-// express.static sí decodifica antes de resolver el archivo — sin decodificar
-// y normalizar aquí primero, "/supabase%2ftutor-setup.sql" esquiva el regex
-// y express.static igual sirve el archivo real.
 const RUTA_PRIVADA = /^\/(node_modules|supabase|scripts|test|docs)(\/|$)|^\/(server\.cjs|package(-lock)?\.json|README\.md|SUPABASE\.md|DEBUG\.md|Procfile)$/i
 app.use((req, res, next) => {
     let rutaDecodificada
@@ -90,22 +68,16 @@ app.use((req, res, next) => {
 app.use(express.static(__dirname, {
     extensions: ['html'],
     setHeaders: (res, filePath) => {
-        // Modelos y texturas: cache larga e inmutable (contenido versionado por ruta).
         if (/[\\/](assets)[\\/].*\.(glb|gltf|bin|png|jpe?g|webp|ktx2)$/i.test(filePath)) {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
         }
     }
 }))
 
-// Health-check para los monitores del proveedor de hosting.
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime() })
 })
 
-// --------------------------------------------------------------------
-// Tutor IA conversacional (Gemini) del laboratorio 3D.
-// La API key vive solo en el servidor; el cliente nunca la ve.
-// --------------------------------------------------------------------
 const TUTOR_MODEL = 'gemini-2.5-flash'
 const TUTOR_SYSTEM_PROMPT = `Eres el dron tutor de LogicFlow, un simulador educativo de ensamblaje de PC para estudiantes de bachillerato o inicios de universidad.
 Responde siempre en español, en 2 a 4 frases, con tono cercano y claro, evitando tecnicismos innecesarios.
@@ -148,7 +120,6 @@ app.post('/api/tutor-chat', express.json({ limit: '4kb' }), async (req, res) => 
 
     const contexto = typeof req.body?.contexto === 'string' ? req.body.contexto.trim().slice(0, 800) : ''
     const historialCrudo = Array.isArray(req.body?.historial) ? req.body.historial : []
-    // Gemini usa role:'model' donde Anthropic usaría 'assistant'.
     const historial = historialCrudo
         .slice(-6)
         .filter(m => m && (m.rol === 'user' || m.rol === 'assistant') && typeof m.texto === 'string')

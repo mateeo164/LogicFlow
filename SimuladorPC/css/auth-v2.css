@@ -1,8 +1,3 @@
-/* ============================================================
-   LogicFlow · Auth v3 — "Circuito"
-   login / registro / recuperar / actualizar / confirmar
-   ============================================================ */
-
 .auth-body {
   height: 100vh;
   display: grid;
@@ -149,7 +144,6 @@
   color: var(--lf-accent-300);
 }
 
-/* Caja de requisitos (actualizar-password) */
 .auth-privacy {
   background: rgba(99, 102, 241, 0.06);
   border: 1px solid rgba(99, 102, 241, 0.14);
@@ -222,8 +216,6 @@
   font-size: 12px;
   color: var(--lf-text-muted);
 }
-
-/* ---------- Panel hero ---------- */
 
 .auth-hero-panel {
   display: flex;
@@ -327,7 +319,6 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
-/* Toast de estado (fixed: no anclar a transform del contenedor) */
 .auth-message {
   position: fixed;
   left: 0;
@@ -352,8 +343,6 @@
 .auth-message--success {
   border-left-color: var(--lf-emerald-500);
 }
-
-/* ---------- Tema oscuro ---------- */
 
 [data-theme="dark"] .auth-body {
   background: var(--lf-paper);
@@ -419,8 +408,6 @@
   background: var(--lf-surface-100);
   color: var(--lf-text-primary);
 }
-
-/* ---------- Responsive ---------- */
 
 @media (max-width: 900px) {
   .auth-body {

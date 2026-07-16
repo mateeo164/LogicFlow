@@ -19,9 +19,6 @@
   }
 
   function getEffectiveTheme() {
-    // El modo por defecto es claro; solo se usa oscuro si el usuario lo eligió
-    // explícitamente. No seguimos la preferencia del sistema para que el tema
-    // sea consistente en todo el sistema web.
     return getStoredTheme() === 'dark' ? 'dark' : 'light';
   }
 

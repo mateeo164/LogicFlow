@@ -1,6 +1,3 @@
-/* Las fuentes se cargan mediante <link> no bloqueante en el <head> de cada
-   página (ver *.html). Se elimina el @import redundante y render-blocking. */
-
 :root {
 
     --surface-0:   #ffffff;
@@ -1073,10 +1070,6 @@ body.sim-dashboard-layout {
     text-overflow: ellipsis;
 }
 
-/* Durante una instalación guiada, el panel "Instalación guiada" ocupa la
-   esquina superior derecha (≈286px + 16px). El banner de pista se reencuadra
-   al espacio libre de la izquierda y permite envolver texto, para que nunca
-   quede tapado por el panel ni pise la interacción. */
 .floating-hint-banner.con-panel-proc {
     left: 16px;
     right: 320px;
@@ -1088,7 +1081,6 @@ body.sim-dashboard-layout {
 }
 
 @media (max-width: 640px) {
-    /* No hay ancho libre junto al panel; el panel ya muestra la instrucción. */
     .floating-hint-banner.con-panel-proc { display: none; }
 }
 
@@ -2107,6 +2099,31 @@ body.sim-dashboard-layout {
     gap: 12px;
     justify-content: center;
     flex-wrap: wrap;
+}
+
+.final-qr-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 16px;
+    background: var(--surface-0);
+    border: 1px solid var(--border-light);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-sm);
+}
+
+.final-qr-box img {
+    border-radius: var(--r-md);
+    background: #fff;
+    padding: 6px;
+}
+
+.final-qr-box a {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue-600);
 }
 
 .drone-float {

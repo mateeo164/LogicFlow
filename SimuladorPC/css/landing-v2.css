@@ -1,13 +1,6 @@
-/* ============================================================
-   LogicFlow · Landing v3 — "Circuito"
-   Estilos exclusivos de index.html (.academic-*)
-   ============================================================ */
-
 .academic-body {
   min-height: 100vh;
 }
-
-/* ---------- Navegación ---------- */
 
 .academic-nav {
   position: fixed;
@@ -91,7 +84,6 @@
   gap: 10px;
 }
 
-/* Identificador de cuenta cuando hay sesión abierta (@Nombre Apellido). */
 .lf-account-chip[hidden] { display: none; }
 
 .lf-account-chip {
@@ -147,8 +139,6 @@
   justify-content: center;
 }
 
-/* ---------- Eyebrow chip ---------- */
-
 .academic-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -184,8 +174,6 @@
   background: var(--lf-primary-300);
   box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.16);
 }
-
-/* ---------- Hero ---------- */
 
 .academic-hero {
   padding: calc(var(--lf-header-height) + 72px) 24px 96px;
@@ -255,8 +243,6 @@
   color: var(--lf-text-muted);
   margin-top: 4px;
 }
-
-/* ---------- Visual del hero ---------- */
 
 .academic-hero-visual {
   position: relative;
@@ -356,8 +342,6 @@
   color: var(--lf-text-muted);
 }
 
-/* ---------- Secciones ---------- */
-
 .academic-section {
   padding: 84px 24px;
   max-width: var(--lf-max-width);
@@ -374,8 +358,6 @@
   font-size: clamp(1.9rem, 3.4vw, 2.6rem);
   letter-spacing: -0.025em;
 }
-
-/* ---------- Método (3 pasos) ---------- */
 
 .academic-method {
   display: grid;
@@ -438,8 +420,6 @@
   line-height: 1.6;
 }
 
-/* ---------- Ruta (chips de componentes) ---------- */
-
 .academic-timeline {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -485,8 +465,6 @@
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-
-/* ---------- Herramientas ---------- */
 
 .academic-tools {
   display: grid;
@@ -546,8 +524,6 @@
   color: var(--lf-primary-300);
 }
 
-/* ---------- CTA final ---------- */
-
 .academic-cta {
   padding: 40px 24px 100px;
 }
@@ -603,8 +579,6 @@
   color: #fff;
   transform: translateY(-2px);
 }
-
-/* ---------- Footer ---------- */
 
 .academic-footer {
   border-top: 1px solid var(--lf-border-light);
@@ -716,8 +690,6 @@
   color: var(--lf-text-muted);
 }
 
-/* ---------- Responsive ---------- */
-
 @media (max-width: 1024px) {
   .academic-hero-grid {
     grid-template-columns: 1fr;
@@ -813,18 +785,12 @@
   }
 }
 
-/* ============================================================
-   Secciones nuevas: beneficios, gamificación, docentes, FAQ
-   ============================================================ */
-
 .academic-section-sub {
   font-size: 16px;
   line-height: 1.7;
   color: var(--lf-text-secondary);
   margin-top: 14px;
 }
-
-/* ---------- Beneficios (¿Por qué elegirlo?) ---------- */
 
 .academic-features {
   display: grid;
@@ -870,8 +836,6 @@
   color: var(--lf-text-muted);
   line-height: 1.6;
 }
-
-/* ---------- Gamificación (showcase dividido) ---------- */
 
 .academic-showcase {
   display: grid;
@@ -1014,8 +978,6 @@
   border: none;
 }
 
-/* ---------- Para docentes ---------- */
-
 .academic-audience {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1065,8 +1027,6 @@
   color: var(--lf-text-muted);
   line-height: 1.55;
 }
-
-/* ---------- FAQ ---------- */
 
 .academic-faq {
   max-width: 760px;

@@ -3,8 +3,6 @@ import { RETOS, LOGROS_RETO } from './retos-data.js'
 import { obtenerResultadosRetos, resumirResultados, obtenerLogrosUsuario } from './retos-api.js'
 
 function estrellas(n) {
-    // Clampeado a [0,3]: String.repeat() lanza RangeError con conteos negativos,
-    // lo que rompería toda la grilla de retos si algún reto llegara a tener dificultad > 3.
     const llenas = Math.max(0, Math.min(3, n))
     return '★'.repeat(llenas) + '☆'.repeat(3 - llenas)
 }
@@ -78,7 +76,7 @@ async function init() {
         obtenerResultadosRetos(),
         obtenerLogrosUsuario()
     ])
-    const resultados = resultadosCrudos || []   // null = falló la petición, no "sin intentos"
+    const resultados = resultadosCrudos || []
 
     const resumen = resumirResultados(resultados)
     renderRetos(resumen)

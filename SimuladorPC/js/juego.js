@@ -15,6 +15,7 @@ import { obtenerReto, calcularNotaReto, LOGROS_RETO, NOTA_MINIMA_RETO } from './
 import { guardarResultadoReto, obtenerResultadosRetos, otorgarLogros, obtenerLogrosUsuario } from './retos-api.js'
 import * as LFSound from './audio.js'
 import { EVALUACION, elegirPreguntaComponente, notaConceptual, combinarNota, gananciaAprendizaje, notaDestreza } from './quiz-data.js'
+import { qrcode } from './vendor/qrcode-generator.mjs'
 
 import { PASOS } from './pasos-data.js'
 import { crearTexturaRadial, crearTexturaMadera, crearTexturaMaderaClara, crearTexturaLetreroComponentes, crearTexturaPisoModerno, crearTexturaPegboard, crearTexturaMat, crearTexturaEtiqueta, crearTexturaPared, crearTexturaCielo, crearTexturaCartel, crearTexturaBlueprint } from './texturas.js'
@@ -24,9 +25,6 @@ import { construirProcedimientoCPU, construirProcedimientoMB, construirProcedimi
 
 const TOTAL = PASOS.length
 
-// Los modelos se sirven comprimidos con Draco (.opt.glb). Se necesita un
-// DRACOLoader con el decodificador WASM local para poder leerlos. Reutilizamos
-// una única instancia entre todos los GLTFLoader.
 let _dracoLoader = null
 function crearGLTFLoader() {
     if (!_dracoLoader) {
@@ -57,19 +55,17 @@ const UMBRAL_DEMORA_SEG = 45
 let fase = 'bienvenida'
 let indiceActual = 0
 let selectedComponent = null
-// Evita que un doble clic o una tecla E mantenida presionada (key-repeat) reentren en
-// finalizarPaso() mientras el guardado async del paso anterior sigue en vuelo, lo que
-// saltaría un componente completo (indiceActual++ se dispararía más de una vez).
+
 let instalandoPaso = false
 let sessionStartTime = Date.now()
 let labStartTime = Date.now()
 let erroresSesion = 0
 let demorasSesion = 0
-let aciertosConceptuales = 0   // preguntas de comprensión acertadas al primer intento
-let preguntasRespondidas = 0   // total de preguntas de comprensión mostradas
-let preTestAciertos = null     // aciertos en el test diagnóstico (null = no realizado)
-let postTestAciertos = null    // aciertos en el test final
-let preTestHecho = false       // evita repetir el diagnóstico al reentrar
+let aciertosConceptuales = 0   
+let preguntasRespondidas = 0   
+let preTestAciertos = null     
+let postTestAciertos = null    
+let preTestHecho = false       
 
 let scene, camera, renderer, controls, raycaster, mouse
 let slotDiscs = []
@@ -77,28 +73,19 @@ let modelos3D = {}
 const animacionesCaida = []
 let motorListo = false
 
-// Ambiente del taller (fase de rediseño): mixers de animación (fans, monitor…),
-// props reales cargados por id (para calibración por consola) y un cargador de
-// texturas PBR compartido para piso/paredes.
 const mixers = []
 const propsTaller = {}
 const _texLoader = new THREE.TextureLoader()
 
-// SSD desarmable (teardown de la Fase 2A). El clip original targetea huesos
-// "Bone.001_SSD" que GLTFLoader renombra sin punto → no bindea. Como las 4 capas
-// son mallas normales accesibles por nombre, animamos su despiece a mano:
-// ssdPartes = [{ nodo, rest, dir }]; ssdProg va de 0 (armado) a 1 (desarmado).
 let ssdPartes = null, ssdProg = 0, ssdTarget = 0
 
 const ES_TACTIL = window.matchMedia('(pointer: coarse)').matches || !window.matchMedia('(pointer: fine)').matches
 
-// Heurística de equipo modesto (pocos núcleos y/o poca RAM reportada, o táctil):
-// baja antialiasing/resolución/sombras para evitar bajones de FPS en esas PCs.
 const EQUIPO_MODESTO = ES_TACTIL
     || (navigator.hardwareConcurrency || 8) <= 4
     || (navigator.deviceMemory || 8) <= 4
 
-// Tope por modelo en precargarModelos(): ver comentario junto a su uso.
+
 const MODEL_LOAD_TIMEOUT_MS = 20000
 
 let walkControls = null
@@ -124,7 +111,7 @@ let camTween     = null
 let iniciandoProc = false
 
 let modoReto = null
-let retoMedicion = false   // Fase 2C: modo multímetro activo durante la inspección de un reto
+let retoMedicion = false   
 
 function pedirActualizarSombras() {
     if (renderer) renderer.shadowMap.needsUpdate = true
@@ -137,24 +124,19 @@ const _scrLook  = new THREE.Vector3()
 const _UP       = new THREE.Vector3(0, 1, 0)
 const _CENTER   = new THREE.Vector2(0, 0)
 
-// ── Post-ensamble: llevar la PC terminada al banco de pruebas y arrancarla ──
-// La PC ensamblada (todas las piezas de PASOS) se reagrupa en `pcCarryGrp` para
-// cargarla en brazos; se posa sobre el banco (bancoPruebas) y el monitor de la
-// estación muestra un arranque (POST→BIOS→escritorio) que refleja si el
-// ensamble quedó aprobado. Estado calibrable por consola con `__lab`.
-let pcCargando = false          // el usuario lleva la PC en brazos (modo caminar)
-let pcEnBanco  = false          // la PC ya está posada sobre el banco de pruebas
-let pcCarryGrp = null           // grupo temporal que sostiene todas las piezas
-let pcTween    = null           // traslado de la PC (mesa→banco / banco→mesa)
-let bancoPruebas = null         // { x, z, topY } de la estación de pruebas
-let cablePC    = null           // cable visual PC→monitor
-let bootPC     = null           // { inicio, aprobado, beep } arranque en pantalla
-let pruebaArranqueGuardada = false  // evita duplicar el registro de la prueba en la BD
-let pruebaFinalPendiente = false    // el ensamble terminó pero falta la prueba de arranque obligatoria
+let pcCargando = false          
+let pcEnBanco  = false          
+let pcCarryGrp = null           
+let pcTween    = null           
+let bancoPruebas = null         
+let cablePC    = null           
+let bootPC     = null           
+let pruebaArranqueGuardada = false  
+let pruebaFinalPendiente = false    
 let pantallaPCcanvas = null, pantallaPCtex = null, pantallaPCmesh = null
-const PC_CARRY_S = 0.42         // escala de la PC mientras se carga
-const PC_BANCO_S = 0.52         // escala de la PC posada en el banco
-let pcBancoCfg = null           // { x, y, z, ry } destino calibrable; se rellena al montar
+const PC_CARRY_S = 0.42         
+const PC_BANCO_S = 0.52         
+let pcBancoCfg = null           
 
 const canvas = document.getElementById('game-canvas')
 
@@ -282,9 +264,7 @@ function mostrarVideo(idx) {
 function mostrarFase3D(idx) {
     indiceActual = idx
     fase = '3d'
-    // El reloj de "demora" arranca aquí, cuando el estudiante queda libre para
-    // interactuar con la pieza — no al terminar el paso anterior (eso incluía de
-    // más el tiempo del video y del quiz de comprensión, inflando falsas demoras).
+
     sessionStartTime = Date.now()
     mostrarOverlay('3d')
     montarDrone('drone-float-svg')
@@ -299,17 +279,10 @@ function mostrarFase3D(idx) {
     setHint(`<strong>Instala: ${paso.nombre}</strong> — haz clic en la pieza dentro de la vitrina y luego en el disco luminoso.`)
 }
 
-// Asistente/dron flotante desactivado en el simulador 3D: no muestra burbujas
-// de mensaje que tapen la interacción.
 function droneHabla(msg) {}
 
-// Evaluación formativa: micro-pregunta conceptual tras instalar un componente.
-// Da retroalimentación del PORQUÉ y suma a la nota de comprensión.
-// Llama onDone() cuando el estudiante pulsa "Continuar".
 function mostrarQuizComponente(paso, onDone) {
-    // El banco de preguntas por componente es un ARREGLO; se elige una al azar.
-    // (Antes se usaba PREGUNTAS_COMPONENTE[id] como objeto único y q.opciones era
-    // undefined → el quiz se rompía al intentar pintar las opciones.)
+
     const q = elegirPreguntaComponente(paso.id)
     if (!q) { onDone(); return }
 
@@ -362,8 +335,8 @@ function mostrarQuizComponente(paso, onDone) {
                 LFSound.error()
                 appendLog(`Pregunta de ${paso.nombre}: incorrecta. Revisa la explicación.`, 'warn')
             }
-            // Registra la respuesta conceptual: alimenta la analítica del docente
-            // ("¿qué concepto le cuesta a la clase?").
+
+
             registrarEvento({ tipo: acierto ? 'quiz_acierto' : 'quiz_error', componenteId: paso.id })
 
             if (fb) {
@@ -381,10 +354,6 @@ function mostrarQuizComponente(paso, onDone) {
     droneHabla(`Antes de seguir, comprobemos que entendiste el ${paso.nombre}.`)
 }
 
-// Test diagnóstico (pre) o final (post): recorre el banco EVALUACION una pregunta a
-// la vez, sin retroalimentación (es una medición, no una lección), y guarda el puntaje.
-// Comparar pre vs post da la "ganancia de aprendizaje" que se muestra al final.
-// onDone(aciertos) se llama al terminar (o al saltar el diagnóstico).
 function mostrarEvaluacion(tipo, onDone) {
     const preguntas = EVALUACION
     if (!preguntas.length) { onDone(null); return }
@@ -447,13 +416,15 @@ function mostrarEvaluacion(tipo, onDone) {
 }
 
 const NOTA_MINIMA = 7
+
+const APP_MOVIL_ANDROID_URL = 'https://expo.dev/accounts/mateeo164/projects/logicflow-mobile/builds/7a7d7cc3-7918-4160-9355-7de5af7a3e3e'
 let notaFinalSesion = 0
-let notaBaseSesion  = 0   // nota de destreza+comprensión antes del bono por logros
+let notaBaseSesion  = 0   
 
 function calcularNota() {
     const nd = notaDestreza(erroresSesion, demorasSesion)
-    // La nota final mezcla la destreza en el ensamble con la comprensión demostrada
-    // en las preguntas conceptuales. Así aprobar exige entender, no solo hacer clic.
+
+
     if (preguntasRespondidas > 0) {
         return combinarNota(nd, notaConceptual(aciertosConceptuales, preguntasRespondidas))
     }
@@ -476,8 +447,8 @@ function mostrarFinal() {
     LFSound.complete()
 
     const t = Math.round((Date.now() - labStartTime) / 1000)
-    // La nota definitiva (con bono de logros) ya se fijó en calcularNotaFinal(),
-    // antes de la prueba de arranque, para que el POST del banco fuera coherente.
+
+
     const notaBase = notaBaseSesion
     const notaFinal = notaFinalSesion
     const aprobado = notaFinal >= NOTA_MINIMA
@@ -522,7 +493,7 @@ function mostrarFinal() {
         document.getElementById('btn-app-movil')?.addEventListener('click', irAppMovil)
     }
 
-    // Ganancia de aprendizaje: compara el test diagnóstico con el final.
+
     const statsEl = document.getElementById('final-stats')
     if (statsEl && preTestAciertos != null && postTestAciertos != null) {
         const total = EVALUACION.length
@@ -545,7 +516,7 @@ function mostrarFinal() {
     const aviso = document.getElementById('final-aviso')
     if (aviso) aviso.style.display = 'none'
 
-    // Persiste la dimensión conceptual para que el docente pueda evaluarla.
+
     const comprensionPct = preguntasRespondidas > 0
         ? Math.round((aciertosConceptuales / preguntasRespondidas) * 100)
         : null
@@ -563,9 +534,6 @@ function mostrarFinal() {
     registrarAprobacionWeb(aprobado, notaFinal)
 }
 
-// Nota definitiva de la sesión: otorga los logros ganados y aplica su bono.
-// Se calcula ANTES de la prueba de arranque para que el POST del banco refleje
-// con exactitud si el ensamble aprueba (nota final ≥ mínimo), no la nota base.
 async function calcularNotaFinal() {
     const ganados = ['primera_pc', 'componente_estrella']
     if (erroresSesion === 0) ganados.push('sin_errores')
@@ -579,11 +547,6 @@ async function calcularNotaFinal() {
     return notaFinalSesion
 }
 
-// Tras el ensamble y el test final, la simulación NO termina: el estudiante debe
-// llevar la PC al banco y encenderla. Solo al completar ese arranque se muestra
-// el resumen (mostrarFinal) y se registra la aprobación. En equipos táctiles (sin
-// mouse/teclado para caminar) se omite la prueba manual y se pasa directo al
-// resumen para no dejar bloqueada la sesión.
 async function iniciarPruebaFinal() {
     await calcularNotaFinal()
 
@@ -623,10 +586,24 @@ async function volverAIntentar() {
 
 function irAppMovil() {
     const aviso = document.getElementById('final-aviso')
-    if (aviso) {
-        aviso.style.display = 'block'
-        aviso.innerHTML = '✓ <strong>Aprobación registrada.</strong> Abre la app móvil de LogicFlow, completa la instalación real guiada y desbloquea tu <strong>certificado</strong> con el tiempo total y la foto de tu PC.'
-    }
+    if (!aviso) return
+    aviso.style.display = 'block'
+
+    let qrImg = ''
+    try {
+        const qr = qrcode(0, 'M')
+        qr.addData(APP_MOVIL_ANDROID_URL)
+        qr.make()
+        qrImg = qr.createImgTag(5, 8)
+    } catch {  }
+
+    aviso.innerHTML = `
+        <div>✓ <strong>Aprobación registrada.</strong> Escanea el código para descargar la app móvil de LogicFlow (por ahora solo Android), completa la instalación real guiada y desbloquea tu <strong>certificado</strong> con el tiempo total y la foto de tu PC.</div>
+        <div class="final-qr-box">
+            ${qrImg}
+            <a href="${APP_MOVIL_ANDROID_URL}" target="_blank" rel="noopener">Abrir el link de descarga →</a>
+        </div>
+    `
 }
 
 function explorarTaller() {
@@ -774,16 +751,13 @@ function renderChecklist() {
     }).join('')
 }
 
-// Deshace el paso "idx" (y todos los posteriores) y deja al estudiante listo para
-// reinstalarlo. El checklist marca "clickable" (con el ícono ↩) los pasos i < indiceActual
-// esperando que hacer clic en uno de ellos lo deshaga a ÉL, no al siguiente.
 function retrocederA(idx) {
     PASOS.forEach((p, i) => {
         if (i >= idx) {
             const m = modelos3D[p.id]
             if (m) m.visible = false
-            // Restaura el aspecto "disponible" del estante: soltarComponenteInstalado()
-            // lo había dejado atenuado (opacity 0.35) al marcarlo como ya instalado.
+
+
             const slotGrupo = shelfSlotObjs[p.id]
             if (slotGrupo) {
                 slotGrupo.traverse(n => {
@@ -826,15 +800,11 @@ function updateMissionProgress() {
     dibujarPantallaTaller()
 }
 
-// La consola/registro en pantalla se eliminó: no se muestra ningún log al
-// usuario. Se conserva solo la retroalimentación sonora (no tapa la interacción).
 function appendLog(msg, type = 'system') {
     if (type === 'success') LFSound.success()
     else if (type === 'warn' || type === 'warning') LFSound.error()
 }
 
-// Banner de pista flotante desactivado: no se muestra nada sobre el 3D.
-// La guía del paso vive en el panel lateral (#instruction-p) y el encabezado.
 function setHint(msg) {}
 
 function handleSelection(componentId) {
@@ -1098,10 +1068,10 @@ async function finalizarPasoInterno(paso) {
     setTimeout(() => {
         const continuar = () => {
             if (indiceActual < TOTAL) mostrarVideo(indiceActual)
-            else mostrarEvaluacion('post', () => iniciarPruebaFinal())  // test final, luego prueba de arranque
+            else mostrarEvaluacion('post', () => iniciarPruebaFinal())  
         }
-        // El quiz NUNCA debe poder dejar al estudiante en un overlay roto sin salida:
-        // si algo falla al pintarlo, continuamos igual con el siguiente componente.
+
+
         try {
             mostrarQuizComponente(paso, continuar)
         } catch (err) {
@@ -1136,10 +1106,10 @@ function initMotor3D() {
     renderer.shadowMap.needsUpdate = true
 
     const pmrem = new THREE.PMREMGenerator(renderer)
-    // Entorno neutro inmediato (se ve algo antes de que llegue el HDRI).
+
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
-    // HDRI real de un taller de máquinas (CC0, Poly Haven): da reflejos
-    // característicos en los metales del hardware en vez de un gris plano.
+
+
     new RGBELoader().load('assets/hdri/machine_shop_01_1k.hdr', (hdr) => {
         hdr.mapping = THREE.EquirectangularReflectionMapping
         const envMap = pmrem.fromEquirectangular(hdr).texture
@@ -1190,27 +1160,27 @@ function initMotor3D() {
             const r = n => Math.round(n * 1000) / 1000
             return { pos: g.position.toArray().map(r), ry: r(g.rotation.y) }
         },
-        ssdSet(p = 1) {   // debug: evalúa el despiece del SSD en [0..1] y renderiza
+        ssdSet(p = 1) {   
             if (ssdPartes) { ssdProg = ssdTarget = p; aplicarTeardownSSD(p); renderer.render(scene, camera) }
             return p
         },
-        // ── Prueba de arranque: calibración/depuración ──
+
         setPantallaPC(cfg = {}) { setPantallaPC(cfg); return pantallaPCmesh ? { pos: pantallaPCmesh.position.toArray(), size: [pantallaPCmesh.geometry.parameters.width, pantallaPCmesh.geometry.parameters.height] } : 'aún no cargó el monitor' },
         setPCBanco(cfg = {}) { if (pcBancoCfg) Object.assign(pcBancoCfg, cfg); if (pcEnBanco && pcCarryGrp && pcBancoCfg) { pcCarryGrp.position.set(pcBancoCfg.x, alturaBaseBanco(), pcBancoCfg.z); pcCarryGrp.rotation.y = pcBancoCfg.ry; crearCablePC(); renderer.render(scene, camera) } return pcBancoCfg },
         agarrarPC() { agarrarPC(); return 'PC en brazos' },
-        probarPC() {   // debug: teletransporta la PC al banco y arranca (sin caminar)
+        probarPC() {   
             if (fase !== '3d') fase = '3d'
             if (!pcCarryGrp) agarrarPC()
             if (pcBancoCfg && pcCarryGrp) { pcCargando = false; pcEnBanco = true; pcCarryGrp.scale.setScalar(PC_BANCO_S); pcCarryGrp.position.set(pcBancoCfg.x, alturaBaseBanco(), pcBancoCfg.z); pcCarryGrp.rotation.y = pcBancoCfg.ry; arrancarPC() }
             return 'arrancando'
         },
-        bootPC(el = 3.5, forzarAprobado = null) {   // debug: pinta un fotograma del arranque a t=el segundos
+        bootPC(el = 3.5, forzarAprobado = null) {   
             const aprobado = forzarAprobado != null ? !!forzarAprobado : notaFinalSesion >= NOTA_MINIMA
             bootPC = { inicio: performance.now() - el * 1000, aprobado, beep: true, chime: true }
             dibujarPantallaPC(); if (renderer) renderer.render(scene, camera)
             return { aprobado, el, canvas: pantallaPCcanvas ? pantallaPCcanvas.toDataURL('image/png') : null }
         },
-        medirReto(id) {   // debug: activa el multímetro y mide un componente en un reto
+        medirReto(id) {   
             if (!modoReto || modoReto.fase !== 'inspeccion') return 'no hay reto en inspección'
             retoMedicion = true
             medirComponenteReto(id)
@@ -1319,14 +1289,6 @@ function initMotor3D() {
         }
     }
 }
-
-
-
-
-
-
-
-
 
 function crearVitrinaComponentes(grupo) {
     const { cols, slotW, depth, backZ, frontZ, w, baseH, rowH } = VITRINA
@@ -1576,7 +1538,7 @@ function fusionarMallasEstante(root) {
     for (const [mat, geos] of porMaterial) {
         const merged = geos.length > 1 ? mergeGeometries(geos, false) : geos[0]
         if (merged) grupo.add(new THREE.Mesh(merged, mat))
-        // Solo son intermedias cuando hubo fusión; con un único mesh, "merged" ES geos[0].
+
         if (geos.length > 1) geos.forEach(g => g.dispose())
     }
     return grupo
@@ -1643,10 +1605,7 @@ function soltarComponenteInstalado(pasoId) {
         slotGrupo.traverse(n => {
             if (n.isMesh && !n.userData.isPlaceholder) {
                 if (n.material) {
-                    // Algunos meshes del estante (pedestal, divisores) comparten un
-                    // material entre TODOS los slots (ver mTrim en la construcción
-                    // del estante); solo podemos liberar el clon que nosotros mismos
-                    // creamos en una vuelta anterior, nunca el material compartido.
+
                     const anterior = n.material
                     n.material = n.material.clone()
                     n.material.opacity = 0.35
@@ -1705,7 +1664,7 @@ function interactuarE() {
 
     if (modoReto) { interactuarEReto(eRay); return }
 
-    // Post-ensamble: cargar la PC terminada y probarla en el banco de pruebas.
+
     if (indiceActual >= TOTAL && !heldComponent) {
         if (pcCargando) {
             const near = bancoPruebas && camera &&
@@ -1716,7 +1675,7 @@ function interactuarE() {
             return
         }
         if (eRay.intersectObjects(pcPickList(), true).length) { agarrarPC(); return }
-        // Si no apunta a la PC ni al banco, continúa con el manejo normal.
+
     }
 
     if (!heldComponent) {
@@ -1786,8 +1745,6 @@ function interactuarEReto(eRay) {
         return
     }
 
-    // Fase reparación: tomar el repuesto de la vitrina, instalarlo y, en la
-    // secuencia especial de CPU, retirar/montar el disipador y aplicar pasta.
     const sHits = eRay.intersectObjects(shelfMeshes)
     if (sHits.length) { tomarRepuestoReto(sHits[0].object.userData.pasoId); return }
 
@@ -1801,8 +1758,6 @@ function interactuarEReto(eRay) {
 
 const PROCEDIMIENTOS = { cpu: construirProcedimientoCPU, mb: construirProcedimientoMB, cooler: construirProcedimientoCooler, ram: construirProcedimientoRAM, gpu: construirProcedimientoGPU, power: construirProcedimientoPSU }
 
-// Procedimiento de instalación guiada desactivado por completo: al instalar una
-// pieza se coloca directamente (finalizarPaso), sin pasos, hotspots ni panel.
 function tieneProcedimiento(id) { return false }
 
 function iniciarProcedimiento(paso) {
@@ -1998,10 +1953,6 @@ function ocultarPanelProc() {
     document.getElementById('hint-box')?.classList.remove('con-panel-proc')
 }
 
-// Las primitivas de procedimiento viven en ./juego-proc-helpers.js y los
-// constructores construirProcedimiento* en ./juego-procedimientos.js (ambos
-// importados arriba). Aquí abajo queda solo su orquestación.
-
 const SALA = { xMin: -5, xMax: 5, zMin: -4, zMax: 5, y0: -1.0, h: 3.6 }
 
 const VITRINA = (() => {
@@ -2018,10 +1969,6 @@ const VITRINA = (() => {
     }
 })()
 
-// Devuelve un set de mapas PBR (baseColor/normal/AO-Rough-Metal empacado) para
-// piso/paredes del taller. Cachea por `base` y comparte las texturas entre las
-// 4 paredes (repeat compartido) para no multiplicar la VRAM. El `arm` empacado
-// se usa como roughnessMap+metalnessMap (three lee rough=verde, metal=azul).
 const _pbrCache = {}
 function pbrTaller(base, rx, ry) {
     if (!_pbrCache[base]) {
@@ -2051,8 +1998,8 @@ function construirEntorno() {
     crearLucesTecho(grupo)
     crearBanco(grupo)
     crearTapete(grupo)
-    // El pegboard procedural se reemplaza por el panel de herramientas real
-    // (tool_storage_board) en cargarPropsTaller, en el mismo hueco de pared.
+
+
     crearEstanteria(grupo, SALA.xMin + 0.32, -1.6, Math.PI / 2)
     crearEstanteria(grupo, SALA.xMax - 0.32, -0.6, -Math.PI / 2)
     crearDecoracionPared(grupo)
@@ -2075,11 +2022,6 @@ function construirEntorno() {
 
 const RUTA_PROP = 'assets/3d_models/'
 
-// Carga un .glb de utilería del taller: lo escala a `size` (por su dimensión
-// mayor), centra su geometría, apoya la base en `y` (piso por defecto), aplica
-// sombras/anisotropía, reproduce en bucle sus animaciones (fans, etc.) y —si se
-// pasa `fact`— lo hace interactivo (el dron comenta al hacer clic). Las
-// posiciones son aproximadas: se pueden afinar por consola con `__lab.props`.
 function cargarProp(archivo, opts = {}) {
     const {
         size = 1, x = 0, z = 0, y = SALA.y0, rotY = 0, rotX = 0,
@@ -2092,7 +2034,7 @@ function cargarProp(archivo, opts = {}) {
         const s = size / (Math.max(dim.x, dim.y, dim.z) || 1)
         inner.scale.setScalar(s)
         box = new THREE.Box3().setFromObject(inner)
-        inner.position.sub(box.getCenter(new THREE.Vector3()))   // geometría al origen
+        inner.position.sub(box.getCenter(new THREE.Vector3()))   
         const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5)
         optimizarMateriales(inner)
 
@@ -2115,51 +2057,39 @@ function cargarProp(archivo, opts = {}) {
     }, undefined, () => appendLog(`Prop del taller no disponible: ${archivo}`, 'system'))
 }
 
-// Plano del taller (top-down). Sala: X[-5,5] (izq→der), Z[-4,5] (frente→fondo),
-// piso y=-1.0, superficie del escritorio y=0. Mesa de ensamble al centro (origen);
-// vitrina de componentes en la pared del fondo (z≈+4.7). Coordenadas deliberadas
-// para que nada se solape; se afinan por consola con `__lab.setProp(id, {...})`.
 function cargarPropsTaller() {
-    // ── Almacén: estantería de repuestos contra la pared izquierda, al fondo
-    //    (después de la ventana, sin pisar la planta ni la estantería procedural).
+
+
     cargarProp('basket_shelving_for_store_or_warehouse.opt.glb', {
         id: 'shelving', size: 2.4, x: -4.4, z: 3.4, rotY: Math.PI / 2,
         fact: 'Estantería de repuestos: aquí guardamos componentes y cajas del taller.'
     })
 
-    // ── Estación de pruebas contra la pared derecha (banco + periféricos).
+
     montarEstacionPruebas()
 
-    // ── Taburete del técnico, frente a la mesa de ensamble.
+
     cargarProp('bar_stool.opt.glb', {
         id: 'stool', size: 1.05, x: 2.5, z: 2.6,
         fact: 'Taburete del técnico. Trabajar a la altura correcta evita forzar los cables.'
     })
 
-    // ── Panel de herramientas real en la pared frontal (reemplaza el pegboard
-    //    procedural, en el mismo hueco: ancho ~2.5, centrado en x=-1.4).
     cargarProp('tool_storage_board.opt.glb', {
         id: 'toolboard', size: 2.5, x: -1.4, z: -3.9, rotY: Math.PI / 2, centroY: 1.0,
         fact: 'Panel de herramientas: destornilladores, pinzas y llaves siempre a mano.'
     })
 
-    // ── Decoración viva: dos ventiladores RGB girando en el borde trasero de la
-    //    mesa (piezas de repuesto), lejos de la zona de ensamble.
     cargarProp('rgb_pc_fan.opt.glb', {
         id: 'fan1', size: 0.26, x: -0.95, z: -0.78, y: 0, rotY: 0.25,
         fact: 'Ventilador RGB de repuesto: sus aspas mueven el aire para refrigerar el gabinete.'
     })
     cargarProp('rgb_fan.opt.glb', { id: 'fan2', size: 0.26, x: 0.95, z: -0.78, y: 0 })
 
-    // Fase 2A: SSD desarmable + herramientas interactivas.
+
     cargarSSDTeardown()
     cargarHerramientas()
 }
 
-// SSD de 2.5" desarmable: al hacer clic (o E al caminar) reproduce su despiece
-// —carcasa, PCB con controlador, chips NAND y tornillos— y al volver a pulsar se
-// rearma. Es un "mira por dentro" educativo. No se auto-reproduce: el clip se
-// controla por tiempo desde animar() según ssdProg→ssdTarget.
 function cargarSSDTeardown() {
     crearGLTFLoader().load(RUTA_PROP + 'ssd_solid-state_drive.opt.glb', (gltf) => {
         const inner = gltf.scene
@@ -2174,16 +2104,13 @@ function cargarSSDTeardown() {
         const g = new THREE.Group()
         g.add(inner)
         g.rotation.y = 0.4
-        g.position.set(1.05, half.y, 0.55)          // apoyado en la mesa (y=0)
+        g.position.set(1.05, half.y, 0.55)          
         g.userData.onClic = toggleSSDTeardown
         g.userData.fact = 'SSD de 2.5": haz clic para desarmarlo y ver sus capas por dentro.'
         scene.add(g)
         propsInteractivos.push(g)
         propsTaller.ssd = g
 
-        // Recolectamos las 4 capas (carcasa sup., PCB, tornillos, carcasa inf.) y
-        // guardamos su posición de reposo. El despiece las separa hacia arriba en
-        // el eje local Y, escalonadas, según ssdProg.
         const orden = ['SSD_Case_1', 'SSD_Board', 'SSD_Screws', 'SSD_Case_2']
         const nodos = {}
         inner.traverse(o => { if (orden.includes(o.name)) nodos[o.name] = o })
@@ -2197,7 +2124,7 @@ function cargarSSDTeardown() {
     }, undefined, () => appendLog('SSD de inspección no disponible.', 'system'))
 }
 
-// Coloca cada capa del SSD en rest + separación·prog a lo largo del eje local Y.
+
 function aplicarTeardownSSD(prog) {
     if (!ssdPartes) return
     for (const p of ssdPartes) p.nodo.position.set(p.rest.x, p.rest.y + p.sep * prog, p.rest.z)
@@ -2217,8 +2144,6 @@ function toggleSSDTeardown() {
     appendLog(abriendo ? 'SSD desarmado para inspección.' : 'SSD rearmado.', 'info')
 }
 
-// Herramientas reales del taller como props interactivos (clic → el dron explica
-// su uso). Colocadas alrededor de la mesa y el banco.
 function cargarHerramientas() {
     cargarProp('phillips_screwdriver..opt.glb', {
         id: 'screwdriver', size: 0.36, x: -0.7, z: 0.7, y: 0, rotY: 0.5,
@@ -2244,14 +2169,6 @@ function cargarHerramientas() {
     })
 }
 
-// Banco de pruebas con periféricos encima. Se agranda a un tamaño comparable a la
-// mesa central (antes era mucho más pequeño y todo se encimaba) y a la altura de un
-// escritorio real. El banco va contra la pared derecha con su lado largo paralelo a
-// la pared (rotY=0); todos los periféricos miran hacia el centro (rotY=-90°). La
-// altura real de la superficie se calcula en onReady para apoyar todo sin adivinar.
-// Distribución (X = profundidad hacia la sala, mayor X = fondo junto a la pared):
-//   · monitor al fondo-centro   · teclado y ratón al frente   · la PC a un lado
-//     (hacia -Z) para que la torre NUNCA atraviese el monitor ni el teclado.
 function montarEstacionPruebas() {
     const wbX = 4.1, wbZ = 1.9, faceCentro = -Math.PI / 2
     cargarProp('workbench_low-poly.opt.glb', {
@@ -2259,12 +2176,9 @@ function montarEstacionPruebas() {
         fact: 'Banco de pruebas: aquí se enciende la PC terminada para su primer arranque (POST).',
         onReady: (g, half) => {
             const topY = g.position.y + half.y
-            // Guarda la estación (centro/altura) para posar la PC y trazar el cable.
+
             bancoPruebas = { x: wbX, z: wbZ, topY }
-            // Zona de posado de la PC: al costado del monitor (hacia -Z), bien dentro
-            // del banco. La Y se calcula al posar (alturaBaseBanco) según su altura.
-            // ry=π orienta el gabinete con su cara visible (cristal/componentes) hacia
-            // la persona (-X); con ry=0 quedaba al revés (frente hacia la pared).
+
             pcBancoCfg = { x: 4.28, z: 1.02, ry: Math.PI }
             cargarProp('pc_monitor.opt.glb', {
                 id: 'monitor', size: 1.25, x: 4.42, z: 2.08, y: topY, rotY: faceCentro, anim: false,
@@ -2283,20 +2197,13 @@ function montarEstacionPruebas() {
                 id: 'lamp', size: 0.55, x: 4.45, z: 3.02, y: topY, rotY: faceCentro,
                 fact: 'Lámpara de banco: buena luz para no equivocarse al conectar cables pequeños.'
             })
-            // El multímetro (herramienta de diagnóstico) se apoya en este banco: se
-            // recoloca aquí, a la altura real de la superficie, para que no quede
-            // hundido al cambiar el tamaño del banco.
+
             const mm = propsTaller.multimeter
             if (mm) mm.position.set(3.62, topY, 2.72)
         }
     })
 }
 
-// ── Pantalla del monitor de la estación de pruebas ──────────────────────────
-// Plano con CanvasTexture (mismo patrón que la pantalla de pared del taller),
-// hijo del grupo del monitor. El monitor está rotado para mirar al centro de la
-// sala, así que el +Z local del plano queda de cara al espectador. Las medidas
-// son aproximadas: se calibran en vivo con `__lab.setPantallaPC({...})`.
 function crearPantallaPC(monitorGrp, half) {
     pantallaPCcanvas = document.createElement('canvas')
     pantallaPCcanvas.width = 512
@@ -2304,21 +2211,15 @@ function crearPantallaPC(monitorGrp, half) {
     pantallaPCtex = new THREE.CanvasTexture(pantallaPCcanvas)
     pantallaPCtex.colorSpace = THREE.SRGBColorSpace
 
-    // El plano se apoya sobre el cristal del monitor, justo delante de su cara frontal
-    // (half.z * 1.03 ≈ 8 mm por delante para evitar z-fighting, no flota de lado). El
-    // alto es MENOR que half.y*2 porque ese bounding incluye la peana: se recorta a la
-    // zona de pantalla y se sube (y = half.y*0.36) para quedar dentro del bisel.
     pantallaPCmesh = new THREE.Mesh(
         new THREE.PlaneGeometry(half.x * 1.34, half.y * 1.10),
         new THREE.MeshBasicMaterial({ map: pantallaPCtex })
     )
     pantallaPCmesh.position.set(0, half.y * 0.36, half.z * 1.03)
     monitorGrp.add(pantallaPCmesh)
-    dibujarPantallaPC()   // estado "apagado/en espera"
+    dibujarPantallaPC()   
 }
 
-// Calibración por consola del plano de la pantalla (posición/tamaño relativos
-// al grupo del monitor).
 function setPantallaPC(cfg = {}) {
     if (!pantallaPCmesh) return
     if (cfg.w != null || cfg.h != null) {
@@ -2333,15 +2234,11 @@ function setPantallaPC(cfg = {}) {
     if (renderer) renderer.render(scene, camera)
 }
 
-// Lista de objetos raycasteables que representan la PC ensamblada (para
-// apuntarle con la mira y agarrarla).
 function pcPickList() {
     if (pcCarryGrp) return [pcCarryGrp]
     return PASOS.map(p => modelos3D[p.id]).filter(g => g && g.visible)
 }
 
-// Guía visible del mini-flujo de pruebas (usa el panel lateral, no un toast que
-// tape el 3D — coherente con la retirada de notificaciones flotantes).
 function guiaBanco(titulo, texto) {
     const t = document.getElementById('mission-title')
     const i = document.getElementById('instruction-p')
@@ -2349,28 +2246,26 @@ function guiaBanco(titulo, texto) {
     if (i && texto) i.textContent = texto
 }
 
-// Levanta la PC ensamblada: reagrupa todas las piezas en `pcCarryGrp` centrado
-// en el origen del grupo, para poder cargarla y rotarla cómodamente.
 function agarrarPC() {
     if (pcCargando || fase !== '3d') return
     limpiarCablePC()
     bootPC = null
-    dibujarPantallaPC()   // apaga la pantalla del monitor (SIN SEÑAL)
+    dibujarPantallaPC()   
 
     if (!pcCarryGrp) {
         pcCarryGrp = new THREE.Group()
         scene.add(pcCarryGrp)
         PASOS.forEach(p => {
             const g = modelos3D[p.id]
-            if (g && g.visible) pcCarryGrp.attach(g)   // conserva transform mundial
+            if (g && g.visible) pcCarryGrp.attach(g)   
         })
-        // Recentra los hijos alrededor del origen del grupo y guarda su "casa"
-        // (el sitio en la mesa) para poder devolverla.
+
+
         const c = new THREE.Box3().setFromObject(pcCarryGrp).getCenter(new THREE.Vector3())
         pcCarryGrp.children.forEach(ch => ch.position.sub(c))
         pcCarryGrp.position.copy(c)
         pcCarryGrp.userData.homePos = c.clone()
-        // Semialtura (a escala 1) para apoyar la base al posarla en el banco.
+
         pcCarryGrp.updateWorldMatrix(true, true)
         const s0 = pcCarryGrp.scale.x
         pcCarryGrp.scale.setScalar(1)
@@ -2385,7 +2280,7 @@ function agarrarPC() {
     guiaBanco('Prueba de arranque', 'Llevas la PC ensamblada. Camina hasta el banco de pruebas (pared derecha), apúntalo con la mira y pulsa E para conectarla al monitor. Q para dejarla.')
 }
 
-// Cancela la carga: devuelve la PC a su sitio en la mesa central.
+
 function devolverPCaMesa() {
     if (!pcCargando || !pcCarryGrp) return
     pcCargando = false
@@ -2397,14 +2292,14 @@ function devolverPCaMesa() {
     guiaBanco('¡PC ensamblada con éxito!', 'Dejaste la PC en la mesa. Puedes volver a levantarla (E) para probarla en el banco.')
 }
 
-// Altura del origen de la PC para que su base quede apoyada en el banco.
+
 function alturaBaseBanco() {
     const topY = bancoPruebas ? bancoPruebas.topY : 0
     const halfY = (pcCarryGrp && pcCarryGrp.userData.halfY) || 0.85
     return topY + halfY * PC_BANCO_S + 0.01
 }
 
-// Posa la PC sobre el banco de pruebas y lanza el arranque.
+
 function colocarPCEnBanco() {
     if (!pcCargando || !pcCarryGrp || !pcBancoCfg) return
     pcCargando = false
@@ -2420,7 +2315,7 @@ function colocarPCEnBanco() {
     guiaBanco('Conectando al monitor…', 'La PC queda sobre el banco de pruebas. Conectando alimentación y video…')
 }
 
-// Cable simple PC→monitor (curva descendente entre ambos).
+
 function crearCablePC() {
     limpiarCablePC()
     if (!bancoPruebas || !pcCarryGrp) return
@@ -2440,7 +2335,7 @@ function limpiarCablePC() {
     if (cablePC) { scene.remove(cablePC); cablePC.geometry.dispose(); cablePC.material.dispose(); cablePC = null }
 }
 
-// Arranca la PC en el monitor: la secuencia depende de si el ensamble aprobó.
+
 function arrancarPC() {
     const aprobado = notaFinalSesion >= NOTA_MINIMA
     bootPC = { inicio: performance.now(), aprobado, beep: false, chime: false }
@@ -2452,7 +2347,7 @@ function arrancarPC() {
             : 'El POST falla y el monitor muestra un error: el ensamble no cumple el mínimo. Repasa el orden y las piezas, y vuelve a probar.'
     )
 
-    // Persistencia: registra la prueba de arranque en la BD una sola vez por sesión.
+
     if (!pruebaArranqueGuardada) {
         pruebaArranqueGuardada = true
         registrarEvento({
@@ -2462,24 +2357,21 @@ function arrancarPC() {
         marcarPruebaArranque({ exito: aprobado }).catch(() => {})
     }
 
-    // Prueba obligatoria: al terminar la secuencia de arranque en el monitor se
-    // cierra la simulación con el resumen (aprobado o no). Los arranques posteriores
-    // (al explorar el taller) ya no reabren el resumen.
     if (pruebaFinalPendiente) {
         pruebaFinalPendiente = false
-        const espera = aprobado ? 4600 : 3000   // deja ver el POST→escritorio o el POST ERROR
+        const espera = aprobado ? 4600 : 3000   
         setTimeout(() => { if (fase === '3d') mostrarFinal() }, espera)
     }
 }
 
-// Dibuja un fotograma del arranque en el monitor según el tiempo transcurrido.
+
 function dibujarPantallaPC() {
     if (!pantallaPCcanvas) return
     const c = pantallaPCcanvas
     const ctx = c.getContext('2d')
     const W = c.width, H = c.height
 
-    if (!bootPC) {                    // monitor en espera (apagado)
+    if (!bootPC) {                    
         ctx.fillStyle = '#05070c'; ctx.fillRect(0, 0, W, H)
         ctx.fillStyle = '#1c2733'; ctx.font = '16px "Segoe UI", sans-serif'
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
@@ -2492,7 +2384,7 @@ function dibujarPantallaPC() {
     ctx.textBaseline = 'alphabetic'
 
     if (!bootPC.aprobado) {
-        // Arranque fallido: intento de POST y pantalla de error.
+
         ctx.fillStyle = '#05070c'; ctx.fillRect(0, 0, W, H)
         if (el < 1.1) {
             if (!bootPC.beep && el > 0.25) { bootPC.beep = true; LFSound.beep(); setTimeout(() => LFSound.beep(), 180); setTimeout(() => LFSound.beep(), 360) }
@@ -2510,16 +2402,16 @@ function dibujarPantallaPC() {
             ctx.fillText('Codigo: 0x' + (0xE00 + erroresSesion).toString(16).toUpperCase() + '   Errores: ' + erroresSesion, W / 2, 196)
             ctx.fillStyle = '#8fa5bd'; ctx.font = '14px "Segoe UI", sans-serif'
             ctx.fillText('Revisa el orden y la elección de piezas, y vuelve a probar.', W / 2, 240)
-            // cursor parpadeante
+
             if (Math.floor(el * 2) % 2 === 0) { ctx.fillStyle = '#ef4444'; ctx.fillRect(W / 2 - 130, 270, 10, 18) }
         }
         pantallaPCtex.needsUpdate = true
         return
     }
 
-    // ── Arranque exitoso ──
+
     if (el < 2.4) {
-        // POST: logo + conteo de memoria + componentes detectados.
+
         ctx.fillStyle = '#05070c'; ctx.fillRect(0, 0, W, H)
         if (!bootPC.beep && el > 0.25) { bootPC.beep = true; LFSound.beep() }
         ctx.textAlign = 'left'
@@ -2535,7 +2427,7 @@ function dibujarPantallaPC() {
             ctx.fillText('  ✓ ' + PASOS[i].nombre + ' detectado', 22, 104 + i * 17)
         }
     } else if (el < 3.3) {
-        // Transición: cargando sistema.
+
         ctx.fillStyle = '#0b1524'; ctx.fillRect(0, 0, W, H)
         ctx.textAlign = 'center'
         ctx.font = 'bold 28px "Segoe UI", sans-serif'; ctx.fillStyle = '#3a8bff'
@@ -2548,31 +2440,29 @@ function dibujarPantallaPC() {
         ctx.strokeStyle = '#3a8bff'
         ctx.beginPath(); ctx.arc(W / 2, H / 2 + 52, 16, el * 6, el * 6 + Math.PI * 1.4); ctx.stroke()
     } else {
-        // Escritorio con "video" en bucle.
+
         if (!bootPC.chime) { bootPC.chime = true; LFSound.complete() }
         dibujarEscritorioPC(ctx, W, H, el - 3.3)
     }
     pantallaPCtex.needsUpdate = true
 }
 
-// Escritorio animado del sistema arrancado: fondo, ventana de "video" con una
-// forma de onda que reacciona, barra de tareas y reloj de sesión.
 function dibujarEscritorioPC(ctx, W, H, t) {
-    // Fondo degradado
+
     const grad = ctx.createLinearGradient(0, 0, 0, H)
     grad.addColorStop(0, '#0e2038'); grad.addColorStop(1, '#0a1424')
     ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H)
 
-    // Ventana de reproductor de video
+
     const vx = 40, vy = 34, vw = W - 80, vh = H - 110
     ctx.fillStyle = '#050a12'; ctx.fillRect(vx, vy, vw, vh)
     ctx.strokeStyle = '#1e3550'; ctx.lineWidth = 2; ctx.strokeRect(vx, vy, vw, vh)
-    // Barra de título del reproductor
+
     ctx.fillStyle = '#12233c'; ctx.fillRect(vx, vy, vw, 22)
     ctx.fillStyle = '#7fd4ff'; ctx.font = '12px "Segoe UI", sans-serif'; ctx.textAlign = 'left'
     ctx.fillText('▶ LogicFlow — demo de video', vx + 10, vy + 15)
 
-    // Forma de onda animada (el "video")
+
     ctx.save()
     ctx.beginPath(); ctx.rect(vx, vy + 22, vw, vh - 22); ctx.clip()
     const cy = vy + 22 + (vh - 22) / 2
@@ -2588,7 +2478,7 @@ function dibujarEscritorioPC(ctx, W, H, t) {
         ctx.stroke()
     }
     ctx.globalAlpha = 1
-    // Logo pulsante al centro del video
+
     const pr = 20 + Math.sin(t * 2.4) * 3
     ctx.fillStyle = 'rgba(58,139,255,0.16)'
     ctx.beginPath(); ctx.arc(vx + vw / 2, cy, pr + 12, 0, Math.PI * 2); ctx.fill()
@@ -2598,14 +2488,14 @@ function dibujarEscritorioPC(ctx, W, H, t) {
     ctx.textBaseline = 'alphabetic'
     ctx.restore()
 
-    // Barra de tareas
+
     ctx.fillStyle = '#0a1220'; ctx.fillRect(0, H - 34, W, 34)
     ctx.fillStyle = '#3a8bff'; ctx.beginPath(); ctx.arc(24, H - 17, 9, 0, Math.PI * 2); ctx.fill()
     ctx.fillStyle = '#eaf2ff'; ctx.font = 'bold 12px "Segoe UI", sans-serif'; ctx.textAlign = 'left'
     ctx.fillText('LF', 20, H - 13)
     ctx.fillStyle = '#4ade80'; ctx.font = '13px "Segoe UI", sans-serif'
     ctx.fillText('● Sistema estable', 48, H - 13)
-    // Reloj de sesión
+
     const total = Math.floor(t)
     const mm = String(Math.floor(total / 60)).padStart(2, '0')
     const ss = String(total % 60).padStart(2, '0')
@@ -2906,12 +2796,10 @@ function crearPlantas(grupo) {
         grupo.add(g)
         propsInteractivos.push(g)
     }
-    // Esquina frontal izquierda (la estantería real ocupa el fondo izquierdo).
+
     mkPlanta(SALA.xMin + 0.7, SALA.zMin + 0.9, 1.4)
     mkPlanta(SALA.xMax - 0.65, SALA.zMin + 0.7, 1.2)
 }
-
-
 
 function crearPanelPegboard(grupo) {
     const g = new THREE.Group()
@@ -3070,10 +2958,6 @@ function crearProps(grupo) {
     }
 }
 
-// Las fábricas de props del taller (meshEntre, crearLampara,
-// crearCajaHerramientas, crearDestornillador, crearTaza, crearBobinaCable)
-// viven ahora en ./juego-props.js — se importan al inicio del módulo.
-
 function construirIluminacion() {
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.28))
@@ -3114,13 +2998,7 @@ function crearMarcadores() {
         disco.userData = { id: paso.id }
         disco.renderOrder = 998
         grupo.add(disco)
-        // slotDiscs guarda el disco (no el grupo) para el raycasting de clics/E;
-        // toda la visibilidad del marcador se controla vía grupo.visible en otros
-        // ~15 sitios del archivo, así que replicamos ese valor aquí en vez de
-        // exponer disco.visible como una propiedad independiente que podría
-        // quedar en `true` mientras el marcador está oculto (raycaster.intersectObjects
-        // consulta object.visible directamente sobre los elementos del array, sin
-        // subir a comprobar la visibilidad de los ancestros).
+
         Object.defineProperty(disco, 'visible', {
             get: () => grupo.visible,
             set: v => { grupo.visible = v }
@@ -3195,9 +3073,7 @@ function optimizarMateriales(obj) {
         if (!n.isMesh) return
         n.castShadow = true
         n.receiveShadow = true
-        // Si la malla no tiene un 2º set de UV (uv1), forzamos los mapas al canal 0:
-        // algunos GLB del taller traen texCoord=1 en normal/AO sin TEXCOORD_1, lo que
-        // rompe la compilación del shader ("uv1 undeclared identifier").
+
         const sinUv1 = !n.geometry?.attributes?.uv1
         const mats = Array.isArray(n.material) ? n.material : [n.material]
         mats.forEach(m => {
@@ -3212,10 +3088,6 @@ function optimizarMateriales(obj) {
     })
 }
 
-// Barrido de escena: en mallas sin 2º set de UV (uv1), fuerza al canal 0 cualquier
-// mapa que apunte al canal 1. Cubre los meshes FUSIONADOS de la vitrina
-// (fusionarMallasEstante), que se crean después de optimizarMateriales y pueden
-// perder el uv1 dejando el normalMap en canal 1 → "uv1 undeclared" al compilar.
 function sanearCanalesUv(root = scene) {
     if (!root) return
     const claves = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']
@@ -3245,7 +3117,7 @@ function precargarModelos() {
     const marcarCargado = () => {
         cargados++
         setLoadingProgress(cargados, total)
-        sanearCanalesUv()   // corrige el normalMap del mesh fusionado de la vitrina
+        sanearCanalesUv()   
         pedirActualizarSombras()
         if (cargados >= total) { clearTimeout(safety); ocultarLoading() }
     }
@@ -3255,14 +3127,6 @@ function precargarModelos() {
         if (idx >= PASOS.length) return
         const paso = PASOS[idx++]
 
-        // GLTFLoader/fetch no traen timeout propio: en una red que "cuelga" la
-        // conexión sin cerrarla (wifi de laboratorio saturado, proxy que retiene
-        // la petición) ni onLoad ni onError se disparan nunca, y como siguiente()
-        // solo se re-invoca desde esos callbacks, TODOS los modelos restantes se
-        // quedan sin cargar para siempre — la pantalla del reto/laboratorio parece
-        // "colgada" cargando el simulador 3D. Igual que refreshSession() en
-        // supabase-config.js, acotamos cada modelo con su propio timeout y caemos
-        // al placeholder existente si se cumple, para que la cadena no se trabe.
         let resuelto = false
         const usarPlaceholder = () => {
             if (resuelto) return
@@ -3351,10 +3215,6 @@ function colocarModelo(paso, conAnimacion) {
 function animar() {
     requestAnimationFrame(animar)
 
-    // Ahorro de GPU/batería: solo renderizamos cuando el laboratorio 3D está
-    // realmente a la vista (no cubierto por los overlays de bienvenida/video/
-    // quiz/final) y con la pestaña activa. Mantenemos el reloj al día para no
-    // provocar un salto de delta al reanudar.
     if (fase !== '3d' || document.hidden) {
         relojWalk.getDelta()
         return
@@ -3365,8 +3225,6 @@ function animar() {
 
     if (mixers.length) for (const m of mixers) m.update(delta)
 
-    // Teardown del SSD: avanza suavemente ssdProg hacia ssdTarget (~1.1 s) y
-    // reubica las capas.
     if (ssdPartes && ssdProg !== ssdTarget) {
         const d = Math.min(Math.abs(ssdTarget - ssdProg), delta / 1.1)
         ssdProg += Math.sign(ssdTarget - ssdProg) * d
@@ -3430,8 +3288,6 @@ function animar() {
         heldMesh.rotation.set(camera.rotation.x + 0.18, camera.rotation.y, camera.rotation.z)
     }
 
-    // PC ensamblada cargada en brazos: se sostiene al frente, más abajo y
-    // pesada (bamboleo lento), siempre en vertical.
     if (pcCargando && pcCarryGrp && walkMode && camera) {
         camera.getWorldDirection(_scrFwd)
         _scrRight.crossVectors(_scrFwd, _UP).normalize()
@@ -3442,7 +3298,7 @@ function animar() {
         pcCarryGrp.rotation.set(0, camera.rotation.y, 0)
     }
 
-    // Traslado de la PC (mesa→banco o banco→mesa).
+
     if (pcTween && pcCarryGrp) {
         pcTween.t += delta / pcTween.dur
         const k = Math.min(1, pcTween.t)
@@ -3454,7 +3310,7 @@ function animar() {
         if (k >= 1) { const al = pcTween.alBanco; pcTween = null; if (al) arrancarPC() }
     }
 
-    // Arranque en el monitor de la estación de pruebas.
+
     if (bootPC && (frameCount & 1) === 0) dibujarPantallaPC()
 
     frameCount++
@@ -3479,14 +3335,8 @@ function resizeRenderer() {
     renderer.setSize(w, h, false)
 }
 
-// Toast de logro en pantalla desactivado: los logros se siguen otorgando y
-// guardando, pero no se muestra ninguna notificación que tape la interacción.
 function notificarLogro(texto, icono = '🏅') {}
 
-// Señal de error MUY notoria y transitoria para cualquier movimiento erróneo:
-// encierra el visor 3D en un marco rojo, muestra una ✕ grande al centro, suena el
-// tono de error y vibra en móvil. No bloquea la interacción (pointer-events:none)
-// y se autodestruye (~1s). Es el reemplazo visible de los avisos que se quitaron.
 let _errFxCSS = false
 function mostrarErrorVisual(mensaje = '') {
     LFSound.error()
@@ -3540,15 +3390,11 @@ function leerProgresoLocal() {
 }
 
 function guardarProgresoLocal(id) {
-    // El setItem va en try/catch: si el navegador bloquea localStorage (modo
-    // privado, datos de sitio bloqueados por política, cuota llena) NO debe
-    // reventar el avance del ensamble. Antes, esta excepción cortaba
-    // finalizarPaso antes de indiceActual++ y la pieza quedaba "sin instalar"
-    // (el simulador volvía a pedir el mismo componente).
+
     try {
         const arr = leerProgresoLocal()
         if (!arr.includes(id)) { arr.push(id); localStorage.setItem(LS_KEY, JSON.stringify(arr)) }
-    } catch (_) { /* progreso local no disponible; el avance en memoria sigue */ }
+    } catch (_) {  }
 }
 
 function limpiarProgresoLocal() {
@@ -3557,11 +3403,6 @@ function limpiarProgresoLocal() {
 
 const LS_STATS_KEY = 'lf_stats'
 
-// bootDone = ya se completó la prueba de arranque obligatoria (solo mostrarFinal()
-// lo pasa en true). Se guarda en cada paso, no solo al final: si el estudiante
-// recarga entre instalar la última pieza y terminar la prueba de arranque, initGame()
-// necesita saber que la nota de esta sesión (errores/demoras) es real y que el
-// arranque sigue pendiente, en vez de asumir 0 errores y saltárselo.
 function guardarStatsLocal(bootDone = false) {
     try {
         localStorage.setItem(LS_STATS_KEY, JSON.stringify({
@@ -3570,7 +3411,7 @@ function guardarStatsLocal(bootDone = false) {
             tiempoMs: Date.now() - labStartTime,
             bootDone
         }))
-    } catch (_) { /* stats locales opcionales; no debe cortar el flujo */ }
+    } catch (_) {  }
 }
 
 function leerStatsLocal() {
@@ -3702,10 +3543,6 @@ function actualizarNotaReto() {
     if (txt) txt.textContent = 'Puntaje del reto'
 }
 
-// Lista ordenada de pasos de la fase reparación, con su estado (done/current/
-// pending), para el panel lateral. Es la guía principal del jugador: droneHabla
-// y setHint son no-op (ver notificaciones eliminadas), así que este checklist
-// tiene que bastar por sí solo.
 function pasosReparacionUI(M, paso) {
     if (M.reto.componenteFalla === 'cpu') {
         const orden = ['retirar-cooler', 'reemplazar-cpu', 'aplicar-pasta', 'montar-cooler']
@@ -3831,12 +3668,8 @@ function diagnosticarReto(id) {
         ocultarMultimetroReadout()
         PASOS.forEach(p => { if (p.marker) p.marker.visible = false })
 
-        // Oculta la falla y, si hace falta desmontar piezas para acceder a ella
-        // (todo lo del gabinete, o lo montado en la placa), también se ocultan.
         M.dependientes = dependientesDe(id)
-        // Se recuerda qué ids deben permanecer ocultos aunque su modelo termine
-        // de cargar recién ahora (carrera entre precargarModelos, que muestra
-        // todo lo "ya instalado", y este diagnóstico); ver debeOcultarsePorReto.
+
         M.ocultos = new Set([id, ...M.dependientes])
         const m = modelos3D[id]
         if (m) m.visible = false
@@ -3846,9 +3679,7 @@ function diagnosticarReto(id) {
         appendLog(`✓ Diagnóstico correcto: ${paso.nombre}. Pieza retirada.`, 'success')
 
         if (id === 'cpu') {
-            // El disipador cubre el CPU: hay que retirarlo primero (ya se ocultó
-            // arriba) antes de poder cambiar el procesador, y al remontarlo hace
-            // falta pasta térmica nueva.
+
             M.subpaso = 'retirar-cooler'
             const cooler = PASOS.find(p => p.id === 'cooler')
             if (cooler?.marker) { cooler.marker.visible = true; cooler.marker.userData.intenso = true }
@@ -3871,9 +3702,6 @@ function diagnosticarReto(id) {
     }
 }
 
-// ── Fase 2C: multímetro de diagnóstico ──────────────────────────────────────
-// Riel/voltaje nominal esperado por componente (con un decimal realista para que
-// parezca una lectura de instrumento). Los cables/switch se miden por continuidad.
 const RIELES = {
     power:   { et: 'Riel principal (+12 V)',     v: 12.09, u: 'V' },
     mb:      { et: 'Standby +5 V (5VSB)',        v: 5.04,  u: 'V' },
@@ -3888,18 +3716,8 @@ const RIELES = {
     case:    { et: 'Botón de encendido',         cont: true }
 }
 
-// Falla eléctrica = la fuente no entrega energía → TODO el sistema mide 0 V. Es el
-// caso donde el multímetro es decisivo; en fallas térmicas/lógicas/de VRAM los
-// voltajes salen normales (y eso también es un dato: la avería no es eléctrica).
 function esFallaElectricaReto(M) { return !!M && M.reto.componenteFalla === 'power' }
 
-// Componentes que hay que retirar temporalmente para acceder al que se está
-// reparando (van montados encima o dentro de él). Se ocultan junto con la
-// falla y se restauran (con animación de caída) al terminar la reparación —
-// evita que queden "flotando" sin soporte cuando la falla es el gabinete o
-// la placa base. El CPU es un caso aparte: el disipador se retira/remonta
-// como un paso interactivo propio (ver retirarCoolerReto/montarCoolerReto),
-// no automáticamente.
 const DEPENDIENTES_REPARACION = {
     case: PASOS.filter(p => p.id !== 'case').map(p => p.id),
     mb:   ['cpu', 'cooler', 'ram', 'storage', 'sata', 'gpu'],
@@ -3907,12 +3725,6 @@ const DEPENDIENTES_REPARACION = {
 }
 function dependientesDe(id) { return DEPENDIENTES_REPARACION[id] || [] }
 
-// precargarModelos muestra automáticamente todo lo "ya instalado" (idx <
-// indiceActual) en cuanto cada GLB termina de cargar — pero en modo reto
-// TOTAL ya está instalado desde el inicio (indiceActual=TOTAL), así que una
-// pieza que siga cargando cuando el jugador ya diagnosticó la falla (rápido,
-// o con conexión lenta) reaparecería sola encima del diagnóstico. M.ocultos
-// es la fuente de verdad de qué debe seguir oculto ahora mismo.
 function debeOcultarsePorReto(pasoId) {
     return !!(modoReto && modoReto.ocultos && modoReto.ocultos.has(pasoId))
 }
@@ -3994,20 +3806,11 @@ function toggleMultimetroReto() {
     renderPanelReto()
 }
 
-// onClic del prop multímetro: dentro de un reto (inspección) alterna el modo
-// medición; fuera de un reto solo explica su uso.
 function clicMultimetro() {
     if (modoReto && modoReto.fase === 'inspeccion') { toggleMultimetroReto(); return }
     droneHabla('Multímetro digital: mide voltajes para diagnosticar la fuente y detectar componentes sin energía. Se usa en los retos de reparación.')
 }
 
-// ── Fase reparación: helpers compartidos por clicReto (mouse/órbita) e
-// interactuarEReto (tecla E/caminar) ─────────────────────────────────────────
-
-// Toma de la vitrina el repuesto de la pieza dañada. Al caminar, se muestra en
-// la mano con el mismo aparato visual que en el ensamblaje normal
-// (agarrarComponente); en modo órbita se mantiene el flag simple, igual que la
-// selección de componentes fuera de reto.
 function tomarRepuestoReto(pasoId) {
     const M = modoReto
     const fallaId = M.reto.componenteFalla
@@ -4030,10 +3833,6 @@ function tomarRepuestoReto(pasoId) {
     renderPanelReto()
 }
 
-// Clic/E sobre un disco luminoso en fase reparación. Despacha según a cuál
-// corresponde: el de la falla (instala el repuesto), o el del disipador
-// durante la secuencia especial de CPU (retirarlo / volver a montarlo).
-// Devuelve true si consumió la interacción.
 function clicDiscoReto(dHits) {
     const M = modoReto
     const fallaId = M.reto.componenteFalla
@@ -4050,8 +3849,6 @@ function clicDiscoReto(dHits) {
     return true
 }
 
-// Clic/E sobre un prop interactivo (herramientas, multímetro…). Devuelve true
-// si consumió la interacción.
 function clicPropReto(hits) {
     if (!hits.length) return false
     let obj = hits[0].object
@@ -4102,8 +3899,8 @@ function instalarReemplazoReto() {
     appendLog(`${paso.nombre} reemplazado.`, 'success')
 
     if (M.reto.componenteFalla === 'cpu') {
-        // No se finaliza todavía: falta reaplicar pasta térmica y remontar el
-        // disipador antes de encender la PC.
+
+
         M.subpaso = 'aplicar-pasta'
         droneHabla('¡Procesador nuevo instalado! Antes de montar el disipador, aplica pasta térmica nueva: haz clic en la jeringa junto a la mesa de herramientas.')
         setHint('<strong>CPU instalado.</strong> Aplica pasta térmica nueva: clic en la jeringa de pasta.')
@@ -4114,8 +3911,6 @@ function instalarReemplazoReto() {
     finalizarInstalacionReto()
 }
 
-// Retira el disipador (fase reparación de CPU, subpaso 'retirar-cooler'):
-// avanza a "toma el CPU nuevo" y revela su disco.
 function retirarCoolerReto() {
     const M = modoReto
     LFSound.click()
@@ -4129,9 +3924,6 @@ function retirarCoolerReto() {
     renderPanelReto()
 }
 
-// onClic de la jeringa de pasta térmica: solo actúa durante el subpaso
-// 'aplicar-pasta' de una reparación de CPU; el resto del tiempo solo explica
-// su uso (igual que el resto de herramientas del taller).
 function clicPastaTermica() {
     const M = modoReto
     if (M && M.fase === 'reparacion' && M.reto.componenteFalla === 'cpu' && M.subpaso === 'aplicar-pasta') {
@@ -4148,8 +3940,6 @@ function clicPastaTermica() {
     droneHabla('Pasta térmica: se aplica una gota del tamaño de un guisante sobre el CPU. Rellena los microporos y conduce el calor al disipador.')
 }
 
-// Vuelve a montar el disipador (fase reparación de CPU, subpaso
-// 'montar-cooler', ya con pasta nueva aplicada) y cierra la reparación.
 function montarCoolerReto() {
     const M = modoReto
     ocultarMarcador('cooler')
@@ -4159,8 +3949,6 @@ function montarCoolerReto() {
     finalizarInstalacionReto()
 }
 
-// Cierra la fase de reparación: remonta (con animación de caída) las piezas
-// que se ocultaron para acceder a la falla y programa el encendido final.
 function finalizarInstalacionReto() {
     const M = modoReto
     M.fase = 'final'
@@ -4169,7 +3957,7 @@ function finalizarInstalacionReto() {
 
     const deps = M.dependientes || []
     deps.forEach(dId => {
-        // El disipador de la secuencia CPU ya se remontó a mano (montarCoolerReto).
+
         if (M.reto.componenteFalla === 'cpu' && dId === 'cooler') return
         const dPaso = PASOS.find(p => p.id === dId)
         if (dPaso) colocarModelo(dPaso, true)
@@ -4198,15 +3986,12 @@ async function finalizarReto() {
 
     const guardado = await guardarResultadoReto(resultado)
     let logrosNuevos = []
-    // Sin guardado no hay nada que otorgar: mostrar insignias "desbloqueadas" que
-    // nunca se persistieron confundiría al estudiante (parecerían ganadas y no lo están).
+
+
     if (guardado) {
         try {
             const resultados = await obtenerResultadosRetos()
 
-            // null = el GET falló (aunque el POST ya tuvo éxito): usamos este intento
-            // como mejor estimación. [] = el servidor confirmó que no hay filas; se
-            // respeta tal cual en vez de inventar historial.
             const historial = resultados === null ? [{
                 reto_id: r.id, nota, exito,
                 errores_diagnostico: M.erroresDiag, pistas_usadas: M.pistasUsadas, segundos
@@ -4309,14 +4094,12 @@ async function initGame() {
         initMotor3D()
         motorListo = true
         if (savedStats?.bootDone) {
-            // Sesión ya completada en una visita anterior: se muestra el resumen con
-            // la nota definitiva (la prueba de arranque ya se hizo en su momento).
+
+
             await calcularNotaFinal()
             mostrarFinal()
         } else {
-            // Se instaló todo pero la pestaña se cerró/recargó antes de terminar la
-            // prueba de arranque obligatoria (o antes de que existiera lf_stats):
-            // no saltarse el requisito. iniciarPruebaFinal() ya recalcula la nota.
+
             iniciarPruebaFinal()
         }
         return
@@ -4411,9 +4194,7 @@ document.getElementById('walk-start-btn')?.addEventListener('click', () => {
 })
 
 window.addEventListener('keydown', (e) => {
-    // Ignora la auto-repetición del SO al mantener una tecla presionada: sin esto,
-    // KeyE dispara interactuarE() muchas veces por segundo mientras se mantiene
-    // pulsada, pudiendo reentrar en una instalación ya en curso.
+
     if (e.repeat) return
     switch (e.code) {
         case 'KeyW': case 'ArrowUp':    if (walkMode) teclas.w = true; break
@@ -4443,10 +4224,8 @@ window.addEventListener('keyup', (e) => {
 document.addEventListener('DOMContentLoaded', async () => {
     const session = await protegerRuta()
     if (!session) return
-    // Requisito pedagógico: el laboratorio 3D (ensamble y retos) exige completar
-    // la Academia con buena calificación. Se baja la nota del servidor primero
-    // para que el requisito valga entre dispositivos; sin red decide lo local.
-    try { await sincronizarAcademia() } catch (e) { /* offline: usamos lo local */ }
+
+    try { await sincronizarAcademia() } catch (e) {  }
     if (!academiaAprobada()) {
         window.location.replace('academia.html?bloqueo=sim')
         return

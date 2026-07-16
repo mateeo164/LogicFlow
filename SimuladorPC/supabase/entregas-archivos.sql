@@ -1,26 +1,6 @@
--- ============================================================
--- LogicFlow · Entregas con ARCHIVO (PDF) — MIGRACIÓN
--- Ejecutar UNA vez en Supabase → SQL Editor, DESPUÉS de tutor-setup.sql.
---
--- Añade a la entrega del estudiante un archivo adjunto (PDF u otro):
---   1) Columnas archivo_path / archivo_nombre en lf_entregas.
---   2) lf_entregar_tarea() ahora acepta el archivo subido.
---   3) lf_mis_tareas() / lf_resumen_tarea() devuelven el archivo.
---   4) Bucket privado de Storage "entregas" + políticas RLS:
---        · el estudiante sube/lee SOLO sus propios archivos,
---        · el tutor de la tarea puede leerlos (para calificarlos).
---
--- Es seguro correrlo varias veces.
--- ============================================================
-
-
--- ---------- 1) COLUMNAS NUEVAS ----------
 alter table public.lf_entregas add column if not exists archivo_path   text;
 alter table public.lf_entregas add column if not exists archivo_nombre text;
 
-
--- ---------- 2) HELPER: ¿puede el usuario entregar esta tarea? ----------
--- (está inscrito en la clase de la tarea). SECURITY DEFINER para saltar RLS.
 create or replace function public.lf_puede_entregar_tarea(p_tarea_id uuid)
 returns boolean language plpgsql security definer stable set search_path = public as $$
 begin
@@ -32,12 +12,6 @@ begin
 end;
 $$;
 
-
--- ---------- 2b) HELPER: ¿sigue vigente la fecha límite de la tarea? ----------
--- lf_entregar_tarea() ya rechaza la entrega si vence_at pasó, pero la política
--- de Storage "lf_entregas_subir" solo validaba inscripción: un estudiante podía
--- seguir subiendo/reemplazando el archivo después del vencimiento aunque no
--- pudiera marcar entregada=true. SECURITY DEFINER para saltar RLS.
 create or replace function public.lf_tarea_vigente(p_tarea_id uuid)
 returns boolean language plpgsql security definer stable set search_path = public as $$
 begin
@@ -48,9 +22,6 @@ begin
 end;
 $$;
 
-
--- ---------- 3) RPC: entregar (con archivo opcional) ----------
--- Se cambia la firma, así que hay que borrar la versión anterior primero.
 drop function if exists public.lf_entregar_tarea(uuid) cascade;
 
 create or replace function public.lf_entregar_tarea(
@@ -69,13 +40,11 @@ begin
         raise exception 'No perteneces a la clase de esta tarea';
     end if;
 
-    -- Fecha límite: si ya pasó, no se puede entregar.
     select vence_at into v_vence from public.lf_tareas where id = p_tarea_id;
     if v_vence is not null and now() > v_vence then
         raise exception 'La fecha límite ya pasó. La tarea no se puede entregar.';
     end if;
 
-    -- Archivo obligatorio: debe venir uno nuevo o existir uno previo.
     select archivo_path into v_archivo_prev
         from public.lf_entregas where tarea_id = p_tarea_id and estudiante_id = auth.uid();
     if p_archivo_path is null and v_archivo_prev is null then
@@ -89,7 +58,6 @@ begin
     on conflict (tarea_id, estudiante_id) do update set
         entregada      = true,
         entregada_at   = now(),
-        -- si esta entrega trae archivo lo reemplaza; si no, conserva el anterior
         archivo_path   = coalesce(excluded.archivo_path,   public.lf_entregas.archivo_path),
         archivo_nombre = coalesce(excluded.archivo_nombre, public.lf_entregas.archivo_nombre),
         updated_at     = now()
@@ -98,9 +66,6 @@ begin
 end;
 $$;
 
-
--- ---------- 4) RPCs de lectura (añaden el archivo) ----------
--- Devuelven columnas nuevas → hay que borrarlas y recrearlas.
 drop function if exists public.lf_resumen_tarea(uuid) cascade;
 
 create or replace function public.lf_resumen_tarea(p_tarea_id uuid)
@@ -157,20 +122,15 @@ begin
 end;
 $$;
 
-
--- ---------- 5) STORAGE: bucket privado + políticas ----------
--- Bucket "entregas" (privado). Ruta de cada archivo: {tarea_id}/{estudiante_id}/{nombre}
 insert into storage.buckets (id, name, public)
 values ('entregas', 'entregas', false)
 on conflict (id) do nothing;
 
--- Limpieza de políticas previas (por si se re-ejecuta).
 drop policy if exists "lf_entregas_subir"     on storage.objects;
 drop policy if exists "lf_entregas_actualizar" on storage.objects;
 drop policy if exists "lf_entregas_leer"       on storage.objects;
 drop policy if exists "lf_entregas_borrar"     on storage.objects;
 
--- El estudiante SUBE archivos solo bajo su propia carpeta y a tareas suyas.
 create policy "lf_entregas_subir" on storage.objects
     for insert to authenticated
     with check (
@@ -180,7 +140,6 @@ create policy "lf_entregas_subir" on storage.objects
         and public.lf_tarea_vigente(((storage.foldername(name))[1])::uuid)
     );
 
--- Reemplazar (upsert) su propio archivo.
 create policy "lf_entregas_actualizar" on storage.objects
     for update to authenticated
     using (
@@ -193,7 +152,6 @@ create policy "lf_entregas_actualizar" on storage.objects
         and public.lf_tarea_vigente(((storage.foldername(name))[1])::uuid)
     );
 
--- LEER: el dueño (estudiante) o el tutor de la tarea.
 create policy "lf_entregas_leer" on storage.objects
     for select to authenticated
     using (
@@ -204,7 +162,6 @@ create policy "lf_entregas_leer" on storage.objects
         )
     );
 
--- BORRAR: el propio estudiante (para reemplazar su entrega).
 create policy "lf_entregas_borrar" on storage.objects
     for delete to authenticated
     using (
@@ -212,14 +169,10 @@ create policy "lf_entregas_borrar" on storage.objects
         and (storage.foldername(name))[2] = auth.uid()::text
     );
 
-
--- ---------- 6) PERMISOS ----------
 grant execute on function public.lf_puede_entregar_tarea(uuid)          to authenticated;
 grant execute on function public.lf_tarea_vigente(uuid)                 to authenticated;
 grant execute on function public.lf_entregar_tarea(uuid, text, text)    to authenticated;
 grant execute on function public.lf_resumen_tarea(uuid)                 to authenticated;
 grant execute on function public.lf_mis_tareas()                        to authenticated;
 
-
--- ---------- 7) Refrescar la caché de la API ----------
 notify pgrst, 'reload schema';

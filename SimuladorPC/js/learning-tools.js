@@ -43,9 +43,6 @@ export function calculateWattage({ cpuId, gpuId, ramSticks = 2, ssds = 1, hdds =
   const recommended = Math.ceil(total * 1.2 / 50) * 50
   const totalR = Math.round(total)
 
-  // Eficiencia 80 Plus: fracción del consumo (DC) que la fuente entrega respecto
-  // a la energía (AC) que toma de la pared. Una fuente MENOS eficiente toma MÁS
-  // energía de la pared para entregar el mismo consumo; el resto se pierde en calor.
   const EFF = { bronze: 0.82, silver: 0.85, gold: 0.90, platinum: 0.92 }
   const desdePared = (pct) => {
     const pared = Math.round(totalR / pct)
@@ -65,8 +62,6 @@ export function calculateWattage({ cpuId, gpuId, ramSticks = 2, ssds = 1, hdds =
   }
 }
 
-// Estima el costo eléctrico mensual a partir de la potencia real tomada de la pared.
-// Precio referencial residencial en Ecuador ≈ 0,10 USD/kWh.
 export function estimarCostoMensual(wattsDesdePared, horasDia = 4, precioKwh = 0.10) {
   const kwhMes = (wattsDesdePared / 1000) * horasDia * 30
   return {
@@ -218,9 +213,6 @@ export const GLOSARIO = [
   }
 ]
 
-// Quita tildes/diacríticos para que buscar "energia" encuentre "Energía", etc.
-// Sin esto, cualquier término escrito sin acento (muy común al teclear rápido)
-// devolvía 0 resultados aunque la entrada existiera con el nombre casi idéntico.
 function normalizar(s) {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 }

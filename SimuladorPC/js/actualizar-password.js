@@ -16,8 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSubmit = form?.querySelector('button[type="submit"]')
     const TEXTO_BTN = 'Guardar nueva contraseña'
 
-    // Si el enlace es de confirmación de cuenta (type=signup) y no de recuperación,
-    // no corresponde mostrar el cambio de contraseña: redirigir a la página de éxito.
     if (obtenerTipoDesdeHash() === 'signup') {
         window.location.replace(RUTA_CONFIRMAR_CUENTA + window.location.hash)
         return
@@ -43,8 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const password = document.getElementById('password')?.value || ''
         return validarConfirmacion(password, valor)
     })
-    // Si el usuario ya escribió la confirmación y vuelve a editar la contraseña,
-    // revalida la confirmación en vez de dejarla "sin error" aunque ya no coincidan.
     document.getElementById('password')?.addEventListener('input', () => {
         const confirmInput = document.getElementById('confirm_password')
         if (confirmInput?.value) confirmInput.dispatchEvent(new Event('blur'))
@@ -92,9 +88,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 'success'
             )
             limpiarSesion()
-            // El botón queda deshabilitado a propósito: reactivarlo permitía reenviar el
-            // formulario en la ventana de 2.2s antes del redirect, ya sin sesión (recién
-            // limpiada), mostrando "debes iniciar sesión nuevamente" encima del éxito.
             setTimeout(() => { window.location.href = 'login.html' }, 2200)
         } catch (err) {
             setBotonCargando(btnSubmit, false, TEXTO_BTN, 'Guardar nueva contraseña')

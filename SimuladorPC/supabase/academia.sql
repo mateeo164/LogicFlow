@@ -1,27 +1,8 @@
--- academia.sql
--- Persiste el progreso de la ACADEMIA (capa de teoría/lecciones) en la misma fila
--- de progreso_usuario que ya usan el laboratorio y la comprensión. Así el avance
--- del estudiante en las lecciones se sincroniza entre dispositivos y queda disponible
--- para el panel del docente.
---
--- Idempotente. Ejecútalo en el SQL Editor de Supabase.
--- Requiere que ya existan tutor-setup.sql, logros-certificado.sql y pedagogia-coherencia.sql.
-
--- =========================================================
--- 1) progreso_usuario: lecciones completadas de la Academia
--- =========================================================
 alter table public.progreso_usuario
-    add column if not exists academia_lecciones     jsonb default '[]'::jsonb,  -- ids de lección completados
-    add column if not exists academia_completadas    integer default 0,          -- nº de lecciones (derivado, para consultas rápidas)
-    add column if not exists academia_actualizado_at  timestamptz;               -- última vez que avanzó en la Academia
+    add column if not exists academia_lecciones     jsonb default '[]'::jsonb,
+    add column if not exists academia_completadas    integer default 0,
+    add column if not exists academia_actualizado_at  timestamptz;
 
--- Nota: las políticas RLS existentes de progreso_usuario (select/insert/update
--- del propio user_id) ya cubren estas columnas. No hace falta política nueva.
-
--- =========================================================
--- 2) Resumen de clase: se añade "Academia" (nº de lecciones completadas)
---    Reemplaza la función de pedagogia-coherencia.sql con una columna nueva al final.
--- =========================================================
 drop function if exists public.lf_tutor_resumen_clase(uuid) cascade;
 
 create or replace function public.lf_tutor_resumen_clase(p_clase_id uuid)

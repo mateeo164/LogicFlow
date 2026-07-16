@@ -1,9 +1,3 @@
-// Función serverless de Vercel para el tutor IA (Gemini) del laboratorio 3D.
-// Vercel es serverless: no ejecuta server.cjs (ese solo corre con `npm start`
-// en Render/Railway/local). Este archivo es el equivalente para Vercel —
-// mismo endpoint (/api/tutor-chat), misma lógica; si cambias una, cambia la otra.
-// Detección automática: cualquier archivo bajo /api/ se vuelve una función,
-// sin necesidad de vercel.json.
 import { GoogleGenAI } from '@google/genai'
 
 const TUTOR_MODEL = 'gemini-2.5-flash'
@@ -15,9 +9,6 @@ No reveles directamente la respuesta de un quiz o de un diagnóstico de falla: d
 
 const TUTOR_RATE_WINDOW_MS = 60_000
 const TUTOR_RATE_MAX = 15
-// Nota: en Vercel cada instancia de función tiene su propia memoria, así que
-// este límite es "mejor esfuerzo" por instancia, no un límite global exacto
-// (igual que en server.cjs, pero ahí sí hay un único proceso).
 const tutorRateBuckets = new Map()
 
 function tutorRateLimitado(ip) {

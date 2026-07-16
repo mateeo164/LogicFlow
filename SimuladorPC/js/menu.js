@@ -118,8 +118,6 @@ function renderProgreso(progreso, retosSuperados = 0) {
     const tiempoSeg = progreso?.tiempo_total_segundos || 0
     const ultimaAct = progreso?.updated_at || null
 
-    // El progreso general del simulador web = ensamble de componentes + retos superados.
-    // Para llegar al 100% hay que instalar todos los componentes Y aprobar todos los retos.
     const totalRetos = RETOS.length
     const retosOk = Math.min(retosSuperados, totalRetos)
     const unidadesTotales = total + totalRetos
@@ -217,7 +215,6 @@ function renderRecomendacion(progreso, resumenRetos) {
             btn.href = reco.accion.href
             btn.style.display = ''
         } else {
-            // Las recomendaciones móviles no tienen enlace web: solo el mensaje.
             btn.style.display = 'none'
         }
     }
@@ -365,10 +362,6 @@ function renderNotasCertificado(progreso, logros = [], resultados = [], summary 
     setEl('nota-retos-mejor', mejor === null ? '—' : `${mejor.toFixed(1)}/10`)
     setEl('nota-retos-superados', `${superados} de ${RETOS.length} retos superados`)
 
-    // Usa el mismo conteo que la grilla de insignias (getProgressSummary.unlockedCount:
-    // BADGES computadas + logros_usuario), no solo logros.length (que es nada más lo
-    // que hay en la tabla logros_usuario) — así el bono mostrado aquí coincide con
-    // "X de 24 insignias desbloqueadas" que se ve arriba en el mismo dashboard.
     const cantidadLogros = summary ? summary.unlockedCount : logros.length
     const bono = summary ? summary.bono : bonoPorLogros(cantidadLogros)
     setEl('nota-bono', `+${bono.toFixed(2)}`)
@@ -421,10 +414,6 @@ function limpiarMensajeModal() {
     if (el) el.setAttribute('hidden', '')
 }
 
-// Pinta la barra grande del recorrido: Academia → Simulador → Retos, con el
-// estado, el % y la nota de cada etapa, más la nota final y si ya se puede
-// continuar en la app móvil. Se llama con lo local al instante y de nuevo tras
-// sincronizar con el servidor (por si otro dispositivo aportó más avance).
 function renderRecorrido(progreso, resumenRetos = {}) {
     const r = calcularRecorrido({ estadoAcademia: estadoAcademia(), progreso: progreso || {}, resumenRetos, retos: RETOS })
 
@@ -470,8 +459,6 @@ function renderRecorrido(progreso, resumenRetos = {}) {
     }
 }
 
-// Bloquea el botón "Ir al laboratorio 3D" hasta que la Academia esté aprobada
-// (todas las lecciones + buena calificación en los mini-quiz).
 function renderCandadoLaboratorio() {
     const btn = document.getElementById('btn-laboratorio')
     if (!btn) return
@@ -522,7 +509,6 @@ async function init() {
     const esTutor = (user?.user_metadata?.rol || 'Estudiante').toLowerCase() === 'tutor'
 
     if (esTutor) {
-
         initTutorPanel()
     } else {
         const [progreso, logros, resultadosRetosCrudos] = await Promise.all([
@@ -530,7 +516,7 @@ async function init() {
             obtenerLogrosUsuario(),
             obtenerResultadosRetos()
         ])
-        const resultadosRetos = resultadosRetosCrudos || []   // null = falló la petición, no "sin intentos"
+        const resultadosRetos = resultadosRetosCrudos || []
 
         const resumenRetos = resumirResultados(resultadosRetos)
         const retosSuperados = RETOS.filter(r => resumenRetos[r.id]?.exito).length
@@ -538,8 +524,6 @@ async function init() {
         renderProgreso(progreso, retosSuperados)
         renderRetosBanner(retosSuperados)
         renderRecomendacion(progreso, resumenRetos)
-        // Offline-first: pinta con lo local al instante y corrige si el servidor
-        // trae una nota más alta (p. ej. la Academia se hizo en otro dispositivo).
         renderCandadoLaboratorio()
         renderRecorrido(progreso, resumenRetos)
         sincronizarAcademia().then(() => {
@@ -551,11 +535,6 @@ async function init() {
         renderEstadisticas(estadisticas)
 
         renderAchievements(progreso, estadisticas, logros)
-        // Mismo cálculo que usa la grilla de insignias (getProgressSummary): antes
-        // el bono de "Notas y certificado" salía de logros.length (solo lo que hay
-        // en la tabla logros_usuario, ~7 insignias) mientras la grilla de arriba
-        // cuenta hasta 24 (BADGES computadas + logros_usuario) — mismo estudiante,
-        // dos conteos distintos en el mismo dashboard.
         renderNotasCertificado(progreso, logros, resultadosRetos, getProgressSummary(progreso, estadisticas, logros))
 
         initClasesEstudiante()

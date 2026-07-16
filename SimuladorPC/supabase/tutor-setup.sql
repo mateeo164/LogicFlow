@@ -1,21 +1,3 @@
--- ============================================================
--- LogicFlow · Rol de Tutor — SETUP COMPLETO (clases + tareas)
--- Ejecutar UNA sola vez en Supabase → SQL Editor.
---
--- Este archivo es AUTOSUFICIENTE y RESETEA todo lo del tutor:
---   1) Borra las tablas/funciones lf_* anteriores (y con ellas las
---      políticas RLS recursivas que causaban el error
---      "infinite recursion detected in policy").
---   2) Las recrea desde cero con el diseño correcto:
---      políticas que usan funciones SECURITY DEFINER en plpgsql
---      (nunca se "inlinean", así que rompen la recursión de forma segura).
---
--- Todo usa el prefijo lf_ para no chocar con otras tablas del proyecto.
--- Es seguro correrlo varias veces.
--- ============================================================
-
-
--- ---------- 0) LIMPIEZA (borra el estado anterior) ----------
 drop table if exists public.lf_entregas       cascade;
 drop table if exists public.lf_tareas         cascade;
 drop table if exists public.lf_inscripciones  cascade;
@@ -32,8 +14,6 @@ drop function if exists public.lf_calificar_entrega(uuid, uuid, numeric, text) c
 drop function if exists public.lf_resumen_tarea(uuid)                        cascade;
 drop function if exists public.lf_mis_tareas()                              cascade;
 
-
--- ---------- 1) TABLAS ----------
 create table public.lf_clases (
     id         uuid primary key default gen_random_uuid(),
     tutor_id   uuid not null references auth.users(id) on delete cascade,
@@ -74,11 +54,6 @@ create table public.lf_entregas (
     primary key (tarea_id, estudiante_id)
 );
 
-
--- ---------- 2) HELPERS SECURITY DEFINER (rompen la recursión) ----------
--- En plpgsql para que Postgres NUNCA los "inline" y así siempre corran como
--- owner (saltando RLS). Si una política de lf_clases consultara lf_inscripciones
--- con un EXISTS directo (y viceversa), entrarían en recursión infinita.
 create or replace function public.lf_es_tutor_de(p_clase_id uuid)
 returns boolean language plpgsql security definer stable set search_path = public as $$
 begin
@@ -104,20 +79,16 @@ begin
 end;
 $$;
 
-
--- ---------- 3) RLS ----------
 alter table public.lf_clases        enable row level security;
 alter table public.lf_inscripciones enable row level security;
 alter table public.lf_tareas        enable row level security;
 alter table public.lf_entregas      enable row level security;
 
--- lf_clases
 create policy "lf_clases_tutor_all" on public.lf_clases
     for all using (auth.uid() = tutor_id) with check (auth.uid() = tutor_id);
 create policy "lf_clases_estudiante_select" on public.lf_clases
     for select using (public.lf_esta_inscrito(id));
 
--- lf_inscripciones
 create policy "lf_inscripciones_tutor_select" on public.lf_inscripciones
     for select using (public.lf_es_tutor_de(clase_id));
 create policy "lf_inscripciones_estudiante_select" on public.lf_inscripciones
@@ -127,22 +98,16 @@ create policy "lf_inscripciones_estudiante_delete" on public.lf_inscripciones
 create policy "lf_inscripciones_tutor_delete" on public.lf_inscripciones
     for delete using (public.lf_es_tutor_de(clase_id));
 
--- lf_tareas
 create policy "lf_tareas_tutor_all" on public.lf_tareas
     for all using (public.lf_es_tutor_de(clase_id)) with check (public.lf_es_tutor_de(clase_id));
 create policy "lf_tareas_estudiante_select" on public.lf_tareas
     for select using (public.lf_esta_inscrito(clase_id));
 
--- lf_entregas
 create policy "lf_entregas_tutor_select" on public.lf_entregas
     for select using (public.lf_es_tutor_de_tarea(tarea_id));
 create policy "lf_entregas_estudiante_select" on public.lf_entregas
     for select using (auth.uid() = estudiante_id);
 
-
--- ---------- 4) RPCs ----------
-
--- Crea una clase con código único de 6 caracteres (sin caracteres ambiguos).
 create or replace function public.lf_crear_clase(p_nombre text)
 returns public.lf_clases language plpgsql security definer set search_path = public as $$
 declare
@@ -172,7 +137,6 @@ begin
 end;
 $$;
 
--- Inscribe al usuario actual en la clase cuyo código coincida.
 create or replace function public.lf_unirse_a_clase(p_codigo text)
 returns public.lf_clases language plpgsql security definer set search_path = public as $$
 declare
@@ -193,7 +157,6 @@ begin
 end;
 $$;
 
--- Resumen de calificaciones de los estudiantes de una clase (solo su tutor).
 create or replace function public.lf_tutor_resumen_clase(p_clase_id uuid)
 returns table (
     estudiante_id         uuid,
@@ -236,7 +199,6 @@ begin
 end;
 $$;
 
--- El estudiante marca una tarea como entregada.
 create or replace function public.lf_entregar_tarea(p_tarea_id uuid)
 returns public.lf_entregas language plpgsql security definer set search_path = public as $$
 declare v_fila public.lf_entregas;
@@ -257,7 +219,6 @@ begin
 end;
 $$;
 
--- El tutor califica la entrega de un estudiante.
 create or replace function public.lf_calificar_entrega(
     p_tarea_id uuid, p_estudiante_id uuid, p_nota numeric, p_comentario text default null
 )
@@ -277,7 +238,6 @@ begin
 end;
 $$;
 
--- Estado de una tarea por estudiante (solo el tutor de su clase).
 create or replace function public.lf_resumen_tarea(p_tarea_id uuid)
 returns table (
     estudiante_id uuid, nombre text, email text, entregada boolean,
@@ -305,7 +265,6 @@ begin
 end;
 $$;
 
--- Tareas del estudiante (en todas sus clases) con su propio estado.
 create or replace function public.lf_mis_tareas()
 returns table (
     tarea_id uuid, clase_id uuid, clase_nombre text, titulo text, descripcion text,
@@ -328,16 +287,11 @@ begin
 end;
 $$;
 
-
--- ---------- 4b) NOTIFICACIONES ----------
--- Cada estudiante recibe un aviso cuando el tutor crea una tarea o califica
--- la suya. Los triggers corren como owner (definer), así que insertan en
--- lf_notificaciones saltando el RLS de forma segura.
 drop table if exists public.lf_notificaciones cascade;
 create table public.lf_notificaciones (
     id         uuid primary key default gen_random_uuid(),
     user_id    uuid not null references auth.users(id) on delete cascade,
-    tipo       text not null,               -- 'tarea_nueva' | 'tarea_calificada'
+    tipo       text not null,
     titulo     text not null,
     cuerpo     text,
     clase_id   uuid,
@@ -355,7 +309,6 @@ create policy "lf_notif_propias_update" on public.lf_notificaciones
 create policy "lf_notif_propias_delete" on public.lf_notificaciones
     for delete using (auth.uid() = user_id);
 
--- Al crear una tarea → aviso a cada estudiante inscrito en la clase.
 create or replace function public.lf_notif_tarea_nueva()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare v_clase text;
@@ -376,7 +329,6 @@ drop trigger if exists lf_tareas_notif on public.lf_tareas;
 create trigger lf_tareas_notif after insert on public.lf_tareas
     for each row execute function public.lf_notif_tarea_nueva();
 
--- Al calificar una entrega → aviso al estudiante.
 create or replace function public.lf_notif_calificacion()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare v_titulo text;
@@ -401,8 +353,6 @@ drop trigger if exists lf_entregas_notif on public.lf_entregas;
 create trigger lf_entregas_notif after insert or update on public.lf_entregas
     for each row execute function public.lf_notif_calificacion();
 
-
--- ---------- 5) PERMISOS ----------
 grant execute on function public.lf_es_tutor_de(uuid)                          to authenticated;
 grant execute on function public.lf_esta_inscrito(uuid)                        to authenticated;
 grant execute on function public.lf_es_tutor_de_tarea(uuid)                    to authenticated;
@@ -414,6 +364,4 @@ grant execute on function public.lf_calificar_entrega(uuid, uuid, numeric, text)
 grant execute on function public.lf_resumen_tarea(uuid)                        to authenticated;
 grant execute on function public.lf_mis_tareas()                              to authenticated;
 
-
--- ---------- 6) Refrescar la caché de la API ----------
 notify pgrst, 'reload schema';
