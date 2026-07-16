@@ -48,6 +48,8 @@ export function ScannerScreen() {
   const tabBarHeight = useBottomTabBarHeight()
   const [scanState, setScanState] = useState<ScanState>('idle')
   const [detected, setDetected] = useState<PCComponent | null>(null)
+  const [manualMode, setManualMode] = useState(false)
+  const [manualPickerVisible, setManualPickerVisible] = useState(false)
   const [instalados, setInstalados] = useState<string[]>([])
   const [showComplete, setShowComplete] = useState(false)
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null)
@@ -183,8 +185,6 @@ export function ScannerScreen() {
     const nuevos = instalados.includes(detected.id) ? instalados : [...instalados, detected.id]
     setInstalados(nuevos)
     setSaving(false)
-    // Al escanear TODAS las piezas se completa el ensamble móvil (condición del
-    // certificado) y se otorga el logro correspondiente.
     if (nuevos.length >= PC_COMPONENTS.length) {
       otorgarLogros(['instalacion_real'], 'scanner')
       sfx.complete()
@@ -193,6 +193,32 @@ export function ScannerScreen() {
     setQuizAnswer(null)
     setQuizFeedback(null)
     sfx.success()
+  }
+
+  function handleManualPick(component: PCComponent) {
+    Alert.alert(
+      'Marcar sin escanear',
+      `Confirma que tu equipo no tiene "${component.label}" (por ejemplo, usa gráficos integrados en vez de una tarjeta gráfica dedicada). Se marcará como completado sin necesidad de escanearlo.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: () => {
+            Speech.stop()
+            lastPhotoBase64.current = null
+            setManualMode(true)
+            setDetected(component)
+            setConversacion([{
+              rol: 'ia',
+              texto: `Marcaste "${component.label}" como no disponible en tu equipo. Aquí tienes la información para que aprendas igual — quedará contabilizado como instalado.`,
+            }])
+            setManualPickerVisible(false)
+            setScanState('result')
+            sfx.tap()
+          },
+        },
+      ]
+    )
   }
 
   function handleQuizAnswer(idx: number) {
@@ -214,6 +240,7 @@ export function ScannerScreen() {
     Speech.stop()
     setScanState('idle')
     setDetected(null)
+    setManualMode(false)
     setQuizAnswer(null)
     setQuizFeedback(null)
     setConversacion([])
@@ -240,6 +267,8 @@ export function ScannerScreen() {
       ]
     )
   }
+
+  const pendientes = PC_COMPONENTS.filter(c => !instalados.includes(c.id))
 
   if (!permission) {
     return <View style={styles.center}><ActivityIndicator color={Colors.primary} /></View>
@@ -324,6 +353,11 @@ export function ScannerScreen() {
                   <Ionicons name="scan" size={30} color={Colors.primaryDeep} />
                 </View>
               </Pressable>
+              {pendientes.length > 0 && (
+                <TouchableOpacity onPress={() => setManualPickerVisible(true)} style={styles.manualLink} hitSlop={8}>
+                  <Text style={styles.manualLinkText}>¿Tu PC no tiene un componente? Márcalo manualmente</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
           {scanState === 'scanning' && (
@@ -351,7 +385,7 @@ export function ScannerScreen() {
                   <Text style={{ fontSize: 40 }}>{detected?.icon}</Text>
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
-                  <Pill label="✓ Detectado por IA" tone="success" />
+                  <Pill label={manualMode ? '✎ Marcado manualmente' : '✓ Detectado por IA'} tone={manualMode ? 'accent' : 'success'} />
                   <Text style={styles.detectedName}>{detected?.label}</Text>
                   <Text style={styles.detectedXp}>+{detected?.xpValue} XP al instalar</Text>
                 </View>
@@ -380,30 +414,32 @@ export function ScannerScreen() {
               </GradientCard>
 
               <View style={styles.chatSection}>
-                <Text style={styles.specsTitle}>Pregúntale a la IA</Text>
+                <Text style={styles.specsTitle}>{manualMode ? 'Nota' : 'Pregúntale a la IA'}</Text>
                 {conversacion.map((turno, i) => (
                   <View key={i} style={[styles.chatBubble, turno.rol === 'usuario' ? styles.chatBubbleUser : styles.chatBubbleIA]}>
                     <Text style={styles.chatBubbleText}>{turno.texto}</Text>
                   </View>
                 ))}
-                {scanState === 'thinking' && (
+                {!manualMode && scanState === 'thinking' && (
                   <View style={styles.chatThinking}>
                     <ActivityIndicator color={Colors.primary} size="small" />
                     <Text style={styles.bottomSubDark}>Pensando…</Text>
                   </View>
                 )}
-                <TouchableOpacity
-                  style={[styles.micBtn, scanState === 'listening' && styles.micBtnActive, cooldown && scanState !== 'listening' && styles.micBtnDisabled]}
-                  onPress={scanState === 'listening' ? handleAskStop : handleAskStart}
-                  disabled={scanState === 'thinking' || (cooldown && scanState !== 'listening')}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name={scanState === 'listening' ? 'stop-circle' : 'mic'} size={20} color={Colors.white} />
-                  <Text style={styles.micBtnText}>
-                    {scanState === 'listening' ? 'Detener y enviar' :
-                     cooldown ? 'Espera un momento…' : 'Preguntar por voz'}
-                  </Text>
-                </TouchableOpacity>
+                {!manualMode && (
+                  <TouchableOpacity
+                    style={[styles.micBtn, scanState === 'listening' && styles.micBtnActive, cooldown && scanState !== 'listening' && styles.micBtnDisabled]}
+                    onPress={scanState === 'listening' ? handleAskStop : handleAskStart}
+                    disabled={scanState === 'thinking' || (cooldown && scanState !== 'listening')}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name={scanState === 'listening' ? 'stop-circle' : 'mic'} size={20} color={Colors.white} />
+                    <Text style={styles.micBtnText}>
+                      {scanState === 'listening' ? 'Detener y enviar' :
+                       cooldown ? 'Espera un momento…' : 'Preguntar por voz'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={{ gap: Spacing.sm, marginTop: Spacing.lg }}>
@@ -483,6 +519,32 @@ export function ScannerScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Manual picker — para equipos que físicamente no tienen alguna pieza (p. ej. GPU dedicada) */}
+      <Modal visible={manualPickerVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.specsTitle}>¿Qué componente no tiene tu equipo?</Text>
+            <Text style={[styles.bottomSubDark, { marginTop: 4, marginBottom: Spacing.md }]}>
+              Úsalo solo si tu PC realmente no tiene esa pieza física (por ejemplo, gráficos integrados en vez de una GPU
+              dedicada). Se marcará como completada para que puedas terminar tu ensamble.
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Spacing.lg }}>
+              {pendientes.map(c => (
+                <TouchableOpacity key={c.id} style={styles.manualOption} onPress={() => handleManualPick(c)} activeOpacity={0.85}>
+                  <Text style={{ fontSize: 24 }}>{c.icon}</Text>
+                  <Text style={styles.manualOptionText}>{c.label}</Text>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.skipBtn} onPress={() => setManualPickerVisible(false)}>
+              <Text style={styles.skipText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -519,6 +581,15 @@ const styles = StyleSheet.create({
   shutter: { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
   shutterDisabled: { opacity: 0.4 },
   shutterInner: { width: 66, height: 66, borderRadius: 33, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center' },
+  manualLink: { marginTop: Spacing.sm, padding: Spacing.xs },
+  manualLinkText: { fontFamily: Fonts.sansSemi, fontSize: 13, color: 'rgba(255,255,255,0.82)', textAlign: 'center', textDecorationLine: 'underline' },
+
+  manualOption: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border,
+    padding: Spacing.md, marginBottom: Spacing.sm,
+  },
+  manualOptionText: { flex: 1, fontFamily: Fonts.sansSemi, fontSize: 14.5, color: Colors.text },
 
   modalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: Colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: Spacing.lg, paddingBottom: Spacing.xl, maxHeight: '88%' },

@@ -1,4 +1,4 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, authStore } from './supabase-config.js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_KEYS, authStore, tokenExpirado, refreshSession } from './supabase-config.js'
 import { leccionesEnOrden } from './academia-data.js'
 
 const LOCAL_KEY = 'logicflow_academia_completadas'
@@ -40,13 +40,13 @@ function guardarAciertosLocal(arr) {
 
 export function registrarQuiz(id, acierto) {
   const set = new Set(leerAciertos())
-  if (!acierto || set.has(id)) return [...set]
+  if (!acierto || set.has(id)) return { lista: [...set], guardado: Promise.resolve(null) }
 
   set.add(id)
   const lista = [...set]
   guardarAciertosLocal(lista)
-  if (estaLogueado()) guardarServidor(leerLocal(), lista)
-  return lista
+  const guardado = estaLogueado() ? guardarServidor(leerLocal(), lista) : Promise.resolve(null)
+  return { lista, guardado }
 }
 
 export function estadoAcademia(completadas = leerLocal(), aciertos = leerAciertos()) {
@@ -99,6 +99,8 @@ function getUserId() {
 }
 
 async function dataRequest(path, options = {}) {
+  if (tokenExpirado()) await refreshSession()
+
   const token = authStore.getItem(STORAGE_KEYS.accessToken)
   const headers = {
     apikey: SUPABASE_ANON_KEY,
@@ -116,6 +118,12 @@ async function dataRequest(path, options = {}) {
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: ctrl.signal
     })
+
+    if (res.status === 401 && !options._reintentado) {
+      const refrescada = await refreshSession()
+      if (refrescada) return dataRequest(path, { ...options, _reintentado: true })
+    }
+
     if (res.status === 204) return null
     const payload = await res.json().catch(() => null)
     if (!res.ok) throw new Error(payload?.message || payload?.error || `HTTP ${res.status}`)
@@ -263,8 +271,8 @@ export async function completar(id) {
       : leerAciertos()
     guardarLocal(union)
     guardarAciertosLocal(unionAciertos)
-    guardarServidor(union, unionAciertos)
-    return union
+    const guardadoOk = await guardarServidor(union, unionAciertos)
+    return { lista: union, guardadoOk }
   }
-  return lista
+  return { lista, guardadoOk: null }
 }

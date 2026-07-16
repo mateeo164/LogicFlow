@@ -39,7 +39,7 @@ app.use(helmet({
             fontSrc: ["'self'", 'https://fonts.gstatic.com'],
             imgSrc: ["'self'", 'data:', 'blob:'],
             connectSrc: ["'self'", 'blob:', 'data:', SUPABASE_HOST],
-            frameSrc: ['https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+            mediaSrc: ["'self'"],
             workerSrc: ["'self'", 'blob:'],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],

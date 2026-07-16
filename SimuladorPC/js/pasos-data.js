@@ -16,7 +16,7 @@ export const PASOS = [
             'Panel lateral de vidrio templado para mostrar el interior',
             'Gestión de cables trasera para un montaje limpio y ordenado'
         ],
-        videoId: 'https://youtu.be/8eKh71G2k5w',
+        video: 'assets/Video/Gabinete.mp4',
         drone: {
             video:       'El gabinete es el esqueleto de tu PC: aloja y protege todos los componentes. Fíjate en sus bahías, soportes y zonas de ventilación.',
             instalacion: 'Coloca el gabinete en tu mesa de trabajo. Haz clic en el disco luminoso para posicionarlo y empezar el montaje.',
@@ -38,7 +38,7 @@ export const PASOS = [
             'El conector PWM regula su velocidad según la temperatura',
             'La iluminación ARGB se sincroniza con el resto del sistema'
         ],
-        videoId: 'https://youtu.be/vTLPD5msfK0',
+        video: 'assets/Video/Ventilador.mp4',
         drone: {
             video:       'Los ventiladores mantienen todo el sistema fresco. Fíjate en la dirección de las aspas: marcan por dónde entra y sale el aire.',
             instalacion: 'Selecciona los ventiladores y colócalos en el frente del gabinete para crear el flujo de aire de entrada.',
@@ -64,7 +64,7 @@ export const PASOS = [
             'Incluye slots M.2 para almacenamiento NVMe ultrarrápido',
             'Distribuye la energía de la fuente a cada componente'
         ],
-        videoId: 'https://youtu.be/5EzS6eVGVGY',
+        video: 'assets/Video/Placa base.mp4',
         drone: {
             video:       'La placa base es el componente central: todo se conecta a ella. Observa el socket del CPU, las ranuras de RAM y los slots PCIe.',
             instalacion: 'Selecciona la placa base en la vitrina y haz clic en el disco luminoso dentro del gabinete para atornillarla a la bandeja.',
@@ -85,7 +85,7 @@ export const PASOS = [
             'El triángulo dorado indica la orientación correcta en el socket',
             'Es uno de los componentes más delicados: nunca toques sus pines'
         ],
-        videoId: 'https://youtu.be/lG-6chJncEQ',
+        video: 'assets/Video/Cpu.mp4',
         drone: {
             video:       'El procesador es el cerebro del PC. Atiende cómo alinear el triángulo dorado del chip con la marca del socket antes de instalarlo.',
             instalacion: 'Selecciona el CPU y colócalo en el socket AM4 de la placa. Respeta la orientación del triángulo dorado.',
@@ -106,7 +106,7 @@ export const PASOS = [
             'El ventilador PWM ajusta su velocidad según la temperatura',
             'Se fija con clips o tornillos justo encima del procesador'
         ],
-        videoId: 'https://youtu.be/2NaJeG9jzkU',
+        video: 'assets/Video/Disipador.mp4',
         drone: {
             video:       'El disipador evita que el procesador se sobrecaliente. La pasta térmica rellena los microporos para conducir mejor el calor.',
             instalacion: 'Selecciona el disipador y colócalo justo encima del procesador. El ventilador queda mirando hacia arriba.',
@@ -128,7 +128,6 @@ export const PASOS = [
             'Dual Channel duplica el ancho de banda entre CPU y RAM',
             'Los módulos encajan con un clic en las ranuras de la placa'
         ],
-        videoId: 'https://youtu.be/A1VGCMgLxY4',
         drone: {
             video:       'La RAM guarda los datos que el procesador usa en el momento. Se instala en pares y en las ranuras del mismo color para Dual Channel.',
             instalacion: 'Selecciona la RAM y colócala en las ranuras DDR4 de la placa. Presiona hasta escuchar el clic de los seguros.',
@@ -149,7 +148,6 @@ export const PASOS = [
             'Sin partes móviles: más silencioso y resistente que un HDD',
             'Con 7450 MB/s, el sistema arranca en pocos segundos'
         ],
-        videoId: 'https://youtu.be/yypHFUc6uKk',
         drone: {
             video:       'El SSD M.2 NVMe es el almacenamiento más rápido. Se inserta en ángulo en el slot M.2 y se asegura con un tornillo, ¡sin cables!',
             instalacion: 'Selecciona el SSD y colócalo en el slot M.2 de la placa base. Se inserta en ángulo y luego se baja para fijarlo.',
@@ -171,7 +169,6 @@ export const PASOS = [
             'Ideal para archivos, fotos, videos y copias de seguridad',
             'Se conecta a la placa base con un cable de datos SATA'
         ],
-        videoId: 'https://youtu.be/bHhjMTwbqfg',
         drone: {
             video:       'El disco duro mecánico ofrece mucho espacio barato. Necesita DOS cables: uno de datos (SATA) y uno de energía de la fuente.',
             instalacion: 'Selecciona el disco duro y colócalo en la bahía de 3.5" del gabinete, en la zona inferior.',
@@ -193,7 +190,7 @@ export const PASOS = [
             'El clip metálico evita que se desconecte por la vibración',
             'Es distinto del cable de energía SATA, que viene de la fuente'
         ],
-        videoId: 'https://youtu.be/G76i7AbyTU8',
+        video: 'assets/Video/cable-sata-datos.mp4',
         drone: {
             video:       'El cable SATA es la vía de datos del disco. Su forma en "L" impide conectarlo al revés: fíjate en la muesca.',
             instalacion: 'Selecciona el cable SATA y conéctalo entre el disco duro y el puerto SATA de la placa base.',
@@ -214,7 +211,7 @@ export const PASOS = [
             'Ray Tracing: simula la iluminación real en tiempo real',
             'Por su consumo, exige una fuente de poder potente y estable'
         ],
-        videoId: 'https://youtu.be/WGNBk3suaFs',
+        video: 'assets/Video/gpu-nvidia-rtx3090.mp4',
         drone: {
             video:       'La GPU es responsable de todos los gráficos. Se inserta en el slot PCIe ×16 y se alimenta con cables dedicados de la fuente.',
             instalacion: 'Selecciona la GPU y colócala en el slot PCIe ×16 principal. Escucharás el clic del seguro al encajar.',
@@ -235,7 +232,7 @@ export const PASOS = [
             'Cableado modular: solo conectas los cables que necesitas',
             'Sus protecciones evitan daños por picos o cortocircuitos'
         ],
-        videoId: 'https://youtu.be/3bVyqPtzuMI',
+        video: 'assets/Video/psu-evga-supernova-850g6.mp4',
         drone: {
             video:       'La fuente de poder suministra energía limpia y estable a todos los componentes. Va en el compartimento inferior del gabinete.',
             instalacion: 'Selecciona la fuente y colócala en el compartimento inferior del gabinete para conectar la energía a todo.',

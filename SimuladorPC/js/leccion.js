@@ -49,7 +49,7 @@ function renderQuiz(quizKey) {
     </section>`
 }
 
-function bindQuiz(id, onResuelto) {
+function bindQuiz(id, onResuelto, onGuardado) {
   const quiz = document.getElementById('lec-quiz')
   if (!quiz) { onResuelto(false); return }
   const correcta = parseInt(quiz.dataset.correcta, 10)
@@ -65,7 +65,8 @@ function bindQuiz(id, onResuelto) {
       const idx = parseInt(btn.dataset.idx, 10)
       const acierto = idx === correcta
 
-      registrarQuiz(id, acierto)
+      const { guardado } = registrarQuiz(id, acierto)
+      if (onGuardado) onGuardado(guardado)
 
       opts.forEach(o => {
         o.disabled = true
@@ -189,6 +190,16 @@ function init() {
   const btn = document.getElementById('btn-completar')
   const doneTag = document.getElementById('lec-done-tag')
 
+  const pendiente = { promise: Promise.resolve() }
+  function avisarSiFalloGuardado(promesaGuardado) {
+    pendiente.promise = promesaGuardado.then(ok => {
+      if (ok === false && window.LFUI?.toast) {
+        window.LFUI.toast('Se guardó en este dispositivo, pero no se pudo sincronizar con la nube. Revisa tu conexión.', { type: 'warning', title: 'Progreso sin sincronizar' })
+        return new Promise(r => setTimeout(r, 1200))
+      }
+    })
+  }
+
   function marcarUICompletada() {
     if (btn) {
       btn.disabled = true
@@ -199,7 +210,7 @@ function init() {
 
   function onCompletar() {
     marcarUICompletada()
-    completar(id).catch(() => {})
+    avisarSiFalloGuardado(completar(id).then(({ guardadoOk }) => guardadoOk).catch(() => false))
   }
 
   if (lec.quiz && !yaHecha) {
@@ -209,13 +220,22 @@ function init() {
         btn.disabled = false
         btn.textContent = 'Marcar como completada'
       }
-    })
+    }, avisarSiFalloGuardado)
     if (btn) btn.addEventListener('click', onCompletar)
   } else if (lec.quiz && yaHecha) {
     bindQuiz(id, () => {})
   } else if (btn) {
     btn.addEventListener('click', onCompletar)
   }
+
+  document.querySelectorAll('.lec-nav__btn, .lec-cta').forEach(a => {
+    a.addEventListener('click', (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      e.preventDefault()
+      const destino = a.href
+      pendiente.promise.then(() => { window.location.href = destino })
+    })
+  })
 
   if (!yaHecha) {
     sincronizar().then(lista => {

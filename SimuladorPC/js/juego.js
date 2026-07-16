@@ -36,20 +36,6 @@ function crearGLTFLoader() {
     return loader
 }
 
-function normalizarVideoId(videoValor) {
-    if (!videoValor) return null
-
-    const valor = String(videoValor).trim()
-    if (!valor) return null
-
-    if (/^[a-zA-Z0-9_-]{11}$/.test(valor)) {
-        return valor
-    }
-
-    const match = valor.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
-    return match ? match[1] : null
-}
-
 const UMBRAL_DEMORA_SEG = 45
 
 let fase = 'bienvenida'
@@ -182,6 +168,11 @@ function mostrarOverlay(id) {
     document.getElementById('sim-main').hidden    = true
     document.getElementById('drone-float').hidden = true
 
+    if (id !== 'overlay-video') {
+        const playerArea = document.getElementById('vf-player-area')
+        if (playerArea) playerArea.innerHTML = ''
+    }
+
     if (id === '3d') {
         document.getElementById('sim-main').hidden          = false
         document.getElementById('sim-header').style.display = ''
@@ -229,14 +220,11 @@ function mostrarVideo(idx) {
         </li>`).join('')
 
     const player = document.getElementById('vf-player-area')
-    const videoId = normalizarVideoId(paso.videoId)
+    const videoSrc = paso.video ? encodeURI(paso.video) : null
 
-    if (videoId) {
+    if (videoSrc) {
         player.innerHTML = `
-            <iframe class="vf-iframe"
-                src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen></iframe>`
+            <video class="vf-iframe" src="${videoSrc}" controls playsinline></video>`
     } else {
         player.innerHTML = `
             <div class="vf-info-card">
@@ -254,8 +242,8 @@ function mostrarVideo(idx) {
                 </div>
                 <div class="vf-video-placeholder">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(15,118,216,0.4)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="rgba(15,118,216,0.4)"/></svg>
-                    <p>El docente puede configurar un video de YouTube aquí</p>
-                    <code class="vf-config-hint">PASOS[${idx}].videoId = 'https://youtu.be/z7cAyUsfwdA'</code>
+                    <p>El docente puede configurar un video local aquí</p>
+                    <code class="vf-config-hint">PASOS[${idx}].video = 'assets/Video/archivo.mp4'</code>
                 </div>
             </div>`
     }
